@@ -3,12 +3,17 @@
   "device": "Samsung Galaxy S20 FE 5G (SM-G781B)",
   "codename": "r8q",
   "soc": "Qualcomm Snapdragon 865 (SM8250)",
-  "generated_at": "2026-11-20T11:13:47.076239+00:00",
+  "generated_at": "2026-11-20T20:40:57.119423+00:00",
   "files": [
     {
       "path": "docs/BOOTCHAIN_FEASIBILITY_REPORT.md",
       "size_bytes": 5285,
       "sha256": "d3ea4b5811de928779ca6d2ed17dbd28022107342d48de92af33f79b5d2dc319"
+    },
+    {
+      "path": "docs/CRITICAL_BOOT_CORRECTIONS_REPORT.md",
+      "size_bytes": 23705,
+      "sha256": "1756fd6ccc15d81815230807f2f697940afd210a33cf02175f4f875be587b461"
     },
     {
       "path": "docs/EDK2_BASELINE_EVALUATION.md",
@@ -24,6 +29,11 @@
       "path": "docs/ENTRY_HANDOFF_DESIGN.md",
       "size_bytes": 4644,
       "sha256": "1ace712adebd79be2adda44499a6f94296146d2ce20ad15783cb30f41cf02dc6"
+    },
+    {
+      "path": "docs/FINAL_PRE_EXECUTION_SAFETY_REVIEW.md",
+      "size_bytes": 20466,
+      "sha256": "82768ae903da195d356fe41ff5cd03d6fb9fffa9a7d1850c1c06a567a45233f7"
     },
     {
       "path": "docs/FIRMWARE_DRIVER_SUPPORT_MATRIX.md",
@@ -76,6 +86,36 @@
       "sha256": "9d7d0c2754e04f8639acce1ecbff5b0f490003e12322ef7d6f672816e36342b2"
     },
     {
+      "path": "docs/M5_DIAGNOSTIC_SUITE_SPECIFICATION.md",
+      "size_bytes": 7200,
+      "sha256": "588bd2d2b400e443c304cfc16a074170d2848df4a1a752cd852447cb4c75d05d"
+    },
+    {
+      "path": "docs/M5_STORAGE_SAFETY_SHELL_AUDIT.md",
+      "size_bytes": 3453,
+      "sha256": "d95681e9fc096e13bf425eec76a50594dd047d639fa28acd8278a2ec2542eef4"
+    },
+    {
+      "path": "docs/M5_UEFI_SHELL_INTEGRATION.md",
+      "size_bytes": 5143,
+      "sha256": "e7e9794319b2457238e052cde6b46cf328e6665d10ff27e43c65b728ed3b66c3"
+    },
+    {
+      "path": "docs/M6_LINUX_EFI_STUB_SPECIFICATION.md",
+      "size_bytes": 5813,
+      "sha256": "84ac20be174621887b9e42f48dc669a63f8773acfac786cc500f1bf8633c0790"
+    },
+    {
+      "path": "docs/M6_LINUX_MEMORY_RESERVATION_AND_HANDOFF.md",
+      "size_bytes": 3770,
+      "sha256": "d01354de7456a46f5c5c7a609b94e0322dd83b816b55d162f63c83090eade30b"
+    },
+    {
+      "path": "docs/M6_LINUX_SUBSYSTEM_SUPPORT_MATRIX.md",
+      "size_bytes": 18815,
+      "sha256": "ebe1a239fe81c7024eb2cbfd2c17ccd6dc670320b4bfcdfb8dcb17dc043f581f"
+    },
+    {
       "path": "docs/MILESTONE3_SPECIFICATION.md",
       "size_bytes": 4646,
       "sha256": "3d26769caeb8a7bec7a8463cd490079e3e0c63a8599f3fbf8c0e0eecd12c3203"
@@ -89,6 +129,56 @@
       "path": "docs/PHASED_IMPLEMENTATION_SCHEDULE.md",
       "size_bytes": 9225,
       "sha256": "927a307a26a7c20fd08001ebd51673b1b78a6432f8f439b5f89fc768c40b0bdb"
+    },
+    {
+      "path": "docs/PHYSICAL_HARDWARE_BOOT_PLAN.md",
+      "size_bytes": 21385,
+      "sha256": "4ba9c6740f839c6f677d7f3d811fd8a2c7a5b90a59fe61714b3403153aaf34ba"
+    },
+    {
+      "path": "docs/R8Q_FINAL_BOOT_READINESS_REPORT.md",
+      "size_bytes": 24076,
+      "sha256": "7bcb25cbd04bd4494b1af5d3a2de17cbfdd8847f9dfb3f7cb48953ffa8866d21"
+    },
+    {
+      "path": "docs/R8Q_INITRAMFS_VALIDATION.md",
+      "size_bytes": 8418,
+      "sha256": "ff73ad3dd6cdc66f9c32171ef5f7fffe9b3191321a2884d289c7bd163842d9a0"
+    },
+    {
+      "path": "docs/R8Q_KERNEL_DRIVER_AUDIT.md",
+      "size_bytes": 10467,
+      "sha256": "0ed30aa11d8b2bf78dfb5f9a9616652644928aee9601a4fc16150932750ddea0"
+    },
+    {
+      "path": "docs/R8Q_NATIVE_ROOTFS_ARCHITECTURE.md",
+      "size_bytes": 12656,
+      "sha256": "bf51e0b5146243b4fc94ec1aea69e590cf44aa5c245752286b864182e0719fb9"
+    },
+    {
+      "path": "docs/R8Q_NATIVE_ROOTFS_BUILD_REPORT.md",
+      "size_bytes": 8411,
+      "sha256": "0d98e1d8642be92a6f212c060d5dbd7dc624a7b2512c72df25ab38f00292610e"
+    },
+    {
+      "path": "docs/R8Q_THREE_TRACK_MASTER_ROADMAP.md",
+      "size_bytes": 9070,
+      "sha256": "dbc62bd0b53f2360893479c898cad7130e06a924c9c7dbb678fefd4850af148f"
+    },
+    {
+      "path": "docs/R8Q_TRACK1_RECOVERY_BOOT_VALIDATION.md",
+      "size_bytes": 11227,
+      "sha256": "0a35c98cb13b0dcf7c28815a73bcacd902092fa8b6d4574c40faa5d6194aa268"
+    },
+    {
+      "path": "docs/R8Q_TRACK2_ALTERNATIVE_BOOT_ARCHITECTURE.md",
+      "size_bytes": 7430,
+      "sha256": "e25823e4eba08141cfcb4702667bb3e161fcfbc9d846717c4257240b63d36716"
+    },
+    {
+      "path": "docs/R8Q_TRACK3_NATIVE_LINUX_DEVELOPMENT.md",
+      "size_bytes": 9549,
+      "sha256": "a7a1e8fcdc4f2bfe221838a4b58b6bfe157cea70c02ad854d29cdd9a6c0f6036"
     },
     {
       "path": "docs/RECOVERY_AND_SAFETY_PLAN.md",
@@ -117,13 +207,18 @@
     },
     {
       "path": "docs/VERIFICATION_LEDGER.md",
-      "size_bytes": 20232,
-      "sha256": "8ae04388e786b8d3c64723af626eb23895b8a4c3b1df7de642677992967f0dcf"
+      "size_bytes": 24095,
+      "sha256": "8891b0d446005977dfff87fd000fea414694f375d2f384f019b745310e777f92"
     },
     {
       "path": "docs/WINDOWS_COMPATIBILITY_REPORT.md",
       "size_bytes": 5586,
       "sha256": "bed8fb5020f6b5bcb49fd988e063cee2ae42f3977481cdc5dbd380b1e02702bb"
+    },
+    {
+      "path": "config/kernel_r8q_defconfig",
+      "size_bytes": 4487,
+      "sha256": "8c5ec44882cb3c0d430b1e5426295beade5c32534a60ec54ff185f49b84301c9"
     },
     {
       "path": "config/platform.env",
@@ -132,8 +227,8 @@
     },
     {
       "path": "shell/scripts/boot-linux.nsh",
-      "size_bytes": 674,
-      "sha256": "87194c5e233c18a3e8c7de1f73ce617b67280ab01d4d2bcbbf10db59d3bad1fe"
+      "size_bytes": 1183,
+      "sha256": "6af4871ecddc2e9d4ebd8e674b853e7df6413c3c79fdbe9d87b759ec9baac7ae"
     },
     {
       "path": "shell/scripts/boot-recovery.nsh",
@@ -147,8 +242,8 @@
     },
     {
       "path": "shell/scripts/startup.nsh",
-      "size_bytes": 1993,
-      "sha256": "a2419da95af7d1cc1e122c5d5b58b1b0339928e54a9e4596db16f7317ae6aa68"
+      "size_bytes": 2236,
+      "sha256": "9c18fbf5090ec6bc99be2098dd5583c03f5db54422764f86610bdb62a322e111"
     },
     {
       "path": "shell/scripts/storage-audit.nsh",
@@ -157,8 +252,23 @@
     },
     {
       "path": "scripts/build.sh",
-      "size_bytes": 2999,
-      "sha256": "a5cc7e48bf5d8f398aad54a44532504e7f234c08918b16b1dd34f7b7e6d40222"
+      "size_bytes": 3024,
+      "sha256": "c22201406b6937bb5f4a1961c11ba5a6b89355894cb290699558908ec623cc34"
+    },
+    {
+      "path": "scripts/build_initramfs.sh",
+      "size_bytes": 11595,
+      "sha256": "fdaed880bd6020119d48323136518a8148356f0cda18f25e85dad1a2f12184fd"
+    },
+    {
+      "path": "scripts/build_kernel.sh",
+      "size_bytes": 2083,
+      "sha256": "a1a7c8c08b5e228a232835660c86670796c5540913dc71b2d3d3911d09d12ee2"
+    },
+    {
+      "path": "scripts/build_rootfs.sh",
+      "size_bytes": 12508,
+      "sha256": "a1852d7494325d9114f2962b5fa6a32ffd0be663235e6dad94ec12a106a4f226"
     },
     {
       "path": "scripts/gen_manifest.py",
@@ -171,6 +281,11 @@
       "sha256": "15de5f90a24fc1ced17030b5f3d2b89d3911c3e49b29fb4121bfad21d14c913d"
     },
     {
+      "path": "scripts/package_complete_boot_img.py",
+      "size_bytes": 5556,
+      "sha256": "c166a215db2f7011dda2d9928aa2e22548414aa523f72b0c31ec2ec0dc71c2eb"
+    },
+    {
       "path": "scripts/verify_environment.sh",
       "size_bytes": 1472,
       "sha256": "1ccf422eab14c89d2214f418f003ebb10df914b8d7463ed10af3940d532c3596"
@@ -181,24 +296,94 @@
       "sha256": "3f47361fbed340c9cfb0a2099bd9f63ebf9695dc6bcaefeed4e61cccd452bcc5"
     },
     {
+      "path": "tests/test_final_boot_readiness.py",
+      "size_bytes": 15969,
+      "sha256": "adf4d4130fc17cb3e2f8d97b91f4f817d1b1c6aaeca40036573f8eb964ef2a95"
+    },
+    {
+      "path": "tests/test_initramfs_validation.py",
+      "size_bytes": 6167,
+      "sha256": "f02a281fa26f4e6fae48b7a1d4c545ba7929deefbbc969f9e73b1febc325c533"
+    },
+    {
+      "path": "tests/test_linux_efi_boot.py",
+      "size_bytes": 7091,
+      "sha256": "70a0d38a8fc94a1fb56e8800eb51f58559ed57e21e2a4d4ef74a0ce8bb180a80"
+    },
+    {
+      "path": "tests/test_memory_stack_overlap.py",
+      "size_bytes": 7599,
+      "sha256": "ba7d6abb786dde7a0ce45fecb1f73bf3bdd4c5b17820c4b0faf188477ab455cc"
+    },
+    {
+      "path": "tests/test_real_device_boot_evidence.py",
+      "size_bytes": 13781,
+      "sha256": "920bf116d7700cad3703c8ca770cc0aaf11d21c10a1df51f443c22f915a9f43d"
+    },
+    {
+      "path": "tests/test_rootfs_validation.py",
+      "size_bytes": 7788,
+      "sha256": "2c2f62262516c6bd2b1cb5e6ab4b86fd864804096185c5b731fd671cf689cba0"
+    },
+    {
+      "path": "tests/test_three_track_strategy.py",
+      "size_bytes": 8577,
+      "sha256": "bdb57d9220f5a3c523d0103dfa05ae45f3c6a5e38d10f0e79c32aabdaa1b41b7"
+    },
+    {
+      "path": "tests/__pycache__/test_final_boot_readiness.cpython-314.pyc",
+      "size_bytes": 22820,
+      "sha256": "3dea5e932e81d0d16b562e28de11c5bf0949187e500ad1c0bc2ac402bb4d03e0"
+    },
+    {
+      "path": "tests/__pycache__/test_initramfs_validation.cpython-314.pyc",
+      "size_bytes": 8313,
+      "sha256": "529a1b672e16f2adc2acc522d7d160d509b21834d0ef02ccb4014c6a29d0d587"
+    },
+    {
+      "path": "tests/__pycache__/test_linux_efi_boot.cpython-314.pyc",
+      "size_bytes": 10568,
+      "sha256": "c703de3a0c227461a3e9301da9432401eab7e29f24c36c39b36966bbb4c5d0e8"
+    },
+    {
+      "path": "tests/__pycache__/test_memory_stack_overlap.cpython-314.pyc",
+      "size_bytes": 8579,
+      "sha256": "e4d9c81bc38ff07b7589d8cdf46a38bd088f4e97bd51417921b66ec32d160bbe"
+    },
+    {
+      "path": "tests/__pycache__/test_real_device_boot_evidence.cpython-314.pyc",
+      "size_bytes": 19568,
+      "sha256": "4af8606eec06ec91ac32624d56f1e897c877c6d6e26987cbe1e793af98847f55"
+    },
+    {
+      "path": "tests/__pycache__/test_rootfs_validation.cpython-314.pyc",
+      "size_bytes": 11872,
+      "sha256": "81bac4e948e5572f788a8801575d02d8ec715912d24d8d338195252efc0bedb3"
+    },
+    {
+      "path": "tests/__pycache__/test_three_track_strategy.cpython-314.pyc",
+      "size_bytes": 11614,
+      "sha256": "851a7d790ce543c9d38faaaf5c59a4cdf5e545f87c1409000f875bbf00e64e58"
+    },
+    {
       "path": "platform/R8QPkg/R8QPkg.dec",
       "size_bytes": 2797,
       "sha256": "86fa0a4a8dfe5e380138d142093c012b6bc14b70bacd7ceaaad6fb716a402681"
     },
     {
       "path": "platform/R8QPkg/R8QPkg.dsc",
-      "size_bytes": 6324,
-      "sha256": "bfa62b9149f5da977578d02b7b3159a2df86be853fd509722a1570fb4bbb62a2"
+      "size_bytes": 6370,
+      "sha256": "dcf252a5edb7b3e5d1090a88da9f89681cc9c060d3b5031c79f4f40c9d032f7a"
     },
     {
       "path": "platform/R8QPkg/R8QPkg.fdf",
-      "size_bytes": 3223,
-      "sha256": "11eaa5daa993df2fb89817905f57285131561439fb633cf5ac61637ed56ee58e"
+      "size_bytes": 3271,
+      "sha256": "36321ab7e08c44899ac5a1d9a151abd8082cadffc59703d8bbff71b2a11ed0b6"
     },
     {
       "path": "platform/R8QPkg/PrePi/ModuleEntryPoint.S",
-      "size_bytes": 1818,
-      "sha256": "bf68ecda17a67761609e72bcf9ae9b46b6af9f954987f6fee6cf83bbbc5c0b7a"
+      "size_bytes": 2003,
+      "sha256": "13320115cf0a95e1f44b8aaa753bc1b0474952edb95007e450035ee5b739754f"
     },
     {
       "path": "platform/R8QPkg/PrePi/PrePi.c",
@@ -391,6 +576,16 @@
       "sha256": "fc2218df8ce5d506f9a3c250b8cf8c45397c99726afe92ad1b26a6dc0280b7c1"
     },
     {
+      "path": "platform/R8QPkg/Applications/LinuxBoot/LinuxBoot.c",
+      "size_bytes": 10655,
+      "sha256": "450401dbdd4f700ea116219115d3d6b308373e465396831b0c7ce824ecac554c"
+    },
+    {
+      "path": "platform/R8QPkg/Applications/LinuxBoot/LinuxBoot.inf",
+      "size_bytes": 1008,
+      "sha256": "ab7459da0c43e5354aec9c1e5ab6b652ce5a68bdff91d033feaba2b3ecfd470e"
+    },
+    {
       "path": "devicetree/README.md",
       "size_bytes": 3548,
       "sha256": "b1c61cb83484c0583edded9b7c7855d8b1e77e3c21006f99c1f5cf43342aa60a"
@@ -401,14 +596,44 @@
       "sha256": "9b71666f5ccf53b9c70d587b9befa002c0aa2f1db3420a79084d9b6857ed91c8"
     },
     {
+      "path": "build/Image",
+      "size_bytes": 48269824,
+      "sha256": "a02004e609206bd34ecf496c7a52c92c11400a19733f42d9e2b063b122e7c05a"
+    },
+    {
       "path": "build/R8Q_EFI.fd",
       "size_bytes": 4194304,
-      "sha256": "aac013fff6ba7a6811697507fe738b5b129dda66b51b812fe08f5cf56d3a9798"
+      "sha256": "fd1b640cf0cf18e3f6cf16f5fb3aa87cbdc2b43c49d3934be2408988ab8bd344"
+    },
+    {
+      "path": "build/initramfs.img",
+      "size_bytes": 2258482,
+      "sha256": "97df17a78f504460a6ee93661fc77378385cf01ebbc1f8a0e888fd80b2dd80bb"
+    },
+    {
+      "path": "build/r8q-rootfs.ext4",
+      "size_bytes": 2147483648,
+      "sha256": "b67bb1f45381000e40f56120eedff3aaf48e54edf29ff9cfdc9db8f9dd8ec98b"
+    },
+    {
+      "path": "build/r8q-rootfs.tar.gz",
+      "size_bytes": 64825620,
+      "sha256": "ddcf3c1ff817be410c6ed1cb96e38266256799702aebcde7ca494cd698ed51ba"
+    },
+    {
+      "path": "build/r8q-uefi-boot-complete.img",
+      "size_bytes": 55554048,
+      "sha256": "dbc59dc0c3447c53a68ea7669e0c4446ef5fd9812ccb73d192d593549836f206"
     },
     {
       "path": "build/r8q-uefi-boot-poc.img",
       "size_bytes": 4202496,
-      "sha256": "41669e887525d113fee5ed5306c7373944099e3276138669f780a203e2a41969"
+      "sha256": "9beb0253d6816cecbbd509ac701d26e5f8ce881fd3caed94ad517304f49e0a5c"
+    },
+    {
+      "path": "build/r8q.dtb",
+      "size_bytes": 821231,
+      "sha256": "75244696944e1fac692366de6898b880480b0c8fde74f28d8cf44e108923e7e3"
     }
   ]
 }
