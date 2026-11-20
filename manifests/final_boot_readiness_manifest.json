@@ -3,7 +3,7 @@
   "device": "Samsung Galaxy S20 FE 5G (SM-G781B)",
   "codename": "r8q",
   "soc": "Qualcomm Snapdragon 865 (SM8250)",
-  "generated_at": "2026-11-20T19:38:22.087916+00:00",
+  "generated_at": "2026-11-20T20:00:29.309591+00:00",
   "files": [
     {
       "path": "docs/BOOTCHAIN_FEASIBILITY_REPORT.md",
@@ -136,6 +136,11 @@
       "sha256": "4ba9c6740f839c6f677d7f3d811fd8a2c7a5b90a59fe61714b3403153aaf34ba"
     },
     {
+      "path": "docs/R8Q_FINAL_BOOT_READINESS_REPORT.md",
+      "size_bytes": 24076,
+      "sha256": "7bcb25cbd04bd4494b1af5d3a2de17cbfdd8847f9dfb3f7cb48953ffa8866d21"
+    },
+    {
       "path": "docs/RECOVERY_AND_SAFETY_PLAN.md",
       "size_bytes": 6732,
       "sha256": "23b03814b3b75f20fc05f1590b118e087439971aa8a04c835af963194f9521e9"
@@ -259,6 +264,11 @@
       "path": "tests/test_memory_stack_overlap.py",
       "size_bytes": 7599,
       "sha256": "ba7d6abb786dde7a0ce45fecb1f73bf3bdd4c5b17820c4b0faf188477ab455cc"
+    },
+    {
+      "path": "tests/test_real_device_boot_evidence.py",
+      "size_bytes": 13781,
+      "sha256": "920bf116d7700cad3703c8ca770cc0aaf11d21c10a1df51f443c22f915a9f43d"
     },
     {
       "path": "platform/R8QPkg/R8QPkg.dec",
