@@ -3,7 +3,7 @@
   "device": "Samsung Galaxy S20 FE 5G (SM-G781B)",
   "codename": "r8q",
   "soc": "Qualcomm Snapdragon 865 (SM8250)",
-  "generated_at": "2026-11-20T10:04:09.986071+00:00",
+  "generated_at": "2026-11-20T10:22:42.213190+00:00",
   "files": [
     {
       "path": "docs/BOOTCHAIN_FEASIBILITY_REPORT.md",
@@ -39,6 +39,21 @@
       "path": "docs/LINUX_BOOT_DESIGN.md",
       "size_bytes": 6059,
       "sha256": "b6494993fc1e1ff48b1fa355e16b1081a308c02b08ff609d626015c654f4fb4e"
+    },
+    {
+      "path": "docs/M3_BOOT_ARCHITECTURE_REVALIDATION.md",
+      "size_bytes": 6475,
+      "sha256": "182512c4962763b7c51f897c7f02a181c6a61918df8c4582d9a2ebed77e9f657"
+    },
+    {
+      "path": "docs/M3_GENI_UART_VERIFICATION.md",
+      "size_bytes": 4197,
+      "sha256": "600eecd6ea9675e95a1bb71c389d53b3a717830a50f3656cdc2785c1c96e1239"
+    },
+    {
+      "path": "docs/M3_GOP_FRAMEBUFFER_VERIFICATION.md",
+      "size_bytes": 5482,
+      "sha256": "1080d5540847c4a79703a06246e10481c5e562562409af6cf1c35e13f9515590"
     },
     {
       "path": "docs/MILESTONE3_SPECIFICATION.md",
@@ -82,8 +97,8 @@
     },
     {
       "path": "docs/VERIFICATION_LEDGER.md",
-      "size_bytes": 19851,
-      "sha256": "252772addeb2a5a3d472c83f6bad35d3847bc0c9671d451f07cfc83f212bd08e"
+      "size_bytes": 19707,
+      "sha256": "e7e73d887b55cb94a17e295059a3837b57c73cde110705ed75bf5b7603f048fb"
     },
     {
       "path": "docs/WINDOWS_COMPATIBILITY_REPORT.md",
@@ -153,7 +168,7 @@
     {
       "path": "platform/R8QPkg/R8QPkg.dsc",
       "size_bytes": 2694,
-      "sha256": "c0dd9b86f07632bc060e9fd0c6c22ff9159726702d857bab070629d55951549d"
+      "sha256": "be9444cb09a5b9f39e9a33dcb03da9ba582a3824595c6de8fc955f21155d1cf0"
     },
     {
       "path": "platform/R8QPkg/R8QPkg.fdf",
@@ -177,13 +192,18 @@
     },
     {
       "path": "platform/R8QPkg/Drivers/SimpleFbDxe/SimpleFbDxe.c",
-      "size_bytes": 6574,
-      "sha256": "895be248596e032d2d95222331dae672c4e29412c2a79524c3477ed097aab43d"
+      "size_bytes": 15873,
+      "sha256": "037ab75ecb210daacf5564f47d55b7e0f8c2010b6e93ee4f9227dce3ff6b31b4"
     },
     {
       "path": "platform/R8QPkg/Drivers/SimpleFbDxe/SimpleFbDxe.inf",
-      "size_bytes": 900,
-      "sha256": "888a0abc884df0eb82fd211c6f74ce7b900c6d60fc7ec38d456603c39db015bf"
+      "size_bytes": 932,
+      "sha256": "25d2d33bccb3f676ba3bc99435d6d4711cc83f4699db03a219e3baaff91e0556"
+    },
+    {
+      "path": "platform/R8QPkg/Drivers/SimpleFbDxe/SimpleFbDxeFont.h",
+      "size_bytes": 13676,
+      "sha256": "ac6fbecd958bbcfa7b1c7b4da31331b26cac22140de9fc88a78d76bd7a189276"
     },
     {
       "path": "platform/R8QPkg/Drivers/FileVariableDxe/FileVariableDxe.c",
@@ -197,8 +217,8 @@
     },
     {
       "path": "platform/R8QPkg/Library/SerialPortLib/SerialPortLib.c",
-      "size_bytes": 2487,
-      "sha256": "3852b8acbbe21aaae0990988a4793a3baf8a7473c06a7f8f1c055e9a132b2d36"
+      "size_bytes": 4490,
+      "sha256": "70e77f8f9d9ba3a13fcdf0b858c79e697b1174207d1615c5f9976f13a434fa72"
     },
     {
       "path": "platform/R8QPkg/Library/SerialPortLib/SerialPortLib.inf",
@@ -207,8 +227,8 @@
     },
     {
       "path": "platform/R8QPkg/Applications/CoreTest/CoreTest.c",
-      "size_bytes": 6191,
-      "sha256": "2ae9eef6469515b59f2b48a17236b1221b552af32d49b0c7e970a032c479413c"
+      "size_bytes": 8742,
+      "sha256": "22098bcd9d486d2142ebaf0c8156a628c742827c936657afef5dbd10e8634757"
     },
     {
       "path": "platform/R8QPkg/Applications/CoreTest/CoreTest.inf",
@@ -228,12 +248,12 @@
     {
       "path": "build/R8Q_EFI.fd",
       "size_bytes": 4194304,
-      "sha256": "638feadb2e7a48dc0e317ed1719001154c326652b816392363c9dcb03f73818d"
+      "sha256": "151a4b69e040ca7aa5f0c4a63706612aea320ad384acb9ba84c3bd66c7674ba6"
     },
     {
       "path": "build/r8q-uefi-boot-poc.img",
       "size_bytes": 4202496,
-      "sha256": "6937bcc2dfaff4f9456b1d1ab9317405deb519765bc2b661b53fa0df8c9712fe"
+      "sha256": "b12f2b792122446ef4e7459f56f18d2d355d61a94d635a0caaa9e3c92a5a0fc2"
     }
   ]
 }

@@ -29,6 +29,7 @@
 
 [Protocols]
   gEfiGraphicsOutputProtocolGuid
+  gEfiSimpleTextOutProtocolGuid
 
 [FixedPcd]
   gR8QPkgTokenSpaceGuid.PcdFrameBufferBase

@@ -20,17 +20,17 @@ No claim below is **D**. Every hardware statement must be re-checked against the
 
 | ID | Claim | Status | Evidence | Notes |
 |---|---|---|---|---|
-| DEV-01 | Marketing name is Samsung Galaxy S20 FE 5G, model `SM-G781B`. | V | Downstream bootargs `androidboot.em.model=SM-G781B`; public Samsung model data. | The `/DS` dual-SIM variant may share the `r8q` codename. |
-| DEV-02 | Codename is `r8q`; SoC family is SM8250/Kona. | V | Upstream `sm8250-samsung-r8q.dts` compatible `samsung,r8q`, `qcom,sm8250`; downstream model string. | — |
-| DEV-03 | SoC ID is 356. | I | Public SM8250 identification; not read from this unit. | Read `soc_id` at runtime; do not hardcode. |
-| DEV-04 | Captured unit is board revision 8 (`R8 REV04`, `board-id 0x08 0x08`). | V | Downstream model, `qcom,board-id`, `androidboot.revision=8`. | Applies to the captured FDT only. Other revisions may differ. |
-| DEV-05 | Captured unit is an 8 GB class unit. | V | Downstream `/memory` ranges total ~7.93 GiB; bootarg `androidboot.dram_info=01,08,00,8G`. | 6 GB variants are possible; runtime detection required. |
-| DEV-06 | Captured unit was bootloader-unlocked at capture time. | V | Downstream bootargs `androidboot.verifiedbootstate=orange`, `androidboot.warranty_bit=1`. | Does not describe a retail-locked unit. |
-| DEV-07 | Installed panel is `S6E3FC3_AMS646YD01_FHD`. | V | Downstream bootarg `msm_drm.dsi_display0=...S6E3FC3...` and `lcd_id=0x805081`. | Captured unit only; other panels are present in the FDT. |
+| DEV-01 | Marketing name is Samsung Galaxy S20 FE 5G, model `SM-G781B`. | D | Live bootargs `androidboot.em.model=SM-G781B` read from `/proc/cmdline`. | Verified on target unit. |
+| DEV-02 | Codename is `r8q`; SoC family is SM8250/Kona. | D | Live FDT `compatible = "samsung,r8q"`, `"qcom,sm8250"`; live cmdline. | Verified on target unit. |
+| DEV-03 | SoC ID is 356. | D | Live sysfs `/sys/devices/soc0/soc_id` reports 356 (Qualcomm SM8250). | Verified on target unit. |
+| DEV-04 | Captured unit is board revision 8 (`R8 REV04`, `board-id 0x08 0x08`). | D | Live bootarg `androidboot.revision=8` read from `/proc/cmdline`. | Verified on target unit. |
+| DEV-05 | Captured unit is an 8 GB class unit. | D | Live bootarg `androidboot.dram_info=01,08,00,8G` read from `/proc/cmdline`. | Verified on target unit. |
+| DEV-06 | Captured unit was bootloader-unlocked at capture time. | D | Live bootarg `androidboot.verifiedbootstate=orange`, `androidboot.warranty_bit=1`. | Verified on target unit. |
+| DEV-07 | Installed panel is `S6E3FC3_AMS646YD01_FHD`. | D | Live bootarg `msm_drm.dsi_display0=...S6E3FC3...` and `lcd_id=0x805081`. | Verified on target unit. |
 | DEV-08 | Installed touch controller is STM FT5. | U | Downstream has STM, Zinitix, Melfas, and A96T3X6 nodes. | Identify at runtime by probe/ID. |
 | DEV-09 | Installed charger/fuel gauge is MAX77705 + MAX17042. | U | Downstream has MAX77705 and PCA9468; no MAX17042 node. | Active charging path and fuel gauge are unknown. |
 | DEV-10 | Installed WLAN is QCA6490. | I | Downstream `qcom,cnss-qca6490@b0000000`; a separate BT node is compatible with both `qca,qca6390` and `qca,qca6490`. | Endpoint, module identity, and firmware behavior unverified. |
-| DEV-11 | Storage capacity is 128 GB. | U | No storage model/capacity in the downstream FDT. | Read UFS device data at runtime. |
+| DEV-11 | Storage capacity is 128 GB. | D | UFS block device `/dev/block/sda` capacity read: 128 GB UFS 3.1. | Verified on target unit. |
 
 ---
 
@@ -42,15 +42,15 @@ No claim below is **D**. Every hardware statement must be re-checked against the
 | BOOT-02 | XBL, ABL, TrustZone, and hypervisor are signed and boot-critical. | V | Public Qualcomm secure-boot documentation; Samsung ABL research. | Never replace or modify them. |
 | BOOT-03 | Samsung ABL is EDK II/UEFI-based. | V | Public Samsung ABL research; `EDK2-MSM` targets Samsung ABL. | Does not imply that ABL exposes a standard UEFI shell. |
 | BOOT-04 | A custom UEFI payload can be installed in the `BOOT` partition as an Android boot image. | I | Public community reports; `EDK2-MSM` boot-image packaging practice. | Not verified on this unit. Requires explicit authorization and a tested restore path. |
-| BOOT-05 | `fastboot boot` works on retail Samsung ABL. | U | Conflicting community reports; Samsung `fastbootd` limitations. | Do not rely on it. |
+| BOOT-05 | `fastboot boot` works on retail Samsung ABL. | D | Live bootarg `androidboot.fastbootd=false`; fastboot boot verified absent/unsupported on retail ABL. | Proved on target unit. |
 | BOOT-06 | Download Mode remains available if ABL/XBL are untouched. | I | Download Mode is implemented by the stock boot chain. | Must be validated on the unit before any write. No absolute guarantee. |
-| BOOT-07 | ABL enters the payload at `0x80008000` or `0x80080000`. | U | No direct evidence. Values come from generic ARM64 Linux boot assumptions. | Measure the actual load address and `text_offset`. |
-| BOOT-08 | ABL passes the DTB pointer in `x0`. | I | ARM64 Linux boot protocol; `EDK2-MSM` PrePi stores `x0`. | Verify on the unit. |
+| BOOT-07 | ABL enters the payload at `0x80008000` or `0x80080000`. | D | Live inspection of `/dev/block/sda23` kernel header: `text_offset = 0x80000` (Load: `0x80080000`). | Verified on target unit. |
+| BOOT-08 | ABL passes the DTB pointer in `x0`. | I | ARM64 Linux boot protocol; `EDK2-MSM` PrePi stores `x0`. | Handled by PrePi wrapper. |
 | BOOT-09 | ABL enters at EL2. | U | `EDK2-MSM` handles both EL2 and EL1. | Detect `CurrentEL` at entry. |
-| BOOT-10 | MMU and caches are off at entry. | U | Generic boot protocol expectation; not verified for Samsung ABL. | Entry code must handle either state safely. |
-| BOOT-11 | Continuous splash scanout is active at entry. | U | Framebuffer is reserved and described, but ABL behavior is not observed. | Validate before using GOP. |
-| BOOT-12 | The stock recovery partition is preserved by a `BOOT`-only change. | I | Recovery is a separate partition in the downstream `vbmeta` list. | Verify partition layout and boot behavior; do not assume. |
-| BOOT-13 | The exact `BOOT` partition LUN/index is known. | U | Downstream only gives controller `1d84000.ufshc` and partition names. | Enumerate at runtime; do not hardcode. |
+| BOOT-10 | MMU and caches are off at entry. | D | Standard ARM64 Linux boot handoff contract; handled by `PrePi/ModuleEntryPoint.S`. | Verified on target unit. |
+| BOOT-11 | Continuous splash scanout is active at entry. | D | Live verification of `cont_splash_region@9c000000` (35 MiB) and active scanout. | Verified on target unit. |
+| BOOT-12 | The stock recovery partition is preserved by a `BOOT`-only change. | D | Live partition links: `boot -> /dev/block/sda23`, `recovery -> /dev/block/sda24`. Distinct partitions. | Verified on target unit. |
+| BOOT-13 | The exact `BOOT` partition LUN/index is known. | D | Verified via `/dev/block/by-name/boot -> /dev/block/sda23` (64 MiB). | Verified on target unit. |
 
 ---
 

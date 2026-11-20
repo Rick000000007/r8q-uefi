@@ -46,7 +46,7 @@
   gR8QPkgTokenSpaceGuid.PcdDisplayBpp|32
 
   # Serial Console & Hardware Controllers
-  gR8QPkgTokenSpaceGuid.PcdUartBaseAddress|0x00988000
+  gR8QPkgTokenSpaceGuid.PcdUartBaseAddress|0x00A90000
   gR8QPkgTokenSpaceGuid.PcdUartBaudRate|115200
   gR8QPkgTokenSpaceGuid.PcdUfsHostControllerBase|0x01D84000
   gR8QPkgTokenSpaceGuid.PcdSdhciControllerBase|0x08804000

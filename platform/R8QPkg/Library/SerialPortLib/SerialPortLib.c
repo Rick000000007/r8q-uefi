@@ -3,7 +3,12 @@
   Project R8Q Qualcomm GENI UART Serial Port Driver Library.
   Target: Samsung Galaxy S20 FE 5G (SM-G781B / r8q / SM8250)
 
-  Base MMIO: 0x00988000 (QUP GENI UART)
+  Base MMIO: 0x00A90000 (QUP v3 SE12 GENI UART / /dev/ttyHS8)
+
+  Features:
+  - Hardware safe probing to detect unclocked/uninitialized controllers.
+  - Bounded FIFO polling with automatic timeout fallback.
+  - Safe non-blocking operation: UART failure NEVER stalls boot or GOP.
 
   Copyright (c) 2026, Antigravity Engineering. All rights reserved.
 **/
@@ -13,11 +18,25 @@
 #include <Library/IoLib.h>
 #include <Library/PcdLib.h>
 
-#define GENI_UART_BASE              0x00988000ULL
-#define GENI_TX_FIFO_STATUS         (GENI_UART_BASE + 0x0800)
-#define GENI_TX_FIFO                (GENI_UART_BASE + 0x0700)
-#define GENI_RX_FIFO_STATUS         (GENI_UART_BASE + 0x0804)
-#define GENI_RX_FIFO                (GENI_UART_BASE + 0x0780)
+#define DEFAULT_GENI_UART_BASE      0x00A90000ULL
+#define GENI_TX_FIFO_STATUS_OFFSET  0x0800
+#define GENI_TX_FIFO_OFFSET         0x0700
+#define GENI_RX_FIFO_STATUS_OFFSET  0x0804
+#define GENI_RX_FIFO_OFFSET         0x0780
+#define GENI_STATUS_OFFSET          0x0040
+
+STATIC BOOLEAN mUartInitialized = FALSE;
+STATIC BOOLEAN mUartAvailable   = FALSE;
+
+STATIC
+UINT64
+GetUartBase (
+  VOID
+  )
+{
+  UINT64 Base = PcdGet64 (PcdUartBaseAddress);
+  return (Base != 0) ? Base : DEFAULT_GENI_UART_BASE;
+}
 
 RETURN_STATUS
 EFIAPI
@@ -25,7 +44,26 @@ SerialPortInitialize (
   VOID
   )
 {
-  // UART clock and baud are pre-configured by AOP/XBL
+  UINT64 UartBase;
+  UINT32 RegVal;
+
+  if (mUartInitialized) {
+    return RETURN_SUCCESS;
+  }
+  mUartInitialized = TRUE;
+
+  UartBase = GetUartBase ();
+
+  // Safe probe: verify if controller MMIO responds without bus error
+  // If unclocked or power-gated, reads return 0x0 or 0xFFFFFFFF
+  RegVal = MmioRead32 (UartBase + GENI_TX_FIFO_STATUS_OFFSET);
+  if (RegVal == 0xFFFFFFFF || RegVal == 0x00000000) {
+    // Controller is unclocked or disabled in production bootloader
+    mUartAvailable = FALSE;
+  } else {
+    mUartAvailable = TRUE;
+  }
+
   return RETURN_SUCCESS;
 }
 
@@ -36,21 +74,48 @@ SerialPortWrite (
   IN UINTN     NumberOfBytes
   )
 {
-  UINTN Index;
+  UINT64 UartBase;
+  UINTN  Index;
+  UINT32 Timeout;
+
+  if (Buffer == NULL || NumberOfBytes == 0) {
+    return 0;
+  }
+
+  if (!mUartInitialized) {
+    SerialPortInitialize ();
+  }
+
+  if (!mUartAvailable) {
+    // Non-blocking bypass: do not stall firmware boot or console
+    return NumberOfBytes;
+  }
+
+  UartBase = GetUartBase ();
 
   for (Index = 0; Index < NumberOfBytes; Index++) {
     // If newline, output carriage return first
     if (Buffer[Index] == '\n') {
-      while ((MmioRead32 (GENI_TX_FIFO_STATUS) & 0x7F) >= 60) {
-        // Wait for FIFO headroom
+      Timeout = 10000;
+      while ((MmioRead32 (UartBase + GENI_TX_FIFO_STATUS_OFFSET) & 0x7F) >= 60 && --Timeout > 0) {
+        // Bounded wait for FIFO headroom
       }
-      MmioWrite32 (GENI_TX_FIFO, (UINT32)'\r');
+      if (Timeout == 0) {
+        mUartAvailable = FALSE;
+        return Index;
+      }
+      MmioWrite32 (UartBase + GENI_TX_FIFO_OFFSET, (UINT32)'\r');
     }
 
-    while ((MmioRead32 (GENI_TX_FIFO_STATUS) & 0x7F) >= 60) {
-      // Wait for FIFO headroom
+    Timeout = 10000;
+    while ((MmioRead32 (UartBase + GENI_TX_FIFO_STATUS_OFFSET) & 0x7F) >= 60 && --Timeout > 0) {
+      // Bounded wait for FIFO headroom
     }
-    MmioWrite32 (GENI_TX_FIFO, (UINT32)Buffer[Index]);
+    if (Timeout == 0) {
+      mUartAvailable = FALSE;
+      return Index;
+    }
+    MmioWrite32 (UartBase + GENI_TX_FIFO_OFFSET, (UINT32)Buffer[Index]);
   }
 
   return NumberOfBytes;
@@ -63,11 +128,26 @@ SerialPortRead (
   IN  UINTN     NumberOfBytes
   )
 {
-  UINTN Count = 0;
+  UINT64 UartBase;
+  UINTN  Count = 0;
+
+  if (Buffer == NULL || NumberOfBytes == 0) {
+    return 0;
+  }
+
+  if (!mUartInitialized) {
+    SerialPortInitialize ();
+  }
+
+  if (!mUartAvailable) {
+    return 0;
+  }
+
+  UartBase = GetUartBase ();
 
   while (Count < NumberOfBytes) {
-    if ((MmioRead32 (GENI_RX_FIFO_STATUS) & 0x7F) > 0) {
-      Buffer[Count++] = (UINT8)(MmioRead32 (GENI_RX_FIFO) & 0xFF);
+    if ((MmioRead32 (UartBase + GENI_RX_FIFO_STATUS_OFFSET) & 0x7F) > 0) {
+      Buffer[Count++] = (UINT8)(MmioRead32 (UartBase + GENI_RX_FIFO_OFFSET) & 0xFF);
     } else {
       break;
     }
@@ -82,7 +162,18 @@ SerialPortPoll (
   VOID
   )
 {
-  return ((MmioRead32 (GENI_RX_FIFO_STATUS) & 0x7F) > 0);
+  UINT64 UartBase;
+
+  if (!mUartInitialized) {
+    SerialPortInitialize ();
+  }
+
+  if (!mUartAvailable) {
+    return FALSE;
+  }
+
+  UartBase = GetUartBase ();
+  return ((MmioRead32 (UartBase + GENI_RX_FIFO_STATUS_OFFSET) & 0x7F) > 0);
 }
 
 RETURN_STATUS
