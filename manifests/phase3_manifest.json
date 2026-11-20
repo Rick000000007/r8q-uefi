@@ -3,7 +3,7 @@
   "device": "Samsung Galaxy S20 FE 5G (SM-G781B)",
   "codename": "r8q",
   "soc": "Qualcomm Snapdragon 865 (SM8250)",
-  "generated_at": "2026-11-20T22:14:31.067889+00:00",
+  "generated_at": "2026-11-20T22:38:35.494791+00:00",
   "security_policy": "Strict zero-private-key credential isolation",
   "files": [
     {
@@ -177,9 +177,49 @@
       "sha256": "36c681cf623ea1135ddfab8159fc6b63445e6ec4bcf3001fabf27098672d3a60"
     },
     {
+      "path": "docs/R8Q_PHASE3_1_BOOT_IMAGE_BINARY_AUDIT.md",
+      "size_bytes": 11755,
+      "sha256": "2c630c601d6a08e149a8cdd90e9da1740ad4a931ce05d79794ed2e2d7070c4c0"
+    },
+    {
+      "path": "docs/R8Q_PHASE3_1_KERNEL_DTB_EVIDENCE.md",
+      "size_bytes": 8997,
+      "sha256": "47c0ece5bc6e4c924c723fcf1fde44e1d8f449a842f792b4789a6c53448e261a"
+    },
+    {
+      "path": "docs/R8Q_PHASE3_1_MASTER_GATE_REVIEW.md",
+      "size_bytes": 18426,
+      "sha256": "2681ea1eff03312ad29acbf38070b1e46fe2f463cb304a5980c009955ce9306c"
+    },
+    {
+      "path": "docs/R8Q_PHASE3_1_MEMORY_SAFETY_AUDIT.md",
+      "size_bytes": 10241,
+      "sha256": "7b4998b9a8a3c1104cc955bcc328082cd84c13818b933dae310ac3608aa1442e"
+    },
+    {
+      "path": "docs/R8Q_PHASE3_1_RECOVERY_SAFETY_AUDIT.md",
+      "size_bytes": 8418,
+      "sha256": "4718717a22f7636f1aea619d03f9c541b713b848025640c08c73bcad313ea5c7"
+    },
+    {
+      "path": "docs/R8Q_PHASE3_1_SECURITY_RELEASE_AUDIT.md",
+      "size_bytes": 7299,
+      "sha256": "dec819626c864acb3313558d2b1354e149df295a54d33b2699b85f157722fa81"
+    },
+    {
+      "path": "docs/R8Q_PHASE3_1_TEST_INDEPENDENCE_AUDIT.md",
+      "size_bytes": 11189,
+      "sha256": "26a4702d3b30af942def29239add82d34b05cbc52fdb9f37580feab2f82a7d87"
+    },
+    {
       "path": "docs/R8Q_PHASE3_HARDWARE_INTEGRATION.md",
       "size_bytes": 14266,
       "sha256": "f813ede5cd7c1fa107b64bd701cb0132e658d57913d22d0343fb06531d93458c"
+    },
+    {
+      "path": "docs/R8Q_PHASE3_MASTER_REPORT.md",
+      "size_bytes": 11629,
+      "sha256": "b744f43c96f55f65b508011ba56b6dea76c6522e86a08784e99a9a79a1d1cdb7"
     },
     {
       "path": "docs/R8Q_PHYSICAL_BOOT_EXECUTION_PLAN.md",
@@ -323,8 +363,8 @@
     },
     {
       "path": "scripts/gen_manifest.py",
-      "size_bytes": 2670,
-      "sha256": "b80303ff9bbf3d38dde47999fbfbe3357b836bc49de731232eba35df4100f413"
+      "size_bytes": 2636,
+      "sha256": "9e3805c65be214385809685c6b7fffb4e98326d5ddaacb95454258140b009e3e"
     },
     {
       "path": "scripts/package_boot_img.py",
@@ -689,12 +729,12 @@
     {
       "path": "build/initramfs.img",
       "size_bytes": 2947587,
-      "sha256": "5ecada33b037c55bf9c122c78adf06573c79906c7462060fb14e700b359264f0"
+      "sha256": "35f7a667f3952b8f8baf3de534c6d81b7dd984ca92c902f683767d5ebc638c59"
     },
     {
       "path": "build/r8q-rootfs.ext4",
       "size_bytes": 2147483648,
-      "sha256": "f1b2e2aa2556ea81cdc85b56349caffb005e4332ed9cf79ea382066e6fc00a2b"
+      "sha256": "24004bf3776d8314387b52aec980bc135193fff63b3bc46ede56827bb8248243"
     },
     {
       "path": "build/r8q-rootfs.tar.gz",
@@ -715,11 +755,6 @@
       "path": "build/r8q.dtb",
       "size_bytes": 821231,
       "sha256": "75244696944e1fac692366de6898b880480b0c8fde74f28d8cf44e108923e7e3"
-    },
-    {
-      "path": "build/r8q_test_id_ed25519.pub",
-      "size_bytes": 104,
-      "sha256": "050cc0221b8cda9a446fe1bf1721699a6ee2e97fd889c03cb30d4679e4c2b61c"
     }
   ]
 }

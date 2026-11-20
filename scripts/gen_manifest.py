@@ -27,7 +27,7 @@ EXCLUDED_PATTERNS = [
 
 def is_excluded(filename):
     for pat in EXCLUDED_PATTERNS:
-        if pat in filename and not filename.endswith(".pub"):
+        if pat in filename:
             return True
     return False
 
