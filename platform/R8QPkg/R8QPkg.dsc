@@ -36,6 +36,8 @@
   UefiApplicationEntryPoint|MdePkg/Library/UefiApplicationEntryPoint/UefiApplicationEntryPoint.inf
   MemoryAllocationLib|MdePkg/Library/UefiMemoryAllocationLib/UefiMemoryAllocationLib.inf
   DevicePathLib|MdePkg/Library/UefiDevicePathLib/UefiDevicePathLib.inf
+  StackCheckLib|MdePkg/Library/StackCheckLibNull/StackCheckLibNull.inf
+  NULL|MdePkg/Library/StackCheckLibNull/StackCheckLibNull.inf
 
 [PcdsFixedAtBuild.common]
   # Platform Framebuffer
@@ -55,4 +57,10 @@
   R8QPkg/PrePi/PrePi.inf
   R8QPkg/Drivers/SimpleFbDxe/SimpleFbDxe.inf
   R8QPkg/Drivers/FileVariableDxe/FileVariableDxe.inf
+  R8QPkg/Drivers/StorageProtectionDxe/StorageProtectionDxe.inf
+  MdeModulePkg/Universal/Disk/DiskIoDxe/DiskIoDxe.inf
+  MdeModulePkg/Universal/Disk/PartitionDxe/PartitionDxe.inf
+  FatPkg/EnhancedFatDxe/Fat.inf
+  MdeModulePkg/Bus/Usb/UsbMassStorageDxe/UsbMassStorageDxe.inf
   R8QPkg/Applications/CoreTest/CoreTest.inf
+  R8QPkg/Applications/StorageTest/StorageTest.inf

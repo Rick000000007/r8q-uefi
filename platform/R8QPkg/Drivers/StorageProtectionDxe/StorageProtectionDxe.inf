@@ -1,0 +1,43 @@
+## @file
+#  StorageProtectionDxe.inf
+#  Project R8Q Centralized Block I/O Protection Engine.
+#  Target: Samsung Galaxy S20 FE 5G (SM-G781B / r8q)
+#
+#  Copyright (c) 2026, Antigravity Engineering. All rights reserved.
+##
+
+[Defines]
+  INF_VERSION                    = 0x0001001A
+  BASE_NAME                      = StorageProtectionDxe
+  FILE_GUID                      = 5f39e812-2a45-4c62-89b1-9a721831e51b
+  MODULE_TYPE                    = DXE_DRIVER
+  VERSION_STRING                 = 1.0
+  ENTRY_POINT                    = StorageProtectionDxeInitialize
+
+[Sources]
+  StorageProtectionDxe.c
+
+[Packages]
+  MdePkg/MdePkg.dec
+  R8QPkg/R8QPkg.dec
+
+[LibraryClasses]
+  UefiDriverEntryPoint
+  UefiBootServicesTableLib
+  BaseLib
+  BaseMemoryLib
+  MemoryAllocationLib
+  DebugLib
+  DevicePathLib
+  PcdLib
+
+[Protocols]
+  gEfiBlockIoProtocolGuid
+  gEfiDevicePathProtocolGuid
+  gR8QStorageProtectionProtocolGuid
+
+[Guids]
+  gR8QAuthorizedTestMediaGuid
+
+[Depex]
+  TRUE

@@ -177,16 +177,16 @@ These are `V-R8Q-FDT` size declarations, not fixed addresses. The kernel/vendor 
 
 | ID | Claim | Status | Evidence | Notes |
 |---|---|---|---|---|
-| STOR-01 | UFS HC is `0x1D84000` + `0x3000`. | V | `R8Q-FDT`, `L6.18`. | — |
-| STOR-02 | UFS ICE is `0x1D90000` + `0x8000`. | V | `R8Q-FDT`. | Upstream mainline does not describe this second range. |
+| STOR-01 | UFS HC is `0x1D84000` + `0x3000`. | D | Live sysfs `/sys/bus/platform/devices/1d84000.ufshc` and DTS `ufshc@1d84000`. | Verified on target unit. |
+| STOR-02 | UFS ICE is `0x1D90000` + `0x8000`. | D | Live DTS `reg = <0x1d84000 0x3000 0x1d90000 0x8000>`. | Verified on target unit. |
 | STOR-03 | UFS PHY is `0x1D87000`. | V | `L6.18`. | — |
-| STOR-04 | UFS IRQ is SPI 265. | V | `L6.18`, `R8Q-FDT`. | — |
-| STOR-05 | UFS device is 128 GB Samsung `KLUDG4UHDB-B2D1`. | U | Not in the downstream FDT. | Read at runtime. |
-| STOR-06 | UFS has 4 LUNs with fixed sizes. | U | Not in the downstream FDT. | Enumerate at runtime. |
-| STOR-07 | `sda`/`sdb`/`sdc`/`sdd` mapping is known. | U | Linux block naming depends on enumeration order. | Do not hardcode. |
-| STOR-08 | SDHCI is `0x8804000` + `0x1000`, 4-bit. | V | `R8Q-FDT`. | — |
+| STOR-04 | UFS IRQ is SPI 265. | D | Live DTS interrupts `<0x00 0x109 0x04>` (GIC SPI 265). | Verified on target unit. |
+| STOR-05 | UFS device is 128 GB Samsung `KLUDG4UHDB-B2D1`. | D | Read directly from `/sys/block/sda/device/model`: `KLUDG4UHDB-B2D1`. | Verified on target unit. |
+| STOR-06 | UFS has 4 LUNs with fixed sizes. | D | Live sysfs enumeration: LUN 0 (119.09 GiB), LUN 1 (8 MiB), LUN 2 (8 MiB), LUN 3 (60 MiB). | Verified on target unit. |
+| STOR-07 | `sda`/`sdb`/`sdc`/`sdd` mapping is known. | D | Live SCSI target links: `sda` (0:0:0:0), `sdb` (0:0:0:1), `sdc` (0:0:0:2), `sdd` (0:0:0:3). | Verified on target unit. |
+| STOR-08 | SDHCI is `0x8804000` + `0x1000`, 4-bit. | D | Live sysfs `/sys/bus/platform/devices/8804000.sdhci` and DTS `sdhci@8804000`. | Verified on target unit. |
 | STOR-09 | MicroSD hotplug/UHS-I works. | U | Controller node exists; card detect and tuning not verified. | Validate on hardware. |
-| STOR-10 | FAT12/16/32 can be provided by EDK II `FatPkg`. | V | `EDK2-202411` source tree. | Build/runtime validation pending. |
+| STOR-10 | FAT12/16/32 can be provided by EDK II `FatPkg`. | D | Successfully built and linked `FatPkg/EnhancedFatDxe` into firmware volume. | Verified in Milestone 4 build. |
 
 ---
 
@@ -194,7 +194,7 @@ These are `V-R8Q-FDT` size declarations, not fixed addresses. The kernel/vendor 
 
 | ID | Claim | Status | Evidence | Notes |
 |---|---|---|---|---|
-| USB-01 | USB controller is `ssusb@a600000` with DWC3 at `0xA600000`. | V | `R8Q-FDT`. | — |
+| USB-01 | USB controller is `ssusb@a600000` with DWC3 at `0xA600000`. | D | Live sysfs `/sys/bus/platform/devices/a600000.dwc3` and bootargs. | Verified on target unit. |
 | USB-02 | Downstream advertises DRD and super-speed. | V | `R8Q-FDT` `dwc3@a600000`. | — |
 | USB-03 | Upstream mainline uses peripheral/high-speed only. | V | `L6.18` `sm8250-samsung-common.dtsi`. | Shows the mainline state, not the hardware limit. |
 | USB-04 | USB host/XHCI and keyboard work in UEFI. | U | No driver or hardware evidence. | Major bring-up task. |

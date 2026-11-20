@@ -41,7 +41,13 @@ APRIORI PEI {
 INF R8QPkg/PrePi/PrePi.inf
 INF R8QPkg/Drivers/SimpleFbDxe/SimpleFbDxe.inf
 INF R8QPkg/Drivers/FileVariableDxe/FileVariableDxe.inf
+INF R8QPkg/Drivers/StorageProtectionDxe/StorageProtectionDxe.inf
+INF MdeModulePkg/Universal/Disk/DiskIoDxe/DiskIoDxe.inf
+INF MdeModulePkg/Universal/Disk/PartitionDxe/PartitionDxe.inf
+INF FatPkg/EnhancedFatDxe/Fat.inf
+INF MdeModulePkg/Bus/Usb/UsbMassStorageDxe/UsbMassStorageDxe.inf
 INF R8QPkg/Applications/CoreTest/CoreTest.inf
+INF R8QPkg/Applications/StorageTest/StorageTest.inf
 
 [Rule.Common.SEC]
   FILE SEC = $(NAMED_GUID) RELOCS_STRIPPED {
@@ -49,6 +55,13 @@ INF R8QPkg/Applications/CoreTest/CoreTest.inf
   }
 
 [Rule.Common.DXE_DRIVER]
+  FILE DRIVER = $(NAMED_GUID) {
+    DXE_DEPEX DXE_DEPEX Optional      $(INF_OUTPUT)/$(MODULE_NAME).depex
+    PE32      PE32                    $(INF_OUTPUT)/$(MODULE_NAME).efi
+    UI        STRING="$(MODULE_NAME)" Optional
+  }
+
+[Rule.Common.UEFI_DRIVER]
   FILE DRIVER = $(NAMED_GUID) {
     DXE_DEPEX DXE_DEPEX Optional      $(INF_OUTPUT)/$(MODULE_NAME).depex
     PE32      PE32                    $(INF_OUTPUT)/$(MODULE_NAME).efi

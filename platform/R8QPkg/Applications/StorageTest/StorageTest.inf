@@ -1,0 +1,42 @@
+## @file
+#  StorageTest.inf
+#  Project R8Q Automated Storage Subsystem & Isolation Test Suite.
+#  Target: Samsung Galaxy S20 FE 5G (SM-G781B / r8q)
+#
+#  Copyright (c) 2026, Antigravity Engineering. All rights reserved.
+##
+
+[Defines]
+  INF_VERSION                    = 0x0001001A
+  BASE_NAME                      = StorageTest
+  FILE_GUID                      = 8a42e710-1824-4f2b-9612-8a9d1871e84a
+  MODULE_TYPE                    = UEFI_APPLICATION
+  VERSION_STRING                 = 1.0
+  ENTRY_POINT                    = StorageTestMain
+
+[Sources]
+  StorageTest.c
+  ../../Drivers/FileVariableDxe/FileVariableDxe.c
+
+[Packages]
+  MdePkg/MdePkg.dec
+  R8QPkg/R8QPkg.dec
+
+[LibraryClasses]
+  UefiApplicationEntryPoint
+  UefiBootServicesTableLib
+  UefiRuntimeServicesTableLib
+  BaseLib
+  BaseMemoryLib
+  MemoryAllocationLib
+  DebugLib
+  UefiLib
+  DevicePathLib
+
+[Protocols]
+  gEfiBlockIoProtocolGuid
+  gEfiSimpleFileSystemProtocolGuid
+  gR8QStorageProtectionProtocolGuid
+
+[Guids]
+  gR8QAuthorizedTestMediaGuid
