@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Project R8Q UEFI: Native Linux Early-Userspace & Initramfs Generator
 # Target: Samsung Galaxy S20 FE 5G (SM-G781B / r8q)
-# Platform: Qualcomm Snapdragon 865 (SM8250 / Kona)
+# Platform: Qualcomm Snapdragon 865 (SM8250 / Kona) & Virtualized QEMU ARM64
 # Architecture: ARM64 / AArch64
 set -e
 
@@ -9,6 +9,7 @@ PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BUILD_DIR="$PROJECT_ROOT/build"
 INITRAMFS_ROOT="/tmp/r8q_initramfs_root"
 OUTPUT_IMG="$BUILD_DIR/initramfs.img"
+MODULES_SRC="/tmp/extracted_modules/usr/lib/modules/7.2.15+kali-arm64"
 
 echo "=========================================================="
 echo "   PROJECT R8Q: NATIVE LINUX INITRAMFS GENERATOR"
@@ -18,7 +19,7 @@ echo "=========================================================="
 
 mkdir -p "$BUILD_DIR"
 rm -rf "$INITRAMFS_ROOT"
-mkdir -p "$INITRAMFS_ROOT"/{bin,sbin,usr/bin,usr/sbin,proc,sys,dev,tmp,mnt/storage,root,newroot,etc}
+mkdir -p "$INITRAMFS_ROOT"/{bin,sbin,usr/bin,usr/sbin,proc,sys,dev,tmp,mnt/storage,root,newroot,etc,lib/modules}
 
 # 1. Copy busybox binary and create applet symlinks
 if [ -f "/usr/bin/busybox" ]; then
@@ -35,7 +36,7 @@ cd "$INITRAMFS_ROOT/bin"
 for applet in sh bash ash ls cat echo dmesg uname mount umount mkdir rm cp mv ps kill sleep sync \
               grep head tail cut sed awk vi clear reset mknod fdisk blkid df free switch_root \
               readlink find xargs wc tr sort losetup findfs fsck e2fsck chroot test pwd basename \
-              dirname env which seq date stat sleep true false; do
+              dirname env which seq date stat sleep true false insmod lsmod modprobe rmmod; do
     ln -sf busybox "$applet"
 done
 cd "$PROJECT_ROOT"
@@ -62,11 +63,24 @@ if ldd "$INITRAMFS_ROOT/bin/busybox" > /dev/null 2>&1; then
     fi
 fi
 
-# 3. Create independent Native Linux init script
+# 3. Bundle essential loadable kernel modules for filesystem & virtualization
+if [ -d "$MODULES_SRC" ]; then
+    echo "[INITRAMFS] Bundling filesystem & virtualization kernel modules..."
+    cp "$MODULES_SRC/kernel/lib/crc/crc16.ko" "$INITRAMFS_ROOT/lib/modules/" 2>/dev/null || true
+    cp "$MODULES_SRC/kernel/fs/mbcache.ko" "$INITRAMFS_ROOT/lib/modules/" 2>/dev/null || true
+    cp "$MODULES_SRC/kernel/fs/jbd2/jbd2.ko" "$INITRAMFS_ROOT/lib/modules/" 2>/dev/null || true
+    cp "$MODULES_SRC/kernel/fs/ext4/ext4.ko" "$INITRAMFS_ROOT/lib/modules/" 2>/dev/null || true
+    cp "$MODULES_SRC/kernel/drivers/block/virtio_blk.ko" "$INITRAMFS_ROOT/lib/modules/" 2>/dev/null || true
+    cp "$MODULES_SRC/kernel/net/core/failover.ko" "$INITRAMFS_ROOT/lib/modules/" 2>/dev/null || true
+    cp "$MODULES_SRC/kernel/drivers/net/net_failover.ko" "$INITRAMFS_ROOT/lib/modules/" 2>/dev/null || true
+    cp "$MODULES_SRC/kernel/drivers/net/virtio_net.ko" "$INITRAMFS_ROOT/lib/modules/" 2>/dev/null || true
+fi
+
+# 4. Create independent Native Linux init script
 cat << 'EOF' > "$INITRAMFS_ROOT/init"
 #!/bin/sh
 # Project R8Q Native Linux Early-Userspace Init
-# Standards-compliant ARM64 Linux early userspace for Samsung Galaxy S20 FE 5G
+# Standards-compliant ARM64 Linux early userspace for Samsung Galaxy S20 FE 5G & QEMU virt
 export PATH=/bin:/sbin:/usr/bin:/usr/sbin
 
 # Mount virtual filesystems
@@ -81,7 +95,26 @@ mount -t tmpfs none /tmp
 [ -c /dev/zero ]    || mknod /dev/zero c 1 5
 [ -c /dev/tty ]     || mknod /dev/tty c 5 0
 [ -c /dev/tty1 ]    || mknod /dev/tty1 c 4 1
-[ -c /dev/ttyMSM0 ] || mknod /dev/ttyMSM0 c 240 0
+[ -c /dev/ttyAMA0 ] || mknod /dev/ttyAMA0 c 204 64 2>/dev/null || true
+[ -c /dev/ttyMSM0 ] || mknod /dev/ttyMSM0 c 240 0 2>/dev/null || true
+
+# Load filesystem drivers
+if [ -f /lib/modules/crc16.ko ]; then
+    insmod /lib/modules/crc16.ko 2>/dev/null || true
+    insmod /lib/modules/mbcache.ko 2>/dev/null || true
+    insmod /lib/modules/jbd2.ko 2>/dev/null || true
+    insmod /lib/modules/ext4.ko 2>/dev/null || true
+fi
+
+# Load virtual hardware storage and network modules if present
+if [ -f /lib/modules/virtio_blk.ko ]; then
+    insmod /lib/modules/virtio_blk.ko 2>/dev/null || true
+fi
+if [ -f /lib/modules/failover.ko ]; then
+    insmod /lib/modules/failover.ko 2>/dev/null || true
+    insmod /lib/modules/net_failover.ko 2>/dev/null || true
+    insmod /lib/modules/virtio_net.ko 2>/dev/null || true
+fi
 
 clear 2>/dev/null || true
 echo "================================================================="
@@ -146,7 +179,7 @@ resolve_device() {
     echo "$dev"
 }
 
-# Allow hardware buses (UFS, SDHCI, USB) to settle
+# Allow hardware buses (UFS, SDHCI, USB, VirtIO) to settle
 echo "[INIT] Scanning storage hardware for root device: ${ROOT_PARAM:-'(auto-probing)'}..."
 sleep 2
 
@@ -172,7 +205,7 @@ if [ "$EMERGENCY" -eq 0 ]; then
     if [ -z "$TARGET_ROOT" ] && [ -n "$ROOT_IMG" ]; then
         echo "[INIT] Searching for virtual rootfs image: $ROOT_IMG..."
         # Scan partitions for the image file
-        for part in /dev/mmcblk0p* /dev/mmcblk1p* /dev/sda* /dev/sdb*; do
+        for part in /dev/mmcblk0p* /dev/mmcblk1p* /dev/sda* /dev/sdb* /dev/vda*; do
             [ -b "$part" ] || continue
             mkdir -p /mnt/storage
             if mount -o ro "$part" /mnt/storage 2>/dev/null; then
@@ -190,7 +223,7 @@ if [ "$EMERGENCY" -eq 0 ]; then
         done
     fi
 
-    # Strategy 3: Auto-probing heuristics (Non-destructive external MicroSD / USB)
+    # Strategy 3: Auto-probing heuristics (Non-destructive external MicroSD, USB, virtio)
     if [ -z "$TARGET_ROOT" ]; then
         echo "[INIT] Auto-probing storage devices for native Linux rootfs..."
 
@@ -200,7 +233,16 @@ if [ "$EMERGENCY" -eq 0 ]; then
             echo "[INIT] Auto-discovered filesystem labeled 'r8q-rootfs' on $TARGET_ROOT"
         fi
 
-        # Probe 3b: External MicroSD partition 2 (/dev/mmcblk0p2)
+        # Probe 3b: VirtIO block device /dev/vda (QEMU environment)
+        if [ -z "$TARGET_ROOT" ] && [ -b "/dev/vda" ]; then
+            FSTYPE=$(blkid -o value -s TYPE /dev/vda 2>/dev/null || true)
+            if [ "$FSTYPE" = "ext4" ]; then
+                echo "[INIT] Auto-discovered ext4 filesystem on virtio block /dev/vda"
+                TARGET_ROOT="/dev/vda"
+            fi
+        fi
+
+        # Probe 3c: External MicroSD partition 2 (/dev/mmcblk0p2)
         if [ -z "$TARGET_ROOT" ] && [ -b "/dev/mmcblk0p2" ]; then
             FSTYPE=$(blkid -o value -s TYPE /dev/mmcblk0p2 2>/dev/null || true)
             if [ "$FSTYPE" = "ext4" ]; then
@@ -209,10 +251,10 @@ if [ "$EMERGENCY" -eq 0 ]; then
             fi
         fi
 
-        # Probe 3c: Virtual disk image 'r8q-rootfs.ext4' or 'r8q-rootfs.img' on external card
+        # Probe 3d: Virtual disk image 'r8q-rootfs.ext4' or 'r8q-rootfs.img' on external card
         if [ -z "$TARGET_ROOT" ]; then
             for img_name in "r8q-rootfs.ext4" "r8q-rootfs.img"; do
-                for part in /dev/mmcblk0p1 /dev/mmcblk0 /dev/sdb1 /dev/sda1; do
+                for part in /dev/mmcblk0p1 /dev/mmcblk0 /dev/sdb1 /dev/sda1 /dev/vda; do
                     [ -b "$part" ] || continue
                     mkdir -p /mnt/storage
                     if mount -o ro "$part" /mnt/storage 2>/dev/null; then
@@ -298,7 +340,7 @@ EOF
 
 chmod +x "$INITRAMFS_ROOT/init"
 
-# 4. Package into reproducible CPIO gzip archive
+# 5. Package into reproducible CPIO gzip archive
 cd "$INITRAMFS_ROOT"
 find . -print0 | cpio --null -ov --format=newc | gzip -9 > "$OUTPUT_IMG"
 cd "$PROJECT_ROOT"

@@ -139,14 +139,29 @@ class TestNativeRootfsValidation(unittest.TestCase):
 
         with open(os.path.join(STAGING_DIR, "etc/shadow"), "r") as f:
             shadow_content = f.read()
-        self.assertIn("root:$6$r8qroot$", shadow_content, "Root password hash must be present")
-        self.assertIn("r8q:$6$r8quser$", shadow_content, "r8q user password hash must be present")
+        # Verify root password is locked (*) to prevent unauthorized password logins
+        self.assertRegex(shadow_content, r"root:\*:", "Root password must be locked (*)")
+        # Verify r8q user has secure SHA-512 hash
+        self.assertRegex(shadow_content, r"r8q:\$6\$", "r8q user password hash must be present")
 
         # Verify sudoers
         sudoers_file = os.path.join(STAGING_DIR, "etc/sudoers.d/r8q")
         self.assertTrue(os.path.exists(sudoers_file))
         mode = oct(os.stat(sudoers_file).st_mode & 0o777)
         self.assertEqual(mode, "0o440", "sudoers file must have 0440 permissions")
+
+        # Verify hardened SSH daemon configuration
+        sshd_config = os.path.join(STAGING_DIR, "etc/ssh/sshd_config")
+        self.assertTrue(os.path.exists(sshd_config))
+        with open(sshd_config, "r") as f:
+            ssh_conf = f.read()
+        self.assertIn("PasswordAuthentication no", ssh_conf)
+        self.assertIn("PermitRootLogin prohibit-password", ssh_conf)
+        self.assertIn("PubkeyAuthentication yes", ssh_conf)
+
+        # Verify authorized_keys exist for root and r8q
+        self.assertTrue(os.path.isfile(os.path.join(STAGING_DIR, "root/.ssh/authorized_keys")))
+        self.assertTrue(os.path.isfile(os.path.join(STAGING_DIR, "home/r8q/.ssh/authorized_keys")))
 
 if __name__ == "__main__":
     unittest.main()
