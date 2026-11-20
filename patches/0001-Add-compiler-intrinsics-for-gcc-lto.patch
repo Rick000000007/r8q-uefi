@@ -1,0 +1,65 @@
+diff --git a/MdePkg/Library/StackCheckLibNull/StackCheckLibNullGcc.c b/MdePkg/Library/StackCheckLibNull/StackCheckLibNullGcc.c
+index cc30632..9ef2e26 100644
+--- a/MdePkg/Library/StackCheckLibNull/StackCheckLibNullGcc.c
++++ b/MdePkg/Library/StackCheckLibNull/StackCheckLibNullGcc.c
+@@ -21,3 +21,60 @@ __stack_chk_fail (
+   )
+ {
+ }
++
++/**
++  Compiler intrinsics for GCC / Clang LTO code generation.
++  Using volatile byte pointers prevents the compiler from optimizing
++  these byte loops back into recursive calls.
++**/
++void *
++memcpy (
++  void          *dest,
++  const void    *src,
++  unsigned long n
++  )
++{
++  volatile unsigned char *d = (volatile unsigned char *)dest;
++  const volatile unsigned char *s = (const volatile unsigned char *)src;
++  while (n--) {
++    *d++ = *s++;
++  }
++  return dest;
++}
++
++void *
++memset (
++  void          *s,
++  int           c,
++  unsigned long n
++  )
++{
++  volatile unsigned char *p = (volatile unsigned char *)s;
++  while (n--) {
++    *p++ = (unsigned char)c;
++  }
++  return s;
++}
++
++void *
++memmove (
++  void          *dest,
++  const void    *src,
++  unsigned long n
++  )
++{
++  volatile unsigned char *d = (volatile unsigned char *)dest;
++  const volatile unsigned char *s = (const volatile unsigned char *)src;
++  if (d < s) {
++    while (n--) {
++      *d++ = *s++;
++    }
++  } else if (d > s) {
++    d += n;
++    s += n;
++    while (n--) {
++      *--d = *--s;
++    }
++  }
++  return dest;
++}

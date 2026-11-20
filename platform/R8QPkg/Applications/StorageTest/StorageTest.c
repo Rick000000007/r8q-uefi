@@ -31,25 +31,6 @@
 #include <Protocol/SimpleFileSystem.h>
 #include <Protocol/StorageProtection.h>
 
-// Compiler intrinsics for GCC LTO code generation
-void *memcpy(void *dest, const void *src, unsigned long n) {
-  unsigned char *d = dest;
-  const unsigned char *s = src;
-  while (n--) *d++ = *s++;
-  return dest;
-}
-
-void *memset(void *s, int c, unsigned long n) {
-  unsigned char *p = s;
-  while (n--) *p++ = (unsigned char)c;
-  return s;
-}
-
-void *__stack_chk_guard = (void *)0xDEADBEEFDEADBEEFULL;
-void __stack_chk_fail(void) {
-  while (1);
-}
-
 // Forward declarations
 EFI_STATUS EFIAPI CommitVariableStoreAtomic (IN CONST VOID *StoreBuffer, IN UINT32 StoreSize);
 EFI_STATUS EFIAPI RecoverVariableStore (IN BOOLEAN PrimaryCorrupt, IN BOOLEAN BackupPresent);

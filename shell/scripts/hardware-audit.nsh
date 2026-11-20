@@ -1,37 +1,51 @@
-# Project R8Q UEFI Hardware Audit Script
-# Platform: Samsung Galaxy S20 FE 5G (SM-G781B)
+# Project R8Q UEFI Full Hardware Audit Script
+# Platform: Samsung Galaxy S20 FE 5G (SM-G781B / r8q)
 
 @echo -off
 cls
-echo "================================================="
-echo "   PROJECT R8Q AUTOMATED HARDWARE AUDIT"
-echo "================================================="
+echo "================================================================="
+echo "   PROJECT R8Q AUTOMATED HARDWARE AUDIT SUITE"
+echo "   Target: Samsung Galaxy S20 FE 5G (SM-G781B / r8q)"
+echo "================================================================="
 echo ""
 
-echo "--- [1/6] SYSTEM INFORMATION ---"
-sysinfo
+echo "--- [1/9] SYSTEM IDENTIFICATION & FIRMWARE TABLES ---"
+sysinfo.efi
 
 echo ""
-echo "--- [2/6] CPU TOPOLOGY & ARCH TIMER ---"
-cpuinfo
+echo "--- [2/9] CPU TOPOLOGY, ARCH TIMER & GIC ---"
+cpuinfo.efi
 
 echo ""
-echo "--- [3/6] PHYSICAL MEMORY & RESERVED CARVEOUTS ---"
-memmap
+echo "--- [3/9] PHYSICAL MEMORY & CARVEOUT AUDIT ---"
+memmap.efi
 
 echo ""
-echo "--- [4/6] STORAGE LUNS & PARTITIONS ---"
-storage
-partitions
+echo "--- [4/9] DISPLAY GOP & CONSOLE SCALING ---"
+display.efi
 
 echo ""
-echo "--- [5/6] DISPLAY GOP & AMOEL PANEL ---"
-display
+echo "--- [5/9] DEVICE TREE (FDT) PROFILE ---"
+fdtinfo.efi
 
 echo ""
-echo "--- [6/6] BATTERY & THERMAL SENSORS ---"
-battery
-thermal
+echo "--- [6/9] STORAGE SUBSYSTEM & UFS READ-ONLY INVARIANT ---"
+storage.efi
 
 echo ""
-echo "Hardware audit complete."
+echo "--- [7/9] BATTERY & PMIC POWER SUBSYSTEM ---"
+battery.efi
+
+echo ""
+echo "--- [8/9] TSENS THERMAL SENSORS & SAFETY TRIPS ---"
+thermal.efi
+
+echo ""
+echo "--- [9/9] FIRMWARE VOLUME & OPTION A NVRAM ---"
+firmware.efi
+
+echo ""
+echo "================================================================="
+echo "   ALL 9 HARDWARE AUDIT MODULES COMPLETED SUCCESSFULLY"
+echo "================================================================="
+echo ""

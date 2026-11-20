@@ -26,20 +26,6 @@
 #include <Protocol/GraphicsOutput.h>
 #include <Protocol/SimpleTextOut.h>
 
-// Compiler intrinsics for GCC LTO code generation
-void *memcpy(void *dest, const void *src, unsigned long n) {
-  unsigned char *d = dest;
-  const unsigned char *s = src;
-  while (n--) *d++ = *s++;
-  return dest;
-}
-
-void *memset(void *s, int c, unsigned long n) {
-  unsigned char *p = s;
-  while (n--) *p++ = (unsigned char)c;
-  return s;
-}
-
 EFI_STATUS
 EFIAPI
 CoreTestMain (

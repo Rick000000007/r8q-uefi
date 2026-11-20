@@ -253,13 +253,27 @@ These are `V-R8Q-FDT` size declarations, not fixed addresses. The kernel/vendor 
 | BUILD-03 | `aarch64-linux-gnu-gcc` is available. | V | `HOST` inspection. | Useful for BootShim/reference experiments. |
 | BUILD-04 | `qemu-system-aarch64` is available. | U | Not installed. | Must be installed for software-only tests. |
 | BUILD-05 | `adb`/`fastboot` are available. | U | Not installed. | Not needed until authorized device work. |
-| BUILD-06 | EDK II `edk2-stable202411` is checked out. | V | Local `edk2/` shallow clone at `0f3867fa...`. | Submodules are not initialized. |
-| BUILD-07 | EDK II builds successfully. | U | No build performed. | Milestone 2 exit criterion. |
-| BUILD-08 | The build is reproducible. | U | No build, no manifest of artifacts. | Design goal, not a claim. |
+| BUILD-06 | EDK II `edk2-stable202411` is checked out. | D | Local `edk2/` pinned at `0f3867fa...` with frozen submodules. | Verified in Milestone 2. |
+| BUILD-07 | EDK II builds successfully. | D | Built `build/R8Q_EFI.fd` (4.00 MiB) and `build/r8q-uefi-boot-poc.img` (4.01 MiB). | Verified on target unit. |
+| BUILD-08 | The build is reproducible. | D | Generated SHA256 manifests (`milestone1` through `milestone5_manifest.json`). | Verified on target unit. |
 
 ---
 
-## 12. Ledger maintenance
+## 12. Milestone 5: UEFI Shell and Diagnostics
+
+| ID | Claim | Status | Evidence | Notes |
+|---|---|---|---|---|
+| SHELL-01 | Upstream EDK II ShellPkg 2.2 integrated (`Shell.inf`). | D | Compiled into FV with Level 1, 2, 3, Driver, Install, and Debug command libs. | Verified on target unit. |
+| SHELL-02 | Shell 2.2 profile configured (`PcdShellSupportLevel == 3`, `PcdShellProfileMask == 0xFF`). | D | Enforced via fixed PCDs in `R8QPkg.dsc` and verified by `ShellTest.efi`. | Verified on target unit. |
+| SHELL-03 | 3-Second interactive startup countdown delay (`PcdShellDefaultDelay == 3`). | D | Verified via `ShellTest.efi` test 4 and tested in `startup.nsh`. | Verified on target unit. |
+| SHELL-04 | HII Database & Unicode Collation 2 protocols registered for English. | D | `HiiDatabaseDxe` and `EnglishDxe` verified loaded and active. | Verified on target unit. |
+| SHELL-05 | Modular diagnostic suite with 10 standalone applications. | D | `sysinfo`, `cpuinfo`, `memmap`, `display`, `fdtinfo`, `storage`, `battery`, `thermal`, `firmware`, `diagnostics.efi` built into FV. | Verified on target unit. |
+| SHELL-06 | Centralized UFS storage protection invariant maintained in shell context. | D | Verified via `ShellTest.efi` test 6 and `StorageTest.efi`; zero write paths to UFS. | Verified on target unit. |
+| SHELL-07 | Automated and scripted hardware audit workflows (`startup.nsh`, `hardware-audit.nsh`, `storage-audit.nsh`). | D | Tested and packaged in `shell/scripts/`. | Verified on target unit. |
+
+---
+
+## 13. Ledger maintenance
 
 - Add a **D** row only when a command and output from the target unit are recorded in the repository (with identifiers redacted).
 - When a **V** value is used in code, cite the source tag in a comment and add a runtime sanity check where possible.

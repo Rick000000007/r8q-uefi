@@ -1,0 +1,45 @@
+## @file
+#  ShellTest.inf
+#  Project R8Q UEFI Shell 2.2 and Interactive Environment Test Suite.
+#
+#  Copyright (c) 2026, Antigravity Engineering. All rights reserved.
+##
+
+[Defines]
+  INF_VERSION                    = 0x0001001A
+  BASE_NAME                      = ShellTest
+  FILE_GUID                      = 18a93b45-912a-4682-8411-9a72b834ef91
+  MODULE_TYPE                    = UEFI_APPLICATION
+  VERSION_STRING                 = 1.0
+  ENTRY_POINT                    = ShellTestMain
+
+[Sources]
+  ShellTest.c
+
+[Packages]
+  MdePkg/MdePkg.dec
+  MdeModulePkg/MdeModulePkg.dec
+  ShellPkg/ShellPkg.dec
+  R8QPkg/R8QPkg.dec
+
+[LibraryClasses]
+  UefiApplicationEntryPoint
+  UefiLib
+  UefiBootServicesTableLib
+  UefiRuntimeServicesTableLib
+  PrintLib
+  MemoryAllocationLib
+  BaseMemoryLib
+
+[Protocols]
+  gEfiHiiDatabaseProtocolGuid
+  gEfiUnicodeCollation2ProtocolGuid
+  gEfiSimpleTextInputExProtocolGuid
+  gEfiSimpleTextInProtocolGuid
+  gEfiBlockIoProtocolGuid
+  gR8QStorageProtectionProtocolGuid
+
+[Pcd]
+  gEfiShellPkgTokenSpaceGuid.PcdShellDefaultDelay
+  gEfiShellPkgTokenSpaceGuid.PcdShellSupportLevel
+  gEfiShellPkgTokenSpaceGuid.PcdShellProfileMask

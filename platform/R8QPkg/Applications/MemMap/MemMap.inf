@@ -1,0 +1,29 @@
+## @file
+#  MemMap.inf
+#  Project R8Q Memory Map Diagnostic Application.
+#
+#  Copyright (c) 2026, Antigravity Engineering. All rights reserved.
+##
+
+[Defines]
+  INF_VERSION                    = 0x0001001A
+  BASE_NAME                      = memmap
+  FILE_GUID                      = 31bf86d2-64e0-47b7-8172-8f921ea5c381
+  MODULE_TYPE                    = UEFI_APPLICATION
+  VERSION_STRING                 = 1.0
+  ENTRY_POINT                    = UefiMain
+
+[Sources]
+  MemMap.c
+
+[Packages]
+  MdePkg/MdePkg.dec
+  R8QPkg/R8QPkg.dec
+
+[LibraryClasses]
+  UefiApplicationEntryPoint
+  UefiLib
+  UefiBootServicesTableLib
+  MemoryAllocationLib
+  BaseMemoryLib
+  PrintLib

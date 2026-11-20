@@ -77,7 +77,7 @@ if [ -f "$POC_IMG" ]; then
     python3 "$PROJECT_ROOT/tests/static_validate_image.py" "$POC_IMG"
 fi
 
-python3 "$PROJECT_ROOT/scripts/gen_manifest.py"
+python3 "$PROJECT_ROOT/scripts/gen_manifest.py" milestone5_manifest.json
 
 echo ""
-echo ">>> MILESTONE 2 PLATFORM BUILD PIPELINE COMPLETE <<<"
+echo ">>> MILESTONE 5 PLATFORM BUILD PIPELINE COMPLETE <<<"

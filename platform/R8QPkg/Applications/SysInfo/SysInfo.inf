@@ -1,0 +1,31 @@
+## @file
+#  SysInfo.inf
+#  Project R8Q Platform System Information Diagnostic Application.
+#
+#  Copyright (c) 2026, Antigravity Engineering. All rights reserved.
+##
+
+[Defines]
+  INF_VERSION                    = 0x0001001A
+  BASE_NAME                      = sysinfo
+  FILE_GUID                      = 6d84f881-817a-4b08-8e34-58a36d2b5911
+  MODULE_TYPE                    = UEFI_APPLICATION
+  VERSION_STRING                 = 1.0
+  ENTRY_POINT                    = UefiMain
+
+[Sources]
+  SysInfo.c
+
+[Packages]
+  MdePkg/MdePkg.dec
+  R8QPkg/R8QPkg.dec
+
+[LibraryClasses]
+  UefiApplicationEntryPoint
+  UefiLib
+  UefiBootServicesTableLib
+  UefiRuntimeServicesTableLib
+  MemoryAllocationLib
+  BaseMemoryLib
+  DebugLib
+  PrintLib

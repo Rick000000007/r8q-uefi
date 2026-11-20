@@ -1,0 +1,27 @@
+## @file
+#  Thermal.inf
+#  Project R8Q TSENS Thermal Subsystem Diagnostic Application.
+#
+#  Copyright (c) 2026, Antigravity Engineering. All rights reserved.
+##
+
+[Defines]
+  INF_VERSION                    = 0x0001001A
+  BASE_NAME                      = thermal
+  FILE_GUID                      = 8f92b450-4819-485e-9081-3561a7d6e501
+  MODULE_TYPE                    = UEFI_APPLICATION
+  VERSION_STRING                 = 1.0
+  ENTRY_POINT                    = UefiMain
+
+[Sources]
+  Thermal.c
+
+[Packages]
+  MdePkg/MdePkg.dec
+  R8QPkg/R8QPkg.dec
+
+[LibraryClasses]
+  UefiApplicationEntryPoint
+  UefiLib
+  UefiBootServicesTableLib
+  PrintLib

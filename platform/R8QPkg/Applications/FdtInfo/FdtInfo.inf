@@ -1,0 +1,28 @@
+## @file
+#  FdtInfo.inf
+#  Project R8Q Device Tree (FDT) Diagnostic Application.
+#
+#  Copyright (c) 2026, Antigravity Engineering. All rights reserved.
+##
+
+[Defines]
+  INF_VERSION                    = 0x0001001A
+  BASE_NAME                      = fdtinfo
+  FILE_GUID                      = 7f5b1892-d610-482a-9bc7-b8921a47df12
+  MODULE_TYPE                    = UEFI_APPLICATION
+  VERSION_STRING                 = 1.0
+  ENTRY_POINT                    = UefiMain
+
+[Sources]
+  FdtInfo.c
+
+[Packages]
+  MdePkg/MdePkg.dec
+  R8QPkg/R8QPkg.dec
+
+[LibraryClasses]
+  UefiApplicationEntryPoint
+  UefiLib
+  UefiBootServicesTableLib
+  PrintLib
+  BaseMemoryLib

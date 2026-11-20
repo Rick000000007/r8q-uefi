@@ -42,12 +42,26 @@ INF R8QPkg/PrePi/PrePi.inf
 INF R8QPkg/Drivers/SimpleFbDxe/SimpleFbDxe.inf
 INF R8QPkg/Drivers/FileVariableDxe/FileVariableDxe.inf
 INF R8QPkg/Drivers/StorageProtectionDxe/StorageProtectionDxe.inf
+INF MdeModulePkg/Universal/HiiDatabaseDxe/HiiDatabaseDxe.inf
+INF MdeModulePkg/Universal/Disk/UnicodeCollation/EnglishDxe/EnglishDxe.inf
 INF MdeModulePkg/Universal/Disk/DiskIoDxe/DiskIoDxe.inf
 INF MdeModulePkg/Universal/Disk/PartitionDxe/PartitionDxe.inf
 INF FatPkg/EnhancedFatDxe/Fat.inf
 INF MdeModulePkg/Bus/Usb/UsbMassStorageDxe/UsbMassStorageDxe.inf
+INF ShellPkg/Application/Shell/Shell.inf
 INF R8QPkg/Applications/CoreTest/CoreTest.inf
 INF R8QPkg/Applications/StorageTest/StorageTest.inf
+INF R8QPkg/Applications/SysInfo/SysInfo.inf
+INF R8QPkg/Applications/CpuInfo/CpuInfo.inf
+INF R8QPkg/Applications/MemMap/MemMap.inf
+INF R8QPkg/Applications/Display/Display.inf
+INF R8QPkg/Applications/FdtInfo/FdtInfo.inf
+INF R8QPkg/Applications/Storage/Storage.inf
+INF R8QPkg/Applications/Battery/Battery.inf
+INF R8QPkg/Applications/Thermal/Thermal.inf
+INF R8QPkg/Applications/Firmware/Firmware.inf
+INF R8QPkg/Applications/Diagnostics/Diagnostics.inf
+INF R8QPkg/Applications/ShellTest/ShellTest.inf
 
 [Rule.Common.SEC]
   FILE SEC = $(NAMED_GUID) RELOCS_STRIPPED {

@@ -1,0 +1,34 @@
+## @file
+#  Diagnostics.inf
+#  Project R8Q Master Hardware & Platform Diagnostics Application.
+#
+#  Copyright (c) 2026, Antigravity Engineering. All rights reserved.
+##
+
+[Defines]
+  INF_VERSION                    = 0x0001001A
+  BASE_NAME                      = diagnostics
+  FILE_GUID                      = d1a94b80-5712-4632-9b04-71a8b92c4819
+  MODULE_TYPE                    = UEFI_APPLICATION
+  VERSION_STRING                 = 1.0
+  ENTRY_POINT                    = UefiMain
+
+[Sources]
+  Diagnostics.c
+
+[Packages]
+  MdePkg/MdePkg.dec
+  R8QPkg/R8QPkg.dec
+
+[LibraryClasses]
+  UefiApplicationEntryPoint
+  UefiLib
+  UefiBootServicesTableLib
+  UefiRuntimeServicesTableLib
+  PrintLib
+  MemoryAllocationLib
+
+[Protocols]
+  gEfiGraphicsOutputProtocolGuid
+  gEfiBlockIoProtocolGuid
+  gEfiSimpleTextOutProtocolGuid
