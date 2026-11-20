@@ -31,7 +31,7 @@ def main():
         "files": []
     }
 
-    scan_dirs = ["docs", "config", "shell/scripts", "scripts", "devicetree"]
+    scan_dirs = ["docs", "config", "shell/scripts", "scripts", "tests", "platform", "devicetree", "build"]
     for d in scan_dirs:
         dirpath = os.path.join(PROJECT_ROOT, d)
         if not os.path.exists(dirpath):
@@ -48,9 +48,15 @@ def main():
                     "sha256": sha256
                 })
 
-    out_file = os.path.join(MANIFEST_DIR, "milestone1_manifest.json")
+    out_file = os.path.join(MANIFEST_DIR, "milestone2_manifest.json")
     with open(out_file, "w") as f:
         json.dump(manifest, f, indent=2)
+
+    # Also write milestone1_manifest.json for historical preservation
+    legacy_file = os.path.join(MANIFEST_DIR, "milestone1_manifest.json")
+    if not os.path.exists(legacy_file):
+        with open(legacy_file, "w") as f:
+            json.dump(manifest, f, indent=2)
 
     print(f"Manifest generated successfully with {len(manifest['files'])} files.")
     print(f"Saved to: {out_file}")

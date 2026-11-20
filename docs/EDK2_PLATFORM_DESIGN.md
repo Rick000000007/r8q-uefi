@@ -1,146 +1,231 @@
-# Project R8Q UEFI: EDK II Platform Design & Architecture
+# Project R8Q UEFI: EDK II Platform Design
 
-**Target Platform:** Samsung Galaxy S20 FE 5G (SM-G781B / r8q / SM8250)  
-**Package Name:** `R8QPkg`  
-**Base Framework:** EDK II (Pinned to `edk2-stable202408` / `edk2-stable202411`)  
-**Document Revision:** 1.0.0-M1  
-**Status:** Approved Architectural Baseline  
+**Target:** Samsung Galaxy S20 FE 5G (`SM-G781B`, `r8q`, SM8250)
+**Package:** `R8QPkg`
+**EDK II pin:** `edk2-stable202411` (`0f3867fa6ef0553e26c42f7d71ff6bdb98429742`), with `edk2-stable202408.01` as fallback.
+**Document revision:** 1.1.0-M1 (corrected baseline)
+**Status:** Design only. No EDK II platform build exists yet.
 
 ---
 
-## 1. Package Directory Hierarchy
+## 1. Design goals
 
-The platform package `R8QPkg` is structured in full compliance with the UEFI Platform Initialization (PI) and UEFI 2.10 specifications:
+1. Build a small, auditable ARM64 EDK II platform that can be tested in QEMU before hardware.
+2. Keep the stock PBL/XBL/ABL and secure world untouched.
+3. Treat the live FDT and memory map as the source of truth.
+4. Avoid hardcoded variant data (RAM size, panel, touch, charger, storage).
+5. Make every hardware address a named PCD with a source comment and a runtime sanity check.
 
-```
+---
+
+## 2. Package layout
+
+The planned package is:
+
+```text
 platform/R8QPkg/
-├── R8QPkg.dec                      # Platform Package Declaration
-├── R8QPkg.dsc                      # Platform Description / Build Rules
-├── R8QPkg.fdf                      # Firmware Device / Flash Definition
+├── R8QPkg.dec
+├── R8QPkg.dsc                  # planned; not committed as a working build
+├── R8QPkg.fdf                  # planned
 ├── Include/
-│   ├── Configuration/
-│   │   └── DeviceTree.h
 │   ├── Library/
 │   │   ├── R8QPlatformLib.h
-│   │   └── SimpleFBLib.h
+│   │   └── R8QFdt.h
 │   └── Protocol/
 │       ├── R8QBattery.h
 │       └── R8QThermal.h
 ├── Library/
-│   ├── ArmPlatformLib/             # Pre-Pi memory mapping & core initialization
-│   ├── FramebufferLib/             # Continuous splash framebuffer mapping
-│   ├── PlatformPeiLib/             # Platform PEI initialization helpers
-│   ├── SerialPortLib/              # Qualcomm QUP GENI UART driver
-│   └── TimerLib/                   # Architectural timer library bindings
+│   ├── R8QPlatformLib/         # live memory map, reserved regions, platform info
+│   ├── R8QFdtLib/              # FDT validation/patching helpers
+│   ├── R8QSerialPortLib/       # QUP UART, only after pin/clock validation
+│   └── R8QFramebufferLib/      # inherited framebuffer probe
 ├── Drivers/
-│   ├── ButtonDxe/                  # Physical volume keys input driver
-│   ├── SimpleFbDxe/                # Continuous Splash Graphics Output Protocol
-│   ├── BatteryDxe/                 # Fuel gauge / PMIC telemetry protocol
-│   ├── ThermalDxe/                 # TSENS thermal monitoring protocol
-│   └── TouchDxe/                   # SEC TS absolute pointer protocol
-└── Applications/
-    ├── Diagnostics/                # R8Q Hardware Inspector suite
-    └── MultiBoot/                  # Multi-OS Boot Manager application
+│   ├── SimpleFbDxe/            # GOP over inherited framebuffer
+│   ├── FileVariableDxe/        # ESP-backed variables
+│   ├── ButtonDxe/              # hardware keys
+│   ├── UfsDxe/                 # UFS host + LUN enumeration
+│   ├── SdMmcDxe/               # SDHCI
+│   ├── XhciDxe/                # DWC3 host, if validated
+│   ├── PmicDxe/                # PMIC telemetry
+│   └── ThermalDxe/             # TSENS
+├── Applications/
+│   ├── Diagnostics/            # shell commands
+│   └── BootManager/            # Linux/recovery/UEFI boot menu
+└── Acpi/                       # research only, no tables yet
 ```
+
+`R8QPkg.dec` exists in Milestone 1 and defines the package GUID, protocol GUIDs, and a small set of candidate PCDs. The DSC/FDF and drivers are Milestone 2+ work.
 
 ---
 
-## 2. Firmware Layout & Memory Organization (FDF)
+## 3. Firmware device layout
 
-The firmware is assembled into a single relocatable Firmware Device (FD) binary image named `R8Q_EFI.fd`:
+A candidate layout, not a validated image:
 
-```
-+-------------------------------------------------------------+ 0x00000000
-| Pre-Pi / SEC Phase Entry Wrapper (64 KB)                    |
-| - ABL Entry Interface (AArch64 register setup)              |
-| - ARM64 Stack Establishment                                 |
-| - Memory Detection & Page Table Mapping                     |
-+-------------------------------------------------------------+ 0x00010000
-| DXE Core & Foundation Drivers (384 KB)                      |
-| - Memory Allocation Services                                |
-| - Architectural Protocols (Timer, Interrupt, CPU)           |
-+-------------------------------------------------------------+ 0x00070000
-| Hardware Drivers FV (FVMAIN) (1536 KB)                      |
-| - SimpleFbDxe (GOP Display)                                 |
-| - ConSplitter & Graphics Console                            |
-| - UfsDxe / PartitionDxe / FatDxe                            |
-| - UsbBusDxe / XhciDxe / UsbKbDxe                            |
-| - BatteryDxe / ThermalDxe / ButtonDxe                       |
-+-------------------------------------------------------------+ 0x001F0000
-| Shell & Diagnostic Applications FV (FVAPPS) (2048 KB)       |
-| - Full UEFI Shell 2.2 Binary                                |
-| - 19 R8Q Diagnostic Commands Suite                          |
-| - Multi-OS Boot Manager Application                         |
-+-------------------------------------------------------------+ 0x003F0000 (Total ~4 MB FD)
+```text
+FD (candidate base 0x9E400000, candidate size 0x00400000)
+┌──────────────────────────────────────────────────────────────┐
+│ SEC/PrePi + early platform code                              │
+│ - entry shim / ARM64 header (if required by ABL)             │
+│ - stack and early heap in a verified free window             │
+│ - live FDT validation and memory-map construction            │
+├──────────────────────────────────────────────────────────────┤
+│ DXE core + architectural protocols                           │
+│ - CPU, timer, GIC, exception handling                        │
+├──────────────────────────────────────────────────────────────┤
+│ Platform drivers                                              │
+│ - GOP, variables, storage, input, telemetry                   │
+├──────────────────────────────────────────────────────────────┤
+│ Applications                                                  │
+│ - UEFI Shell, diagnostics, boot manager                      │
+└──────────────────────────────────────────────────────────────┘
 ```
 
-### 2.1 Memory Execution Regions
-- **FD Load Base:** `0x9E400000` (safe region above continuous splash and below secure carveouts)
-- **Primary Stack Base:** `0x9E3F0000` (Top of FD, descending 64 KB)
-- **Early Heap Base:** `0x9E3B0000` (64 KB early heap for Pre-Pi)
-- **DXE System Memory Range:** Dynamically claimed from `0xA0002000` to `0xB0000000` (255 MiB pool)
+The base `0x9E400000` is an **inference** from the downstream reserved-memory map: it is the 12 MiB gap between `dfps_data` end (`0x9E400000`) and `sec_debug` start (`0x9F000000`). It is not validated. The `edk2-msm` reference uses `0xCE000000` + `0x00700000`; that is an alternative candidate, not a target fact. The final base must be a build parameter and must be checked against the live map.
+
+The FDF must not assume that the FD is the only thing in the window. It must reserve space for:
+
+- the FD image;
+- the PrePi stack;
+- the early heap;
+- page tables;
+- the DXE memory pool if it is placed in the same window.
+
+If the window is too small, the platform must use a different free region rather than overlapping a carveout.
 
 ---
 
-## 3. Platform Configuration Database (PCD) Architecture
+## 4. PCD strategy
 
-Platform parameters are defined using EDK II PCDs in `R8QPkg.dsc`:
+PCDs are grouped into three classes:
+
+### 4.1 Verified SoC constants
+
+These are source-verified and unlikely to vary:
 
 ```ini
-[PcdsFixedAtBuild.common]
-  # System Architecture & Cores
-  gArmTokenSpaceGuid.PcdArmArchTimerFreqInHz|19200000
-  gArmTokenSpaceGuid.PcdGicDistributorBase|0x17A00000
-  gArmTokenSpaceGuid.PcdGicRedistributorsBase|0x17A60000
-  gArmTokenSpaceGuid.PcdArmPrimaryCore|0x00000000
-
-  # Display Framebuffer Configuration
-  gR8QPkgTokenSpaceGuid.PcdFrameBufferBase|0x9C000000
-  gR8QPkgTokenSpaceGuid.PcdFrameBufferSize|0x02300000
-  gR8QPkgTokenSpaceGuid.PcdDisplayWidth|1080
-  gR8QPkgTokenSpaceGuid.PcdDisplayHeight|2400
-  gR8QPkgTokenSpaceGuid.PcdDisplayBpp|32
-
-  # Serial Debug Console (QUP GENI UART)
-  gR8QPkgTokenSpaceGuid.PcdUartBaseAddress|0x00988000
-  gR8QPkgTokenSpaceGuid.PcdUartBaudRate|115200
-
-  # Storage Controllers
-  gR8QPkgTokenSpaceGuid.PcdUfsHostControllerBase|0x01D84000
-  gR8QPkgTokenSpaceGuid.PcdSdhciControllerBase|0x08804000
+gArmTokenSpaceGuid.PcdArmArchTimerFreqInHz|19200000
+gArmTokenSpaceGuid.PcdGicDistributorBase|0x17A00000
+gArmTokenSpaceGuid.PcdGicRedistributorsBase|0x17A60000
 ```
 
+### 4.2 Verified controller addresses
+
+These are source-verified for the captured unit but must still be sanity-checked:
+
+```ini
+gR8QPkgTokenSpaceGuid.PcdFrameBufferBase|0x9C000000
+gR8QPkgTokenSpaceGuid.PcdFrameBufferSize|0x02300000
+gR8QPkgTokenSpaceGuid.PcdDisplayWidth|1080
+gR8QPkgTokenSpaceGuid.PcdDisplayHeight|2400
+gR8QPkgTokenSpaceGuid.PcdDisplayStride|4320
+gR8QPkgTokenSpaceGuid.PcdUfsHostControllerBase|0x01D84000
+gR8QPkgTokenSpaceGuid.PcdUfsIceBase|0x01D90000
+gR8QPkgTokenSpaceGuid.PcdSdhciControllerBase|0x08804000
+gR8QPkgTokenSpaceGuid.PcdUartBaseAddress|0x00988000
+```
+
+The UART address is verified as an SoC UART, but physical access and pin mux are not. The framebuffer is verified as a reserved buffer, but scanout at handoff is not.
+
+### 4.3 Candidate / runtime values
+
+These must not be fixed PCDs in a production build:
+
+- RAM base/size and the memory map;
+- FD base/size;
+- UFS LUN/partition map;
+- panel/touch/charger/fuel-gauge variant;
+- USB host role;
+- PCIe endpoint population;
+- ACPI tables.
+
+They belong in runtime discovery code, a generated platform description, or a build-time configuration file that is explicitly marked "candidate."
+
 ---
 
-## 4. Boot Execution Phases
+## 5. Boot phases
 
-### 4.1 SEC / Pre-Pi Phase
-1. Invoked by ABL at entry address with Device Tree pointer in `x0`.
-2. Preserves `x0` and command line arguments.
-3. Configures ARMv8 architectural system registers:
-   - Sets `CPACR_EL1.FPEN = 0b11` to enable full access to FP/SIMD registers.
-   - Clears pending interrupts in GIC.
-4. Initializes page tables with flat 1:1 mapping:
-   - DRAM (`0x80000000`–`0x27FFFFFFF`): Normal, Inner/Outer Write-Back, Non-Shareable.
-   - Peripherals / MMIO (`0x00000000`–`0x7FFFFFFF`): Device-nGnRnE.
-   - Continuous Splash (`0x9C000000`–`0x9E300000`): Normal Memory, Write-Combining.
-5. Enables MMU and data/instruction caches.
-6. Transfers control to DXE Foundation Entry Point.
+### 5.1 SEC/PrePi
 
-### 4.2 DXE Phase (Driver Execution Environment)
-1. DXE Core initializes memory management, event timers, and protocol databases.
-2. Dispatches architectural protocol drivers: CPU, Timer, GIC Interrupt.
-3. Loads R8Q SimpleFbDxe to provide instant visual feedback on AMOLED display.
-4. Dispatches storage drivers (UFS, SDHCI, PartitionDxe, FatPkg).
-5. Dispatches USB host stack and keyboard/mouse drivers.
-6. Dispatches R8Q custom telemetry drivers (Battery, Thermal, Physical Buttons).
+1. Preserve the incoming `x0` (candidate DTB pointer) and validate the FDT header before dereferencing it.
+2. Detect `CurrentEL`; handle EL1 and EL2 without assuming one.
+3. Disable interrupts and reconfigure MMU/caches safely.
+4. Establish a stack in a verified free region.
+5. Parse `/memory` and `/reserved-memory`; build a conservative memory map.
+6. Reserve the FD, stack, heap, page tables, framebuffer, and every vendor carveout.
+7. Enable the MMU and caches with a flat mapping that covers DRAM and the required MMIO windows.
+8. Transfer to DXE.
 
-### 4.3 BDS Phase (Boot Device Selection)
-1. Dispatches UEFI Boot Manager.
-2. If automatic boot timeout expires or user interrupts:
-   - Launches interactive UEFI Shell or R8Q Multi-OS Boot Menu.
-3. Loads selected OS bootloader (`EFI/BOOT/BOOTAA64.EFI` or Linux `Image`).
+The entry shim must be able to present an ARM64 Linux-image-compatible header if the measured ABL path requires it. That header format is a hypothesis until the stock `BOOT` image and ABL behavior are inspected.
+
+### 5.2 DXE
+
+1. Dispatch CPU, timer, GIC, and exception drivers.
+2. Publish GOP only if the framebuffer probe passes.
+3. Publish a serial console only if the UART is validated.
+4. Load the file-backed variable driver.
+5. Bring up UFS read-only, then partition/FAT.
+6. Bring up MicroSD, USB, PCIe, and telemetry only as dependencies allow.
+7. Dispatch the shell and boot manager.
+
+### 5.3 BDS
+
+1. Read boot entries from the ESP.
+2. If a key is held or the timeout expires, enter the shell.
+3. Otherwise boot the selected Linux/recovery/UEFI target.
+4. On failure, return to the menu or shell; do not automatically write to internal storage.
 
 ---
 
-*Authored by Antigravity Engineering for Project R8Q UEFI.*
+## 6. Memory map rules
+
+- Use `EfiReservedMemoryType` for all `no-map` and vendor carveouts.
+- Use `EfiMemoryMappedIO` for MMIO windows that are not RAM.
+- Use `EfiBootServicesCode`/`Data` only for regions the firmware actually owns.
+- Use `EfiConventionalMemory` only for regions that are free in the live FDT and not used by the firmware.
+- Keep the framebuffer reserved even when GOP is active; the OS may reuse it only after its display driver takes over.
+- Do not describe the 69 MiB gap between the two RAM ranges as conventional memory unless the live map says it is usable.
+- Do not assume that the downstream `removed` region is free; it is explicitly reserved.
+
+---
+
+## 7. Build outputs (planned)
+
+| Output | Path | Status |
+|---|---|---|
+| EDK II FD | `build/R8Q_EFI.fd` | Not built |
+| Boot image wrapper | `build/r8q-uefi-boot.img` | Not built |
+| Build manifest | `manifests/build_manifest.json` | Not generated |
+| Verification log | `logs/build.log` | Not generated |
+| QEMU test log | `logs/qemu.log` | Not generated |
+
+The Milestone 1 `scripts/build.sh` intentionally does **not** build firmware. It validates the documentation baseline and regenerates the source manifest. A real build driver is Milestone 2 work.
+
+---
+
+## 8. QEMU strategy
+
+Before hardware, the platform should be testable with `qemu-system-aarch64` using a virtual machine or a minimal ARM virt platform. The QEMU target does not need to emulate SM8250 peripherals; it needs to exercise:
+
+- SEC/PrePi entry and memory-map construction;
+- DXE dispatch;
+- GOP on a synthetic framebuffer;
+- file-backed variables on a virtual FAT disk;
+- UEFI Shell startup;
+- Linux EFI-stub handoff with a test kernel/DTB.
+
+The host currently lacks `qemu-system-aarch64`; installing it is a Milestone 2 prerequisite.
+
+---
+
+## 9. Open design questions
+
+1. Does ABL require an Android boot-image wrapper, an ARM64 Linux-image header, or a raw FD?
+2. What is the exact load address and available free window?
+3. Does ABL provide a UEFI memory map, or only an FDT?
+4. Is the UFS controller usable after ABL without a full reset?
+5. Can the inherited framebuffer be mapped safely with the firmware's cache attributes?
+6. Which variable-store medium is available before UFS/SD drivers exist?
+7. What is the minimum viable console for first hardware bring-up?
+
+These questions are tracked in `docs/VERIFICATION_LEDGER.md` and must be resolved before the corresponding code is treated as portable.

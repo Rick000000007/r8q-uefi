@@ -1,109 +1,289 @@
-# Project R8Q UEFI: Phased Implementation Schedule & Milestones
+# Project R8Q UEFI: Phased Implementation Schedule
 
-**Target Platform:** Samsung Galaxy S20 FE 5G (SM-G781B / r8q / SM8250)  
-**Document Revision:** 1.0.0-M1  
-**Status:** Approved Architectural Baseline  
-
----
-
-## 1. Twelve-Milestone Engineering Roadmap
-
-In accordance with Section 17 of the Master Engineering Specification, the development of Project R8Q UEFI progresses through twelve distinct, sequentially validated milestones. Each milestone includes explicit completion criteria, technical dependencies, and verification procedures.
+**Target:** Samsung Galaxy S20 FE 5G (`SM-G781B`, `r8q`, SM8250)
+**Document revision:** 1.1.0-M1 (corrected baseline)
+**Status:** Evidence-gated plan. Durations are indicative, not commitments.
 
 ---
 
-### Milestone 1: Platform Architecture & Hardware Initialization Research
-- **Objective:** Establish the foundational engineering baseline, reverse-engineer boot chain constraints, map all memory and peripheral carveouts, formulate the non-destructive security model, and verify the host toolchain.
-- **Deliverables:**
-  1. Full UEFI Architecture Document (`docs/UEFI_ARCHITECTURE.md`)
-  2. Hardware Initialization Dependency Graph (`docs/HARDWARE_DEPENDENCY_GRAPH.md`)
-  3. Firmware Driver Support Matrix (`docs/FIRMWARE_DRIVER_SUPPORT_MATRIX.md`)
-  4. EDK II Platform Design (`docs/EDK2_PLATFORM_DESIGN.md`)
-  5. Shell Command Implementation Plan (`docs/SHELL_COMMAND_SUITE.md`)
-  6. Linux Boot Design (`docs/LINUX_BOOT_DESIGN.md`)
-  7. Windows Compatibility Report (`docs/WINDOWS_COMPATIBILITY_REPORT.md`)
-  8. Recovery and Safety Plan (`docs/RECOVERY_AND_SAFETY_PLAN.md`)
-  9. Reproducible Build Strategy (`docs/REPRODUCIBLE_BUILD_STRATEGY.md`)
-  10. Phased Implementation Schedule (`docs/PHASED_IMPLEMENTATION_SCHEDULE.md`)
-- **Completion Criteria:** All hardware nodes identified in live DTS; memory carveouts mapped; toolchain validated; directory hierarchy created in git repository; zero modifications made to device storage.
+## 1. Rules
+
+- A milestone is complete only when its exit criteria are met and recorded.
+- Hardware milestones require explicit user authorization before any device write.
+- No milestone may claim a hardware subsystem works without a driver, a protocol, and a test record.
+- A failed safety gate stops the schedule; it is not bypassed to keep a date.
+- Documentation and verification ledger updates are part of every milestone.
 
 ---
 
-### Milestone 2: EDK II ARM64 Platform Foundation
-- **Objective:** Integrate upstream EDK II framework, configure `R8QPkg` platform package, establish Pre-Pi SEC wrapper, configure ARMv8 architectural system registers, and implement early memory mapping.
-- **Deliverables:** `R8QPkg.dec`, `R8QPkg.dsc`, `R8QPkg.fdf`, Pre-Pi entry assembly, page table initialization library, and BaseTools compilation scripts.
-- **Completion Criteria:** `R8Q_EFI.fd` builds cleanly without warnings using GCC5 on ARM64; memory map parses 8 GB LPDDR5 cleanly.
+## 2. Milestone summary
+
+| Milestone | Goal | Device writes | Exit criteria |
+|---|---|---|---|
+| **M1** | Research baseline | None | Corrected docs, verification ledger, manifest, sanitized FDT, host checks. |
+| **M2** | EDK II build + QEMU | None | Pinned EDK II builds a minimal AArch64 image; QEMU boot log recorded. |
+| **M3** | Handoff instrumentation | None (read-only) | Live FDT, memory map, partition map, and handoff state captured; restore plan documented. |
+| **M4** | First hardware payload | `BOOT` only, authorized | Custom payload boots to a console; stock restore tested. |
+| **M5** | Storage + variables | `BOOT` only | UFS read-only enumeration, partition/FAT, file-backed variables. |
+| **M6** | Shell + diagnostics | `BOOT` only | Shell runs; safe diagnostic subset works. |
+| **M7** | Linux boot | `BOOT` only | Linux kernel reaches userspace; display/serial console works. |
+| **M8** | Recovery integration | `BOOT` only | Recovery path and rollback tested. |
+| **M9** | Windows research | None | ACPI/driver gap analysis; no install claim. |
+| **M10** | Optional GUI + hardening | `BOOT` only | GUI, stress tests, reproducible release. |
 
 ---
 
-### Milestone 3: UEFI Console & Core Services
-- **Objective:** Implement the Continuous Splash Framebuffer GOP driver (`SimpleFbDxe`), connect EDK II ConSplitter, and initialize the architectural timer and GICv3 interrupt protocols.
-- **Deliverables:** `SimpleFbDxe`, glyph font renderer, `EFI_GRAPHICS_OUTPUT_PROTOCOL` interface, and text console displaying firmware banner on the AMOLED screen (`1080×2400`).
-- **Completion Criteria:** Direct display output visible on internal AMOLED panel at native resolution with zero screen tearing or flicker.
+## 3. Milestone details
+
+### M1 — Research baseline (complete)
+
+**Objective:** Replace the unsupported "approved" claims with an evidence-graded baseline.
+
+**Deliverables:**
+
+- `docs/RESEARCH_BASELINE.md`;
+- `docs/VERIFICATION_LEDGER.md`;
+- corrected architecture, dependency, driver, platform, shell, Linux, Windows, recovery, build, and schedule documents;
+- sanitized downstream FDT and provenance note;
+- updated `config/platform.env`, `R8QPkg.dec`, scripts, and manifest.
+
+**Exit criteria:**
+
+- all prior fabricated claims are removed or downgraded;
+- every hardware value is tagged V/I/U with a source;
+- no device write or firmware build is claimed;
+- manifest regenerated and committed;
+- `scripts/verify_environment.sh` passes on the host.
+
+**Status:** Complete when this commit is made.
 
 ---
 
-### Milestone 4: UFS and MicroSD Storage Subsystem
-- **Objective:** Implement Qualcomm UFS 3.1 host driver (`qcom,ufshc` @ `0x01D84000`) and Qualcomm SDHCI driver (`0x08804000`); integrate `PartitionDxe` and `FatPkg`.
-- **Deliverables:** `UfsDxe`, `SdMmcDxe`, GPT partition enumeration protocol, and FAT32 Simple File System driver.
-- **Completion Criteria:** R8Q UEFI successfully enumerates LUN 0 (`sda`), LUN 3 (`sdd`), and external MicroSD; discovers partitions; reads files from FAT32 ESP without corruption.
+### M2 — EDK II build and QEMU foundation
+
+**Objective:** Prove that a minimal ARM64 EDK II image can be built and booted in QEMU.
+
+**Work:**
+
+- initialize the pinned EDK II submodules;
+- build BaseTools;
+- create a minimal `R8QPkg.dsc`/`.fdf` with SEC/PrePi and a null console;
+- build for AARCH64 with a supported toolchain;
+- boot in `qemu-system-aarch64` (virt or a minimal platform);
+- record the exact commands, versions, image hash, and QEMU log.
+
+**Exit criteria:**
+
+- build completes without errors;
+- image boots in QEMU to a known point;
+- memory map and entry code do not overlap;
+- no hardware claim is made.
+
+**Risks:** EDK II version/toolchain incompatibility; missing submodules; QEMU platform mismatch.
 
 ---
 
-### Milestone 5: Full Interactive UEFI Shell
-- **Objective:** Integrate ARM64 UEFI Shell v2.2 into firmware flash image (`FVAPPS`); bind standard shell commands to GOP console and USB/button input.
-- **Deliverables:** Interactive UEFI Shell, `startup.nsh` script execution engine, filesystem navigation commands (`ls`, `cd`, `cat`, `map`), and environment variable support.
-- **Completion Criteria:** Interactive shell accessible on phone display; commands executable via connected USB-C keyboard.
+### M3 — Read-only handoff instrumentation
+
+**Objective:** Measure the real device before writing anything.
+
+**Work:**
+
+- capture the live FDT, `/memory`, `/reserved-memory`, and partition map read-only;
+- record the stock `BOOT` image hash and bootloader/recovery versions;
+- determine the ABL payload format and load address from the stock image and public documentation;
+- document the handoff state as far as possible without modifying the device;
+- write and test the restore plan on a disposable unit or with a verified path.
+
+**Exit criteria:**
+
+- live map matches or explains the differences from `r8q-live.dts`;
+- partition map and stock image hashes are recorded;
+- restore plan is documented and, if possible, tested;
+- user authorization checklist is ready.
+
+**Device writes:** None.
 
 ---
 
-### Milestone 6: Original R8Q Diagnostic Command Suite
-- **Objective:** Implement the nineteen original diagnostic commands in `R8QPkg/Applications/Diagnostics/`.
-- **Deliverables:** Compiled diagnostic commands (`sysinfo`, `cpuinfo`, `memmap`, `storage`, `partitions`, `display`, `gpuinfo`, `battery`, `powerinfo`, `thermal`, `dtbinfo`, `firmware`, `pcieinfo`, `usbinfo`, `inputinfo`, `bootmenu`, `bootlog`, `diagnostics`, `recovery`).
-- **Completion Criteria:** Each command returns verified live hardware telemetry; `diagnostics` command successfully exports complete hardware audit report to storage.
+### M4 — First hardware payload
+
+**Objective:** Boot a minimal R8Q UEFI payload on the target unit.
+
+**Preconditions:** M3 complete; verified stock backup; explicit user authorization; tested restore path.
+
+**Work:**
+
+- package the minimal payload in the format required by ABL;
+- write only the `BOOT` partition;
+- boot to a console (inherited framebuffer or serial);
+- record the exact output and any faults;
+- restore the stock `BOOT` image and verify it.
+
+**Exit criteria:**
+
+- payload boots to a known banner or shell prompt;
+- no bootloader/calibration/recovery partition is touched;
+- restore is tested;
+- the test record includes the image hash and commands.
+
+**Risks:** unknown load address, display state, memory map, or ABL verification behavior.
 
 ---
 
-### Milestone 7: Linux Boot Manager & Kernel Handoff
-- **Objective:** Implement native ARM64 Linux kernel boot manager, runtime Device Tree synthesis, memory reservation preservation, initramfs handoff, and `ExitBootServices()` handling.
-- **Deliverables:** Linux Boot Manager application, DTB patcher library, `boot-linux.nsh` script.
-- **Completion Criteria:** Linux ARM64 kernel booted via UEFI EFI stub; device tree handoff validated; kernel mounts root filesystem and enters userspace.
+### M5 — Storage and variables
+
+**Objective:** Read internal storage safely and provide a variable store.
+
+**Work:**
+
+- UFS host initialization, read-only LUN enumeration;
+- partition table parsing;
+- FAT driver on an external/disposable ESP;
+- file-backed variable store;
+- no internal partition writes.
+
+**Exit criteria:**
+
+- UFS LUNs and partitions are enumerated read-only;
+- the ESP is readable;
+- variables persist across a reboot on the test medium;
+- no internal `uefivarstore` write occurs.
 
 ---
 
-### Milestone 8: Recovery Architecture & Safety Mechanisms
-- **Objective:** Finalize independent recovery environment, emergency safe-mode key shortcuts, and boot restoration utilities.
-- **Deliverables:** `boot-recovery.nsh`, automated fallback on boot failure, volume-key safe mode trigger.
-- **Completion Criteria:** Holding Volume Up during boot reliably enters UEFI Shell; failed boot cleanly restarts or enters recovery; Odin Download Mode remains 100% accessible.
+### M6 — Shell and diagnostics
+
+**Objective:** Provide a usable shell and a safe diagnostic subset.
+
+**Work:**
+
+- integrate UEFI Shell 2.2;
+- implement `sysinfo`, `memmap`, `cpuinfo`, `display`, `fdtinfo`, `keys`;
+- add storage/PCIe/USB/telemetry commands only as drivers become available;
+- label every output with its source and confidence.
+
+**Exit criteria:**
+
+- shell runs on the target console;
+- safe commands produce measured or `UNKNOWN` values, never fabricated ones;
+- no command writes to a protected partition.
 
 ---
 
-### Milestone 9: Windows ARM64 & ACPI Compatibility Research
-- **Objective:** Author comprehensive ACPI 6.3 tables (DSDT, SSDT, MADT, GTDT, DBG2, PPTT) for SM8250; implement UEFI runtime services for Windows virtual memory mapping.
-- **Deliverables:** `R8QPkg/AcpiPlatformDxe`, compiled AML tables, Windows memory map validation test.
-- **Completion Criteria:** Windows Boot Manager (`bootmgfw.efi`) loads without firmware exceptions; ACPI tables parsed by Microsoft validation tooling.
+### M7 — Linux boot
+
+**Objective:** Boot a Linux ARM64 kernel to userspace.
+
+**Work:**
+
+- EFI-stub path with DTB/initrd;
+- direct-boot fallback;
+- memory reservation preservation;
+- console/display handoff;
+- root filesystem and initrd validation.
+
+**Exit criteria:**
+
+- kernel reaches userspace;
+- the DTB reserved map matches the live map;
+- display or serial console works;
+- the test record includes the kernel, DTB, initrd, and firmware hashes.
 
 ---
 
-### Milestone 10: Graphical Firmware Interface
-- **Objective:** Develop lightweight, modular graphical dashboard utilizing GOP.
-- **Deliverables:** R8Q Graphical Dashboard, touchscreen pointer integration (`TouchDxe`), safe fallback to text console.
-- **Completion Criteria:** Touchscreen navigation functional; graphical UI renders crisply at 1080×2400 without degrading firmware startup latency.
+### M8 — Recovery integration
+
+**Objective:** Make recovery a first-class, tested path.
+
+**Work:**
+
+- recovery image or maintenance shell on the ESP;
+- boot menu entry;
+- rollback to stock `BOOT`;
+- hardware-key safe mode;
+- incident-response documentation.
+
+**Exit criteria:**
+
+- recovery boots;
+- stock restore is tested;
+- a failed boot returns to the menu/shell without writing internal storage.
 
 ---
 
-### Milestone 11: USB, Input & Additional Hardware Drivers
-- **Objective:** Finalize Synopsys DWC3 USB host controller stack, PCIe bus enumeration for QCA6390 Wi-Fi, and extended PMIC controls.
-- **Deliverables:** `XhciDxe`, `PciHostBridgeDxe`, USB-C OTG power switching.
-- **Completion Criteria:** External USB storage and keyboards operate seamlessly; PCIe endpoints enumerate properly.
+### M9 — Windows ARM64 research
+
+**Objective:** Determine whether Windows is feasible, without claiming it is.
+
+**Work:**
+
+- ACPI table requirements and prototypes;
+- storage/USB/display driver gap analysis;
+- runtime-services validation;
+- licensed Windows PE test only if the prerequisites exist.
+
+**Exit criteria:**
+
+- a documented blocker matrix with evidence;
+- no installability or functionality claim unless a PE boot is recorded;
+- a tested restore path remains available.
 
 ---
 
-### Milestone 12: Reliability, Stress & Multi-OS Validation
-- **Objective:** Execute full validation test matrix across all subsystems: multi-OS boot switching, thermal stress testing, cold/warm reboot cycles, and documentation release.
-- **Deliverables:** Final signed firmware binaries, checksum manifests, complete architectural documentation suite, and user flashing guide.
-- **Completion Criteria:** Zero memory leaks in firmware; 50 consecutive successful boot cycles without hang; clean multi-OS handoff between Linux, Recovery, and UEFI Shell.
+### M10 — Optional GUI and hardening
+
+**Objective:** Improve usability and reliability after the core platform works.
+
+**Work:**
+
+- optional graphical boot menu/dashboard;
+- touch/pointer support if the controller is identified;
+- stress/reboot testing;
+- reproducible release build and signed manifest.
+
+**Exit criteria:**
+
+- GUI is optional and falls back to text;
+- stress test results are recorded;
+- release artifacts are reproducible and hashed;
+- documentation matches the tested build.
 
 ---
 
-*Authored by Antigravity Engineering for Project R8Q UEFI.*
+## 4. Indicative sequencing
+
+The milestones are dependency-ordered, not date-ordered. A realistic sequence is:
+
+```text
+M1 → M2 → M3 → [authorization gate] → M4 → M5 → M6 → M7 → M8 → M9 → M10
+```
+
+M9 can run in parallel with M5–M8 as a research task, but it must not block the Linux/recovery path and must not justify device writes.
+
+---
+
+## 5. Schedule risks
+
+| Risk | Effect | Mitigation |
+|---|---|---|
+| No device access | M3/M4 cannot start | Continue M2/QEMU and host-side work. |
+| Unknown ABL format | Payload may not boot | Inspect stock images and public documentation; instrument read-only first. |
+| UFS driver complexity | Storage/variables delayed | Start with ESP/MicroSD; keep internal storage read-only. |
+| Display handoff failure | No visual console | Validate serial/headless fallback. |
+| USB host unverified | No keyboard | Use hardware keys or serial. |
+| Windows driver gap | M9 stalls | Keep Windows research-only; do not promise a date. |
+| Safety incident | Project stops | Backup, restore test, authorization gate. |
+
+---
+
+## 6. Definition of done
+
+A milestone is done when:
+
+- the code/docs are committed;
+- the verification ledger is updated;
+- the test commands and outputs are recorded;
+- the manifest is regenerated;
+- the next milestone's preconditions are met;
+- no unsupported claim remains in the documentation.

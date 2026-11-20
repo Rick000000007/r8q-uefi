@@ -3,62 +3,92 @@
   "device": "Samsung Galaxy S20 FE 5G (SM-G781B)",
   "codename": "r8q",
   "soc": "Qualcomm Snapdragon 865 (SM8250)",
-  "generated_at": "2026-11-20T07:26:02.454960+00:00",
+  "generated_at": "2026-11-20T09:51:18.759900+00:00",
   "files": [
     {
+      "path": "docs/BOOTCHAIN_FEASIBILITY_REPORT.md",
+      "size_bytes": 5285,
+      "sha256": "d3ea4b5811de928779ca6d2ed17dbd28022107342d48de92af33f79b5d2dc319"
+    },
+    {
+      "path": "docs/EDK2_BASELINE_EVALUATION.md",
+      "size_bytes": 4645,
+      "sha256": "e2a21a7d15d2bf5fe3e51c9bcde95bbe7ae3535a39231ae65144aa7bf4b1d72e"
+    },
+    {
       "path": "docs/EDK2_PLATFORM_DESIGN.md",
-      "size_bytes": 6638,
-      "sha256": "8debddf824ea95c9a98644b6b719e0418bcc1f6a8c86cfe8ecb7bcf47f601eb0"
+      "size_bytes": 10378,
+      "sha256": "13f5e4eb10423f6d02907af3c5b7ddbf7fd9e1d811b22c9c187fa708117108b5"
+    },
+    {
+      "path": "docs/ENTRY_HANDOFF_DESIGN.md",
+      "size_bytes": 4644,
+      "sha256": "1ace712adebd79be2adda44499a6f94296146d2ce20ad15783cb30f41cf02dc6"
     },
     {
       "path": "docs/FIRMWARE_DRIVER_SUPPORT_MATRIX.md",
-      "size_bytes": 5433,
-      "sha256": "23a95d816b154cc41f5de8e41424c43e3fbe55045b94c9d1759d88add95a6e12"
+      "size_bytes": 7876,
+      "sha256": "a053552a5fe019b27d88f887d272fb42187221c66f8d2258db28ef6421885b85"
     },
     {
       "path": "docs/HARDWARE_DEPENDENCY_GRAPH.md",
-      "size_bytes": 6185,
-      "sha256": "77fbe1f52b37e4e934e149bb14f857697451803a24af11dd018ffc802761a90c"
+      "size_bytes": 7841,
+      "sha256": "8f980049cad82236a1cd2abcd3077866eff8d0156d4933a32e8a10db35b3e806"
     },
     {
       "path": "docs/LINUX_BOOT_DESIGN.md",
-      "size_bytes": 3816,
-      "sha256": "bcc4472d9754ac758462bf3b7fce7ee23a7411534b66f577b56dc9baeefbb0ce"
+      "size_bytes": 6059,
+      "sha256": "b6494993fc1e1ff48b1fa355e16b1081a308c02b08ff609d626015c654f4fb4e"
+    },
+    {
+      "path": "docs/NVRAM_FILE_STORAGE_DESIGN.md",
+      "size_bytes": 5528,
+      "sha256": "bdcbf155b7bfde6b42bd01903f178e7266d07bd239395170774a47bd0dbdbb82"
     },
     {
       "path": "docs/PHASED_IMPLEMENTATION_SCHEDULE.md",
-      "size_bytes": 7427,
-      "sha256": "a486f79ef6c3aa46d98c14d94ebad42313619711faab7bdce6f564f2f2875fbe"
+      "size_bytes": 9225,
+      "sha256": "927a307a26a7c20fd08001ebd51673b1b78a6432f8f439b5f89fc768c40b0bdb"
     },
     {
       "path": "docs/RECOVERY_AND_SAFETY_PLAN.md",
-      "size_bytes": 3549,
-      "sha256": "d79a581f9c268dd19160023c79791dd67d71efc98078a66337d564900f72ac18"
+      "size_bytes": 6732,
+      "sha256": "23b03814b3b75f20fc05f1590b118e087439971aa8a04c835af963194f9521e9"
     },
     {
       "path": "docs/REPRODUCIBLE_BUILD_STRATEGY.md",
-      "size_bytes": 2698,
-      "sha256": "fadf107b230e3fa33d20d5a9de52cecd967d021a414197a36e63d24104fcc20f"
+      "size_bytes": 5441,
+      "sha256": "137792497befd4475c986343eeef43ec1648896ea681b7b34ed9aa4313926994"
+    },
+    {
+      "path": "docs/RESEARCH_BASELINE.md",
+      "size_bytes": 17286,
+      "sha256": "81169754cb64319b23639b8124a6bbb58885587a8b4a42b4ee86e141b72f8943"
     },
     {
       "path": "docs/SHELL_COMMAND_SUITE.md",
-      "size_bytes": 5348,
-      "sha256": "dfb00e09f32cf871d7bb3744f187553f812c0226323b7a55f3b2969ede6bddac"
+      "size_bytes": 5121,
+      "sha256": "776257881b7f05d1d603fc68cbf5fde67b149508dd196482be516d94d3168e21"
     },
     {
       "path": "docs/UEFI_ARCHITECTURE.md",
-      "size_bytes": 12192,
-      "sha256": "2caa4a9e5ba6198146d202116e341a0cbd552a618e6aa24dc4afc5257673736a"
+      "size_bytes": 14463,
+      "sha256": "8da35da9deebe8b5dceab8d7e4b3ff30efb1b6ebbf8033c93c55d6d6e3b3a8ab"
+    },
+    {
+      "path": "docs/VERIFICATION_LEDGER.md",
+      "size_bytes": 19851,
+      "sha256": "252772addeb2a5a3d472c83f6bad35d3847bc0c9671d451f07cfc83f212bd08e"
     },
     {
       "path": "docs/WINDOWS_COMPATIBILITY_REPORT.md",
-      "size_bytes": 4298,
-      "sha256": "e5eba99ba2e2db4cfacd5be7dd5fae638d6932b7f630d06b872c21f9025c8de4"
+      "size_bytes": 5586,
+      "sha256": "bed8fb5020f6b5bcb49fd988e063cee2ae42f3977481cdc5dbd380b1e02702bb"
     },
     {
       "path": "config/platform.env",
-      "size_bytes": 1390,
-      "sha256": "bddb1032a1744e18bc39eadfb2930f03bb7a933700a7cbc444e39ab0fe77fcda"
+      "size_bytes": 3888,
+      "sha256": "3cf28c34d8e28b4a0eb92e5f1f278e47ad739b90cb8b5573a9faaf32b9733bb6"
     },
     {
       "path": "shell/scripts/boot-linux.nsh",
@@ -87,8 +117,8 @@
     },
     {
       "path": "scripts/build.sh",
-      "size_bytes": 1205,
-      "sha256": "f2b8f26192200517ca7f36e31d4fc2c79b786af043b0aea9ab027d07071aeb5e"
+      "size_bytes": 2999,
+      "sha256": "a5cc7e48bf5d8f398aad54a44532504e7f234c08918b16b1dd34f7b7e6d40222"
     },
     {
       "path": "scripts/gen_manifest.py",
@@ -96,14 +126,24 @@
       "sha256": "0f69ac1021df50f5129cd521ce4d180df4f42395913955fb882a30f5a6aac8b5"
     },
     {
+      "path": "scripts/package_boot_img.py",
+      "size_bytes": 4386,
+      "sha256": "15de5f90a24fc1ced17030b5f3d2b89d3911c3e49b29fb4121bfad21d14c913d"
+    },
+    {
       "path": "scripts/verify_environment.sh",
       "size_bytes": 1472,
       "sha256": "1ccf422eab14c89d2214f418f003ebb10df914b8d7463ed10af3940d532c3596"
     },
     {
+      "path": "devicetree/README.md",
+      "size_bytes": 3548,
+      "sha256": "b1c61cb83484c0583edded9b7c7855d8b1e77e3c21006f99c1f5cf43342aa60a"
+    },
+    {
       "path": "devicetree/r8q-live.dts",
-      "size_bytes": 1234562,
-      "sha256": "ee342423634a9e3f086f8cc355c388910b63309337db9a0f5ec0f77f7d556e7e"
+      "size_bytes": 1234551,
+      "sha256": "9b71666f5ccf53b9c70d587b9befa002c0aa2f1db3420a79084d9b6857ed91c8"
     }
   ]
 }

@@ -4,14 +4,18 @@
 #  Target Platform: Samsung Galaxy S20 FE 5G (SM-G781B / r8q)
 #  SoC: Qualcomm Snapdragon 865 (SM8250)
 #
-#  Copyright (c) 2026, Antigravity Engineering. All rights reserved.
+#  Values in this DEC are either source-verified SoC/controller addresses or
+#  explicitly marked candidates. See docs/VERIFICATION_LEDGER.md. A PCD is not
+#  a hardware guarantee; runtime validation is still required.
+#
+#  Copyright (c) 2026, Project R8Q UEFI contributors. All rights reserved.
 ##
 
 [Defines]
   DEC_SPECIFICATION              = 0x0001001A
   PACKAGE_NAME                   = R8QPkg
   PACKAGE_GUID                   = 3e4b7b20-1a74-4b5c-8902-8a9d1871e84a
-  PACKAGE_VERSION                = 1.0.0
+  PACKAGE_VERSION                = 1.1.0
 
 [Includes]
   Include
@@ -24,17 +28,28 @@
   gR8QThermalProtocolGuid        = { 0xb593f922, 0x2923, 0x4e2c, { 0x9a, 0xd2, 0x01, 0x53, 0x88, 0x81, 0x62, 0x02 } }
 
 [PcdsFixedAtBuild]
-  # Display GOP Framebuffer
+  # Display: continuous-splash framebuffer described by upstream Linux and the
+  # downstream FDT. Scanout state at ABL handoff is UNKNOWN.
   gR8QPkgTokenSpaceGuid.PcdFrameBufferBase|0x9C000000|UINT64|0x00000001
   gR8QPkgTokenSpaceGuid.PcdFrameBufferSize|0x02300000|UINT32|0x00000002
   gR8QPkgTokenSpaceGuid.PcdDisplayWidth|1080|UINT32|0x00000003
   gR8QPkgTokenSpaceGuid.PcdDisplayHeight|2400|UINT32|0x00000004
   gR8QPkgTokenSpaceGuid.PcdDisplayBpp|32|UINT32|0x00000005
+  gR8QPkgTokenSpaceGuid.PcdDisplayStride|4320|UINT32|0x00000006
 
-  # UART Serial Console
+  # Serial debug UART: SoC address is source-verified; board pin mux and
+  # physical access are not.
   gR8QPkgTokenSpaceGuid.PcdUartBaseAddress|0x00988000|UINT64|0x00000010
   gR8QPkgTokenSpaceGuid.PcdUartBaudRate|115200|UINT32|0x00000011
 
-  # Storage Controllers
+  # Interrupt controller and architectural timer: source-verified.
+  gR8QPkgTokenSpaceGuid.PcdGicDistributorBase|0x17A00000|UINT64|0x00000012
+  gR8QPkgTokenSpaceGuid.PcdGicRedistributorsBase|0x17A60000|UINT64|0x00000013
+  gR8QPkgTokenSpaceGuid.PcdArchTimerFreqInHz|19200000|UINT32|0x00000014
+
+  # Storage and USB controller addresses: source-verified. LUN layout, card
+  # detect, and USB host mode remain runtime/board unknowns.
   gR8QPkgTokenSpaceGuid.PcdUfsHostControllerBase|0x01D84000|UINT64|0x00000020
   gR8QPkgTokenSpaceGuid.PcdSdhciControllerBase|0x08804000|UINT64|0x00000021
+  gR8QPkgTokenSpaceGuid.PcdUfsIceBase|0x01D90000|UINT64|0x00000022
+  gR8QPkgTokenSpaceGuid.PcdUsbDwc3Base|0x0A600000|UINT64|0x00000023

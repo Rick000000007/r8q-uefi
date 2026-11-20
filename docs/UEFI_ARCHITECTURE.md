@@ -1,192 +1,266 @@
-# Project R8Q UEFI: Comprehensive Platform Architecture Document
+# Project R8Q UEFI: Platform Architecture
 
-**Target Platform:** Samsung Galaxy S20 FE 5G (SM-G781B / SM-G781B/DS)  
-**Codename:** `r8q`  
-**SoC:** Qualcomm Snapdragon 865 (SM8250 / Kona, Rev 2.1, SoC ID: 356)  
-**Architecture:** ARMv8.2-A (AArch64)  
-**Firmware Subsystem:** Project R8Q UEFI Multi-OS Firmware  
-**Document Revision:** 1.0.0-M1  
-**Status:** Approved Architectural Baseline  
+**Target:** Samsung Galaxy S20 FE 5G (`SM-G781B`, `r8q`, Qualcomm SM8250/Kona)
+**Document revision:** 1.1.0-M1 (corrected baseline)
+**Status:** Research architecture. Not a hardware-enablement claim.
+**Supersedes:** `docs/UEFI_ARCHITECTURE.md` at commit `07b1882`.
 
 ---
 
-## 1. Executive Summary & Platform Context
+## 1. Purpose
 
-Project R8Q UEFI is an independently engineered, standards-compliant ARM64 UEFI (Unified Extensible Firmware Interface) platform engineered specifically for the Samsung Galaxy S20 FE 5G (SM-G781B). It delivers a robust pre-boot execution environment, a comprehensive interactive UEFI Shell, advanced hardware diagnostics, native Linux OS boot capability, and an experimental ACPI/UEFI handoff path for Windows ARM64.
+Project R8Q UEFI is an independent ARM64 UEFI platform intended to run after Samsung's stock boot chain and before an operating system. It is designed to provide a UEFI environment, a shell, diagnostics, a boot manager, Linux handoff, and an experimental Windows ARM64 research path.
 
-Unlike generic ARM64 UEFI stubs, R8Q UEFI is designed to interface cleanly with the physical reality of the Qualcomm SM8250 SoC and Samsung's secondary boot stage (ABL), operating within strict security boundaries without risking device bricking, hardware damage, or irreversible state transitions.
+The architecture is constrained by three rules:
+
+1. **Do not replace PBL, XBL, or ABL.** The stock boot chain remains responsible for early DRAM, PMIC, secure world, and Download Mode.
+2. **Do not assume hardware state.** Every address, carveout, panel, controller, and partition is either source-verified and re-checked at runtime, or treated as unknown.
+3. **Do not make destructive changes during research.** Milestone 1 is documentation and host-side validation only.
 
 ---
 
-## 2. Samsung Boot Chain Architecture & Execution Boundary
-
-### 2.1 Complete Target Device Boot Chain
+## 2. Boot chain and execution boundary
 
 ```mermaid
 flowchart TD
-    ROM["Qualcomm Primary Boot Loader (PBL)<br/>ROM @ SoC | Security Fuses Verified"] --> XBL["Qualcomm eXtensible Boot Loader (XBL)<br/>UFS sdb1 (Boot LUN 1) | LPDDR5 Trained, Clocks Up"]
-    XBL --> TZ["TrustZone / QSEE & Hypervisor<br/>UFS sdd5 (tz) & sdd35 (hyp) | EL3 / EL2 Secure"]
-    XBL --> AOP["Always-On Processor (AOP)<br/>UFS sdd7 | Power Rails & PMIC"]
-    XBL --> ABL["Samsung Android Boot Loader (ABL)<br/>UFS sdd8 | Display DPU Init, Fastboot, Boot Verification"]
-    ABL -->|Verified Boot State: Orange| R8Q["Project R8Q UEFI Payload<br/>Loaded into DRAM @ 0x80008000 (AArch64 Non-Secure)"]
-    R8Q --> UEFI_CORE["R8Q UEFI Core (DXE Engine & Memory Map)"]
-    UEFI_CORE --> SHELL["Interactive UEFI Shell & R8Q Diagnostics"]
-    UEFI_CORE --> MULTI_BOOT["R8Q Multi-OS Boot Manager"]
-    MULTI_BOOT --> LINUX["Native Linux (EFI Stub / Image + DTB)"]
-    MULTI_BOOT --> WIN["Experimental Windows ARM64 (ACPI)"]
-    MULTI_BOOT --> RECOVERY["Linux Recovery Environment"]
+    PBL["Qualcomm PBL (ROM)<br/>signature/fuse checks"] --> XBL["XBL / XBL_CONFIG<br/>DDR, clocks, PMIC, secure world"]
+    XBL --> TZ["TrustZone / QSEE<br/>EL3 secure"]
+    XBL --> HYP["Hypervisor<br/>EL2 secure/non-secure boundary"]
+    XBL --> AOP["AOP<br/>always-on power"]
+    XBL --> ABL["Samsung ABL<br/>EDK II-based bootloader<br/>Download Mode, recovery, boot verification"]
+    ABL -->|normal boot or authorized test path| PAYLOAD["R8Q UEFI payload<br/>packaged as an Android boot image<br/>load address: UNKNOWN"]
+    PAYLOAD --> CORE["UEFI SEC/PrePi → DXE → BDS"]
+    CORE --> SHELL["UEFI Shell + R8Q diagnostics"]
+    CORE --> BOOT["Boot manager"]
+    BOOT --> LINUX["Linux ARM64<br/>EFI stub or direct boot"]
+    BOOT --> REC["Recovery / maintenance"]
+    BOOT --> WIN["Windows ARM64 research<br/>no installability claim"]
 ```
 
-### 2.2 Security Architecture & Partition Boundaries
+The exact XBL/ABL partition locations, the payload load address, the exception level, and the handoff register state are **unknown** (`U`). They must be measured on the target unit. The diagram shows the functional chain, not a memory layout.
 
-The SM-G781B features Qualcomm Secure Boot with Samsung Knox extensions:
-1. **PBL (Primary Boot Loader):** Read-only ROM. Verifies XBL digital signature using Qualcomm root certificates.
-2. **XBL & XBL_CONFIG (`sdb1`, `sdb2`):** Initializes PMIC, system clocks, and trains LPDDR5 memory channels. Under no circumstances should `sdb` or `sdd` bootloader partitions be flashed.
-3. **TrustZone (`tz` `sdd5`):** Runs at EL3 (Secure Monitor). Protects cryptographic keys, RPMB, and secure peripherals.
-4. **Hypervisor (`hyp` `sdd35`):** Operates at EL2.
-5. **Samsung ABL (`sdd8`):** Executes in non-secure state. In OEM-unlocked state (`warranty_bit=1`, `androidboot.verifiedbootstate=orange`), ABL permits loading unsigned kernel payloads formatted as standard Android Boot Images (v2).
-6. **R8Q UEFI Delivery Strategy:** R8Q UEFI is packaged as an EFI payload wrapped in an Android Boot Image format (kernel image). This avoids flashing ABL or XBL, ensuring that:
-   - Samsung Download Mode (ODIN / LOKE via Volume Down + USB) remains 100% intact in ROM/ABL.
-   - Device recovery is always possible without hardware flashing tools (JTAG / EDL).
+### 2.1 What is preserved
 
----
+The following are boot-critical and are never written by R8Q UEFI during research or early bring-up:
 
-## 3. Firmware Entry Conditions & Execution State
+- PBL (ROM), XBL, XBL_CONFIG, ABL;
+- TrustZone/QSEE, hypervisor, AOP and other remote processors;
+- `EFS`, `sec_efs`, `persist`, modem calibration, and other calibration/NVRAM partitions;
+- stock recovery and Download Mode;
+- the stock `BOOT` image and any partition needed to restore it.
 
-When Samsung ABL jumps to the R8Q UEFI payload, the machine state is strictly defined:
+The exact partition names and indices must be enumerated from the unit. The downstream FDT's `vbmeta` node lists names such as `boot`, `recovery`, `abl`, `xbl`, `tz`, and `hyp`; that is evidence of names, not of LUNs, indices, or sizes. See `docs/VERIFICATION_LEDGER.md`.
 
-| Parameter | State at R8Q UEFI Entry |
-|---|---|
-| **CPU Architecture** | ARMv8.2-A (AArch64 mode) |
-| **Active Core** | Core 0 (Kryo 585 Silver / Cortex-A55 @ 1.80 GHz) |
-| **Secondary Cores (1-7)** | Quiescent (held in WFI or PSCI power-down) |
-| **Exception Level** | EL2 (if ABL drops to EL2) or EL1 Non-Secure (if TIMA/UH resides at EL2) |
-| **MMU State** | Disabled (or 1:1 identity-mapped by ABL before jump) |
-| **Data / Instruction Caches** | Cleaned and invalidated; I-cache enabled, D-cache disabled |
-| **DDR Memory State** | 8 GB LPDDR5 completely trained, refreshed, and accessible |
-| **Register `x0`** | Physical address of Device Tree Blob passed by ABL |
-| **Registers `x1`–`x4`** | Reserved / zeroed in accordance with ARM64 Linux Boot Protocol |
-| **Display State** | DPU + MIPI DSI active in Continuous Splash Mode (`0x9C000000`) |
-| **Storage State** | UFS 3.1 controller initialized and clocked |
+### 2.2 Integration hypothesis
+
+Public community work suggests that a custom UEFI payload can be installed in Samsung's `BOOT` partition as an Android boot image, leaving ABL/XBL/recovery untouched. This is a **hypothesis for a later, explicitly authorized phase**:
+
+- it has not been tested on this unit;
+- `fastboot boot` is not a reliable retail-Samsung test path;
+- a verified stock `BOOT` image, partition layout, and restore procedure must exist first;
+- the user must authorize any write to the device.
+
+No device modification is part of Milestone 1.
 
 ---
 
-## 4. Hardware Memory Architecture & UEFI Memory Map
+## 3. Execution state at handoff
 
-The target device contains 8,589,934,592 bytes (8 GB) of physical LPDDR5 SDRAM extending from `0x80000000` to `0x27FFFFFFF`.
+The table records what the UEFI entry code must handle, not what ABL is assumed to provide.
 
-### 4.1 Reserved Regions (Protected SoC Carveouts)
+| Item | Baseline status | Design response |
+|---|---|---|
+| CPU mode | AArch64 expected (`I`) | Check `CurrentEL`; do not assume EL1/EL2. |
+| Active cores | Unknown (`U`) | Use only the boot CPU until PSCI is validated. |
+| MMU/caches | Unknown (`U`) | Disable/reconfigure safely; invalidate caches/TLB as needed. |
+| Interrupts | Unknown (`U`) | Mask DAIF and initialize GIC before enabling. |
+| `x0` | DTB pointer likely (`I`) | Preserve it; validate the FDT header before use. |
+| `x1`–`x3` | Unknown (`U`) | Do not rely on them. |
+| Stack | Unknown (`U`) | Establish a known stack in a validated free region. |
+| Display | Continuous splash may be active (`U`) | Probe the reserved framebuffer; do not reinitialize DPU/DSI. |
+| Storage | UFS may be initialized (`U`) | Treat the controller as unknown; initialize from a clean state or reuse only if documented. |
+| Memory map | Unknown (`U`) | Parse the live FDT `/memory` and `/reserved-memory`; never use a static 8 GB map. |
 
-The following regions are actively claimed by Qualcomm firmware subsystems and Samsung Knox security monitors:
+The `edk2-msm` PrePi reference handles both EL2 and EL1 and stores `x0` in a fixed device-tree slot. That is useful prior art, not proof of this unit's state. Its fixed slot (`0x80650000`) lies inside the downstream `xbl_aop` carveout and must not be reused without validation.
 
-| Physical Range | Size | Allocation / Subsystem | UEFI Memory Type |
+---
+
+## 4. Memory architecture
+
+### 4.1 RAM described by the captured downstream FDT
+
+| Range | Size | Status |
+|---|---:|---|
+| `0x80000000`–`0xBBB00000` | `0x3BB00000` (~954.7 MiB) | `V-R8Q-FDT` for captured unit |
+| `0xC0000000`–`0x280000000` | `0x1C0000000` (7,168 MiB) | `V-R8Q-FDT` for captured unit |
+| `0xBBB00000`–`0xC0000000` | `0x4500000` (~69 MiB) | Not described as RAM; treat as reserved/unknown |
+
+The total is approximately 7.93 GiB, consistent with an 8 GB class unit. This is not a license to hardcode 8 GB: 6 GB variants may exist, and the live map may differ.
+
+### 4.2 Carveouts
+
+The downstream `/reserved-memory` map is the primary target-specific evidence. Key regions:
+
+- `hyp` at `0x80000000` + 6 MiB;
+- `xbl_aop` at `0x80603000` + `0x25D000`;
+- `cmd_db` at `0x80860000` + `0x20000`;
+- XBL UEFI log at `0x80880000` + `0x14000`;
+- `smem` at `0x80900000` + 2 MiB;
+- `removed` at `0x80B00000` + 121 MiB;
+- SLPI/ADSP/SPSS/NPU/video/CVP/CDSP/camera/WLAN/IPA/GPU PIL regions between `0x89200000` and `0x90400000`;
+- continuous splash at `0x9C000000` + 35 MiB;
+- display ramdump and DFPS data around the splash;
+- Samsung security/debug/log/ramoops/TIMA regions at `0x9F000000`–`0xB0200000`;
+- a large RDX buffer at `0x100000000` + 173 MiB;
+- a vendor heap at `0xB0400000` + 24 MiB.
+
+The full table, including dynamic pools and upstream differences, is in `docs/VERIFICATION_LEDGER.md`. The UEFI memory map must be built from the live FDT, not from a copied static table. Regions marked `no-map` or otherwise reserved by the vendor must be `EfiReservedMemoryType` (or `EfiMemoryMappedIO` for MMIO), never general-purpose RAM.
+
+### 4.3 Candidate firmware window
+
+The downstream map leaves a 12 MiB gap between the end of `dfps_data` (`0x9E400000`) and the start of `sec_debug` (`0x9F000000`). A 4 MiB firmware image plus early stack/heap could fit there, but this is an **inference**, not a validated load plan. The `edk2-msm` reference uses a different window (`0xCE000000` + 7 MiB), which is also only a candidate for this device.
+
+The FD base must be a build-time parameter, not a universal constant. The runtime entry code must verify that its own image, stack, heap, and page tables do not overlap any live reserved region.
+
+---
+
+## 5. Console and display
+
+### 5.1 Inherited framebuffer
+
+The upstream Samsung common DTS and the downstream FDT both describe a continuous-splash framebuffer:
+
+| Property | Value | Status |
+|---|---|---|
+| Base | `0x9C000000` | `V-L6.18`, `V-R8Q-FDT` |
+| Size | `0x2300000` (35 MiB) | `V-L6.18`, `V-R8Q-FDT` |
+| Width | 1080 | `V-L6.18`, `V-R8Q-FDT` |
+| Height | 2400 | `V-L6.18`, `V-R8Q-FDT` |
+| Stride | 4320 bytes | `V-L6.18` |
+| Format | `a8r8g8b8` | `V-L6.18` |
+
+The early GOP plan is to reuse this buffer **only if** the handoff probe confirms that scanout is active and the format/stride match. If the probe fails, the firmware must fall back to a serial console or a headless mode. It must not blindly reinitialize the DPU, DSI PHYs, PLLs, or panel.
+
+### 5.2 Panel variants
+
+The downstream FDT contains three panel definitions:
+
+| Panel | Resolution | Timing entries | Backlight max |
 |---|---|---|---|
-| `0x80000000` - `0x80600000` | 6.00 MiB | Hypervisor Region (`hyp_region`) | `EfiReservedMemoryType` |
-| `0x80603000` - `0x80860000` | 2.36 MiB | XBL / AOP Firmware (`xbl_aop_region`) | `EfiReservedMemoryType` |
-| `0x80880000` - `0x80894000` | 0.08 MiB | XBL UEFI Log Region | `EfiReservedMemoryType` |
-| `0x80900000` - `0x80B00000` | 2.00 MiB | Qualcomm Shared Memory (`smem_region`) | `EfiReservedMemoryType` |
-| `0x80B00000` - `0x88400000` | 121.00 MiB | Removed System Region | `EfiReservedMemoryType` |
-| `0x89200000` - `0x8A700000` | 21.00 MiB | SLPI PIL Carveout | `EfiReservedMemoryType` |
-| `0x8A700000` - `0x8D300000` | 44.00 MiB | ADSP PIL Carveout | `EfiReservedMemoryType` |
-| `0x8D300000` - `0x8D400000` | 1.00 MiB | SPSS PIL Carveout | `EfiReservedMemoryType` |
-| `0x8D400000` - `0x8D900000` | 5.00 MiB | NPU PIL Carveout | `EfiReservedMemoryType` |
-| `0x8D900000` - `0x8DE00000` | 5.00 MiB | Video (VPU) PIL Carveout | `EfiReservedMemoryType` |
-| `0x8DE00000` - `0x8E300000` | 5.00 MiB | CVP PIL Carveout | `EfiReservedMemoryType` |
-| `0x8E300000` - `0x8FD00000` | 26.00 MiB | CDSP PIL Carveout | `EfiReservedMemoryType` |
-| `0x8FD00000` - `0x90200000` | 5.00 MiB | Camera PIL Carveout | `EfiReservedMemoryType` |
-| `0x90200000` - `0x90300000` | 1.00 MiB | WLAN Firmware Carveout | `EfiReservedMemoryType` |
-| `0x90300000` - `0x9031C000` | 0.11 MiB | IPA Firmware & GSI | `EfiReservedMemoryType` |
-| `0x90400000` - `0x90A00000` | 6.00 MiB | CDSP Secure Heap | `EfiReservedMemoryType` |
-| `0x9C000000` - `0x9E300000` | 35.00 MiB | Continuous Splash Framebuffer | `EfiReservedMemoryType` / GOP |
-| `0x9F000000` - `0x9F800000` | 8.00 MiB | Samsung Security Debug Region | `EfiReservedMemoryType` |
-| `0x9F800000` - `0x9FA00000` | 2.00 MiB | Samsung Plog Region | `EfiReservedMemoryType` |
-| `0x9FA00000` - `0x9FB00000` | 1.00 MiB | Ramoops Console Buffer | `EfiReservedMemoryType` |
-| `0xB0100000` - `0xB0200000` | 1.00 MiB | Samsung TIMA Security Region | `EfiReservedMemoryType` |
-| `0xB0400000` - `0xB1C00000` | 24.00 MiB | UH Heap Region | `EfiReservedMemoryType` |
-| `0x100000000` - `0x10AD00000` | 173.00 MiB | Sec Debug RDX Buffer | `EfiReservedMemoryType` |
+| `S6E3FC3_AMS646YD01_FHD` | 1080×2400 | 60 Hz and 120 Hz | 486 (`0x1E6`) |
+| `EA8076A_AMS646UJ10_FHD` | 1080×2400 | 60 Hz and 120 Hz | 425 (`0x1A9`) |
+| `EA8079B_AMS646YB01_FHD` | 1080×2400 | 60 Hz and 120 Hz | 486 (`0x1E6`) |
 
-### 4.2 Usable RAM Allocation for R8Q UEFI
+The captured unit's bootargs select `S6E3FC3`. Other units may use the other panels. The firmware must not hardcode a panel model; it should use the inherited display state or a runtime panel ID. The refresh-rate entries above describe the downstream timing tables, not a guaranteed active mode.
 
-Total usable DRAM exceeds 7.4 GiB across high-memory banks:
-- **Firmware FD Base:** `0x9E400000` (or `0xA0000000` upper safe boundary)
-- **Firmware Stack & Heap Pool:** `0xA0002000` - `0xB0000000` (255 MiB contiguous boot services pool)
-- **High Memory Pool:** `0x10AD00000` - `0x275D7FFFF` (~5.7 GiB free pool for OS, kernel image, and initramfs)
+### 5.3 MDSS/DSI addresses
+
+- MDSS/DPU: `0xAE00000`;
+- DSI PHY0/1: `0xAE94400`/`0xAE96400`;
+- DSI PLL0/1: `0xAE94900`/`0xAE96900`;
+- DP display: `0xAE90000`;
+- RSCC: `0xAF20000`.
+
+These are `V-R8Q-FDT`/`V-L6.18` addresses. They are documented for future driver work, not for unconditional reinitialization.
 
 ---
 
-## 5. Console & Graphics Subsystem Architecture
+## 6. Interrupts and timer
 
-### 5.1 Display Engine & Hardware Specifications
+| Block | Address | Status |
+|---|---|---|
+| GIC distributor | `0x17A00000`, 64 KiB | `V-L6.18` |
+| GIC redistributors | `0x17A60000`, 1 MiB | `V-L6.18` |
+| Generic timer frame | `0x17C20000` | `V-L6.18` |
+| Timer frequency | 19,200,000 Hz | `V-L6.18` |
 
-The device incorporates a Samsung 6.46-inch Super AMOLED panel driven by Qualcomm DPU (Display Processing Unit, MDSS MDP @ `0xAE00000`):
-- **Panel Identifier:** `ss_dsi_panel_S6E3FC3_AMS646YD01_FHD`
-- **Native Resolution:** 1080 × 2400 pixels
-- **Pixel Format:** 32-bit ARGB/XRGB (8-8-8-8), loose packing
-- **Refresh Rates:** 60 Hz and 120 Hz command mode (`dsi_cmd_mode`)
-- **Backlight Control:** MIPI DCS command-based (`bl_ctrl_dcs`), range 1 to 486 (`0x1E6`)
-
-### 5.2 Zero-Risk Framebuffer Handoff (Continuous Splash GOP)
-
-Rather than reinitializing the complex DPU clock tree, DSI PHY PLLs, and sending proprietary panel init sequences in firmware (which risks display lockup or panel burnout), R8Q UEFI implements the **Continuous Splash Graphics Output Protocol**:
-1. ABL initializes the DPU pipe and panel during early boot, showing the Samsung splash logo.
-2. The display scanout buffer is anchored at physical address `0x9C000000` (pitch: 4320 bytes = 1080 * 4).
-3. R8Q UEFI maps `0x9C000000` into its MMU page tables as Write-Combining / Normal Memory.
-4. The R8Q GOP Driver exposes standard `EFI_GRAPHICS_OUTPUT_PROTOCOL` pointing directly to `0x9C000000`.
-5. The UEFI Core and Shell render text, graphics, and dialogs directly onto the active AMOLED screen with zero flickering and 100% hardware safety.
+The architectural timer is accessed through `CNTFRQ_EL0`, `CNTPCT_EL0`, `CNTP_TVAL_EL0`, and `CNTP_CTL_EL0`. The GIC initialization must preserve secure interrupts and must not assume that the non-secure PPI/INTID assignment is already correct. The timer PPI mapping is an inference until validated on the unit.
 
 ---
 
-## 6. Interrupt & Timer Architecture
+## 7. Storage
 
-1. **Interrupt Controller:** ARM GICv3 (Generic Interrupt Controller v3):
-   - Distributor (GICD): Physical Base `0x17A00000`, Size `0x10000` (64 KB).
-   - Redistributors (GICR): Physical Base `0x17A60000`, Size `0x100000` (1 MB, 8 cores × 128 KB stride).
-   - Interrupt lines: PPIs for generic timer (Non-secure physical timer PPI 30 / interrupt 14).
-2. **System Counter / Architectural Timer:**
-   - Base Frequency: 19,200,000 Hz (19.2 MHz, register value `0x124F800`).
-   - Standard ARMv8 architectural system registers (`CNTFRQ_EL0`, `CNTP_TVAL_EL0`, `CNTP_CTL_EL0`, `CNTPCT_EL0`).
-   - EDK II `ArmArchTimerLib` binds directly to system registers without requiring MMIO timer emulation.
+### 7.1 UFS
 
----
+- Host controller: `0x1D84000` + `0x3000`;
+- UFS ICE: `0x1D90000` + `0x8000`;
+- UFS PHY: `0x1D87000`;
+- IRQ: SPI 265.
 
-## 7. Storage Architecture & Partition Discovery
+These are source-verified. The UFS device model, capacity, LUN count, LUN sizes, and partition indices are **unknown**. The firmware must enumerate them at runtime and must never hardcode `sda`/`sdb`/`sdc`/`sdd` or partition numbers.
 
-### 7.1 Qualcomm UFS 3.1 Controller
+The downstream `vbmeta` node lists partition names (`boot`, `recovery`, `abl`, `xbl`, `tz`, `hyp`, `dtbo`, etc.). Names are not indices; the mapping must be read from the partition table.
 
-- **Base Controller:** `qcom,ufshc` @ `0x01D84000`.
-- **Interface:** JEDEC Universal Flash Storage (UFS) 3.1 compliant.
-- **Physical Memory Unit:** Samsung `KLUDG4UHDB-B2D1` (128 GB UFS 3.1).
-- **Logical Units (LUNs):**
-  - LUN 0 (`sda`): 119.09 GiB — Main GPT partition table (partitions 1 to 36).
-  - LUN 1 (`sdb`): 8.00 MiB — Primary Boot LUN containing `xbl` (`sdb1`) and `xbl_config` (`sdb2`).
-  - LUN 2 (`sdc`): 8.00 MiB — Secondary Boot LUN (A/B failover).
-  - LUN 3 (`sdd`): 60.00 MiB — Bootloader and security partition table (partitions 1 to 37, containing `abl`, `tz`, `hyp`, `uefivarstore`).
-- **UEFI Protocol Support:** Standard `EFI_BLOCK_IO_PROTOCOL` and `EFI_DISK_IO_PROTOCOL`.
+### 7.2 SDHCI
 
-### 7.2 MicroSD Storage Controller
+- Controller: `0x8804000` + `0x1000`;
+- 4-bit bus;
+- IRQs `0xCC` and `0xDE`.
 
-- **Controller:** Qualcomm SDHCI controller @ `0x08804000` (`sdhc2`).
-- **Standard:** SD 3.0 / UHS-I host controller.
-- **Support:** Hot-pluggable FAT32, exFAT, and EFI System Partitions on external MicroSD cards for multi-OS installations.
+MicroSD card detect, hotplug, UHS tuning, and filesystem support are not verified. The controller is a candidate for an external test ESP, but it must be brought up and validated before it is used as a variable store or boot medium.
+
+### 7.3 UEFI variables
+
+The early design uses a file-backed variable store on a disposable FAT32 ESP (for example, `EFI/R8Q/VARS.BIN`). It does not touch an internal `uefivarstore` partition, and it does not assume that such a partition exists or is safe to write. Runtime variable persistence after `ExitBootServices()` is an open design problem; file I/O drivers are not automatically runtime-safe.
 
 ---
 
-## 8. UEFI Variables & NVRAM Persistence
+## 8. USB, PCIe, and wireless
 
-UEFI requires persistent NVRAM variables (`BootOrder`, `BootNext`, `OsIndications`, etc.).
-On SM-G781B, there are two distinct paths for variable storage:
-1. **Dedicated Variable Partition:** `uefivarstore` (`sdd31`, 512 KiB). Safe to format as an authentic EDK II Fault Tolerant Write (FTW) variable store.
-2. **ESP File-Backed Emulated NVRAM:** A dedicated variable file `NVRam.dat` maintained on the FAT32 EFI System Partition (`/EFI/R8Q/VARS.BIN`).
-3. **Architectural Choice:** R8Q UEFI implements the file-backed variable service for initial phases, guaranteeing zero chance of corrupting LUN 3 partitions during development.
+- USB: `ssusb@a600000`, DWC3 at `0xA600000`; downstream advertises DRD/super-speed, upstream mainline uses peripheral/high-speed. Host/XHCI support is **unknown** and is a major bring-up task.
+- PCIe: controllers at `0x1C00000`, `0x1C08000`, `0x1C10000`; downstream WLAN is described as QCA6490 on root complex 0, while the Bluetooth node lists both QCA6390 and QCA6490. Endpoint/module enumeration and firmware loading are **unknown**.
+- No UEFI Wi-Fi, Bluetooth, or USB-host functionality is claimed in Milestone 1.
 
 ---
 
-## 9. Firmware Security & Safety Policy
+## 9. Power, thermal, and input
 
-1. **Read-Only Critical Hardware:** Partitions `xbl`, `xbl_config`, `tz`, `hyp`, `abl`, `efs`, `sec_efs`, `persist`, `modemst1`, `modemst2` are marked strictly immutable in R8Q UEFI drivers.
-2. **Download Mode Invariance:** Samsung Download Mode is hosted in read-only ROM / XBL / ABL routines. Because R8Q UEFI does not modify ABL, holding Volume Down + USB insertion into a host PC will ALWAYS enter Odin Download Mode, regardless of any software state.
-3. **No Hardware Overvoltage / Overclocking:** CPU and GPU clocks are maintained at default boot frequencies established by AOP/XBL.
+- PMIC: PM8150/PM8150B/PM8150L family (plus PM8150A regulator nodes).
+- Charger: MAX77705 at `0x66`, PCA9468 at `0x57`; SMB5 node is disabled. The active charging path is unknown.
+- Fuel gauge: no MAX17042 node was found; the active gauge is unknown.
+- Thermal: TSENS at `0xC222000`/`0xC263000` and `0xC223000`/`0xC265000`.
+- Keys: volume-up is described as a GPIO key; power and volume-down handling are not confirmed.
+- Touch: STM, Zinitix, Melfas, and A96T3X6 nodes exist; the installed controller is unknown.
+
+Battery, thermal, and touch protocols are planned for later milestones. They are not implemented in Milestone 1.
 
 ---
 
-*Authored by Antigravity Engineering for Project R8Q UEFI.*
+## 10. Operating-system handoff
+
+### 10.1 Linux
+
+The primary path is the ARM64 Linux EFI stub: load the kernel `Image` as a PE/COFF image, pass the DTB and initrd through the UEFI configuration table or `/chosen`, call `ExitBootServices()`, and let the stub enter the kernel. A direct-boot fallback follows the ARM64 boot protocol (`x0` = DTB, `x1`–`x3` = 0). The exact kernel load address and the handling of the vendor carveouts are unverified. See `docs/LINUX_BOOT_DESIGN.md`.
+
+### 10.2 Windows ARM64
+
+Windows is a research target only. There are no ACPI tables, no UFS storage driver, no validated USB host stack, no display driver, and no boot evidence. No installability or functionality claim is made. See `docs/WINDOWS_COMPATIBILITY_REPORT.md`.
+
+### 10.3 Recovery
+
+The recovery plan is to preserve the stock recovery and Download Mode, keep a verified stock `BOOT` image offline, and require explicit authorization before any write. "Always recoverable" is not claimed; the restore path must be tested. See `docs/RECOVERY_AND_SAFETY_PLAN.md`.
+
+---
+
+## 11. Security boundaries
+
+- PBL/XBL/ABL and the secure world are outside R8Q UEFI's ownership.
+- R8Q UEFI runs non-secure and must not attempt to disable or reprogram TrustZone, RPMB, or secure clocks.
+- The firmware must not write to boot-critical or calibration partitions.
+- UEFI Secure Boot is not claimed. If it is added later, key management and the interaction with Samsung's verified boot must be designed explicitly.
+- Bootloader unlocking, custom boot images, and any `BOOT` partition write affect Knox/warranty/DRM and require user authorization.
+
+---
+
+## 12. Open questions
+
+1. What is the exact ABL handoff state (EL, MMU/caches, `x0`, secondary cores, display scanout)?
+2. What is the exact payload load address and Android boot-image format accepted by this ABL?
+3. What is the live UFS LUN/partition layout and storage capacity?
+4. Which panel, touch controller, charger, fuel gauge, and WLAN variant is installed?
+5. Does USB host mode work, and what role does the Type-C controller play?
+6. Can the inherited framebuffer be used safely without reinitializing the display?
+7. Which internal partitions are safe to read, and which must never be touched?
+8. What is the tested restore path from a custom `BOOT` payload?
+
+These questions are tracked in `docs/VERIFICATION_LEDGER.md` and must be closed before the corresponding hardware claims are made.

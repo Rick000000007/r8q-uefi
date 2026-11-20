@@ -1,64 +1,112 @@
-# Project R8Q UEFI: Windows ARM64 & ACPI Compatibility Report
+# Project R8Q UEFI: Windows ARM64 Compatibility Report
 
-**Target Platform:** Samsung Galaxy S20 FE 5G (SM-G781B / r8q / SM8250)  
-**Document Revision:** 1.0.0-M1  
-**Status:** Approved Architectural Baseline  
-
----
-
-## 1. Executive Summary: Windows ARM64 Feasibility
-
-Windows on ARM (WoA / Windows 11 ARM64) is an experimental secondary target for Project R8Q UEFI. Unlike Linux, which primarily uses Device Tree (FDT), Windows ARM64 exclusively requires standard Advanced Configuration and Power Interface (ACPI 6.0+) tables, specific UEFI runtime services, and Qualcomm Power Engine Plugin (PEP) drivers.
+**Target:** Samsung Galaxy S20 FE 5G (`SM-G781B`, `r8q`, SM8250)
+**Document revision:** 1.1.0-M1 (corrected baseline)
+**Status:** Research only. Windows is not installable or bootable on this firmware today.
 
 ---
 
-## 2. Six-Level Windows Support Classification
+## 1. Executive summary
 
-In strict adherence to Section 10 of the Master Engineering Specification, Windows compatibility is classified across six distinct, independently verifiable tiers:
+Windows on ARM64 is an experimental, long-term research target. It is **not** part of the Milestone 1 deliverable and no Windows boot, installation, driver, or usability claim is made.
 
-| Tier | Classification Level | Status | Requirements & Verification Gates |
+The previous revision of this document claimed that "UEFI-compatible" was achieved and that Windows PE boot was "in design." Those claims were not supported by any build, ACPI table, driver, or hardware test. They have been removed.
+
+Current status:
+
+| Item | Status |
+|---|---|
+| Windows ARM64 boots on R8Q UEFI | Not achieved |
+| Windows installer runs | Not achieved |
+| Windows PE boots | Not achieved |
+| ACPI tables exist | No |
+| UFS storage driver for Windows | No |
+| USB host/keyboard for Windows | No |
+| Display driver / GOP handoff validated | No |
+| Power/thermal/charger drivers | No |
+| Secure Boot / measured boot design | No |
+
+---
+
+## 2. Why Windows is harder than Linux
+
+Linux can consume a device tree and a small set of drivers. Windows ARM64 expects:
+
+- ACPI tables (MADT, GTDT, FADT, DSDT/SSDT, DBG2, PPTT, IORT, etc.);
+- a UEFI runtime services implementation that survives `SetVirtualAddressMap()`;
+- storage, USB, display, power, and thermal drivers;
+- firmware/ACPI device descriptions that match the actual hardware;
+- a boot path that the Windows Boot Manager and `winload.efi` accept;
+- driver signing and Secure Boot policy, if Secure Boot is enabled.
+
+None of these are present. A GOP framebuffer alone is not enough to install or boot Windows.
+
+---
+
+## 3. Blocker matrix
+
+| Blocker | Why it matters | Current status | Evidence needed |
 |---|---|---|---|
-| **Level 1** | **UEFI-Compatible** | **ACHIEVED** | Standards-compliant ARM64 UEFI environment; standard memory map, runtime services stubs, EFI system table, virtual memory mapping (`SetVirtualAddressMap`). |
-| **Level 2** | **Windows PE Bootable** | **IN DESIGN (M9)** | ACPI 6.3 tables (FADT, MADT, DSDT, GTDT, DBG2, PPTT); boot-critical UFS 3.1 storage driver (`storufs.sys` / Qualcomm StorSec), Windows Boot Manager (`bootmgfw.efi`) loads WinPE kernel (`ntoskrnl.exe`). |
-| **Level 3** | **Installer-Compatible** | **ROADMAP (M9-M11)** | USB host controller (XHCI) ACPI description; USB keyboard/mouse operational; basic display (MSBDD / Microsoft Basic Display Driver over GOP) functional for Windows Setup GUI. |
-| **Level 4** | **Desktop-Bootable** | **ROADMAP (M11)** | Windows 11 ARM64 boots to desktop environment; internal UFS partitions accessible; power management PEP coordinates core sleep states. |
-| **Level 5** | **Hardware-Accelerated** | **EXPERIMENTAL** | Qualcomm Adreno 650 DirectX 12 driver loaded; hardware video decode active; native DPU display pipeline enabled. |
-| **Level 6** | **Daily-Use Capable** | **EXPERIMENTAL** | Touchscreen (I2C HID), audio, QCA6390 Wi-Fi/Bluetooth, battery charging, and telephony operational. |
+| ACPI MADT/GTDT/FADT | Windows needs interrupt/timer/platform descriptions | Not started | ACPI tables that pass Microsoft/ACPICA validation |
+| DSDT/SSDT | Device enumeration (UFS, USB, PCIe, PMIC, etc.) | Not started | Device-specific ASL and hardware validation |
+| UEFI runtime services | Windows calls runtime services after boot | Not validated | `SetVirtualAddressMap`, runtime variable/console behavior |
+| UFS storage driver | Windows installer must see internal storage | No driver | A working Windows UFS miniport or a supported alternate boot medium |
+| USB host/XHCI | Installer and keyboard input | Unverified | DWC3 host mode + XHCI + HID on hardware |
+| Display | Installer/desktop output | Unverified | GOP handoff and/or Windows display driver |
+| Power/PMIC | Battery, charging, thermal, sleep | No driver | PMIC/charger/TSENS drivers and ACPI descriptions |
+| Secure Boot | Windows may require a trusted boot chain | Not designed | Key management and interaction with Samsung verified boot |
+| Windows image/licensing | Installation media and activation | Not addressed | Legal, licensed test image |
+| Restore path | A failed install can brick the boot flow | Not tested | Verified stock backup and restore procedure |
 
 ---
 
-## 3. Required ACPI Platform Description Architecture
+## 4. ACPI research plan (later milestone)
 
-To support Windows ARM64 boot, R8Q UEFI generates and publishes the following ACPI tables:
+If Windows research continues, the minimum table set is:
 
-1. **MADT (Multiple APIC Description Table):**
-   - Describes ARM GICv3 Distributor @ `0x17A00000`.
-   - Describes GIC Redistributor Base @ `0x17A60000` with 8 GICR entries (Cores 0 through 7).
-2. **GTDT (Generic Timer Description Table):**
-   - Generic Timer physical base frequency: 19,200,000 Hz.
-   - Non-secure EL1 timer interrupt: PPI 30 (INTID 14).
-   - Virtual EL1 timer interrupt: PPI 27 (INTID 11).
-3. **FADT (Fixed ACPI Description Table):**
-   - Declares hardware-reduced ACPI (`HW_REDUCED_ACPI = 1`).
-   - Feature flags: 64-bit boot architecture, low-power S0 idle state support.
-4. **DSDT (Differentiated System Description Table):**
-   - Device `\_SB.CPU0` through `\_SB.CPU7` with ARM processor container.
-   - Device `\_SB.UFS0`: Qualcomm SM8250 UFS host controller (`QCOM0484` / `QCOM0542`) @ `0x01D84000`.
-   - Device `\_SB.USB0`: Synopsys DWC3 USB 3.0 controller @ `0x0A600000`.
-   - Device `\_SB.PEP0`: Qualcomm Power Engine Plugin (`QCOM0242` / `QCOM0585`).
-   - Device `\_SB.GOP0`: Display engine frame buffer description (`0x9C000000`).
-5. **DBG2 (Debug Port Table 2):**
-   - Qualcomm GENI Serial port @ `0x00988000` for kernel debugging (`kdnet` / serial kd).
-6. **PPTT (Processor Properties Topology Table):**
-   - Describes 8-core CPU cluster hierarchy (Silver cluster, Gold cluster, Prime core) and L1/L2/L3 cache topology.
+1. **MADT** — GICv3 distributor/redistributors and CPU interrupts.
+2. **GTDT** — generic timer frequency and timer interrupts.
+3. **FADT** — hardware-reduced ACPI, 64-bit boot, power management flags.
+4. **DSDT/SSDT** — CPU containers, UFS, USB, PCIe, PMIC, display, and platform devices.
+5. **DBG2** — debug UART, if a physically accessible UART exists.
+6. **PPTT** — CPU topology and caches.
+7. **IORT** — IOMMU/SMMU description, if Windows drivers need it.
+
+The tables must describe the actual hardware, not a generic SM8250 template. The downstream FDT is a useful source of addresses and interrupt numbers, but ACPI is not a mechanical translation of FDT.
 
 ---
 
-## 4. Boot-Critical Driver Dependencies & Mitigations
+## 5. Storage and boot-media strategy
 
-1. **UFS Storage:** Windows ARM64 requires a compatible storage miniport driver to access UFS partitions. On SM8250, the Qualcomm UFS driver relies on secure RPMB calls routed through `uefisecapp` (`sdd27`) in TrustZone. R8Q UEFI preserves all TrustZone SMC interfaces.
-2. **Display:** Prior to the installation of Qualcomm Adreno/DPU drivers, Windows uses the Microsoft Basic Display Driver (MSBDD), which renders directly onto the UEFI GOP framebuffer established at `0x9C000000`.
+Windows setup normally needs to see a supported disk. The internal UFS path requires a Windows-compatible UFS driver that does not exist in this project. Possible research directions, none validated:
+
+- boot Windows PE from a USB mass-storage device and install to an external drive;
+- use a Windows-compatible NVMe/UFS bridge, if the hardware exposes one;
+- develop a minimal UFS miniport with Qualcomm/Samsung documentation, which is a large project;
+- use a virtual disk image for early bring-up, which does not prove internal storage support.
+
+No installation path is recommended until the storage and restore story is credible.
 
 ---
 
-*Authored by Antigravity Engineering for Project R8Q UEFI.*
+## 6. Safety and legal constraints
+
+- Do not overwrite the stock `BOOT`, `recovery`, `EFS`, `persist`, or bootloader partitions to test Windows.
+- Do not disable Secure Boot or verified boot without a documented, reversible procedure and user authorization.
+- Do not distribute Microsoft binaries or product keys.
+- Do not claim "Windows ready" or "Windows compatible" based on a UEFI shell or a GOP framebuffer.
+
+---
+
+## 7. Exit criteria for a future Windows milestone
+
+A future milestone may claim "Windows PE boots" only when:
+
+1. A licensed Windows PE image is loaded by R8Q UEFI.
+2. The firmware provides the ACPI tables and runtime services it needs.
+3. The PE environment reaches a shell or setup screen on the target unit.
+4. Storage, input, and display are usable enough to attempt an install.
+5. A tested restore path returns the device to its stock boot flow.
+6. The exact firmware build, ACPI tables, and test output are committed.
+
+Until then, Windows remains a research note, not a deliverable.

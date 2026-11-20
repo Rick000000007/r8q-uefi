@@ -1,67 +1,155 @@
-# Project R8Q UEFI: Native Linux Boot Design & Protocol Handoff
+# Project R8Q UEFI: Linux Boot Design
 
-**Target Platform:** Samsung Galaxy S20 FE 5G (SM-G781B / r8q / SM8250)  
-**Document Revision:** 1.0.0-M1  
-**Status:** Approved Architectural Baseline  
-
----
-
-## 1. Primary Operating System Target: Native Linux
-
-Native Linux is the primary operating system target of Project R8Q UEFI. The firmware provides a clean, standards-compliant UEFI handoff to the ARM64 Linux kernel, supporting both EFI Stub loading and direct Image execution.
+**Target:** Samsung Galaxy S20 FE 5G (`SM-G781B`, `r8q`, SM8250)
+**Document revision:** 1.1.0-M1 (corrected baseline)
+**Status:** Design. No Linux kernel has been booted on R8Q UEFI.
 
 ---
 
-## 2. Kernel Boot Protocols & Handoff Mechanics
+## 1. Scope
 
-### 2.1 Supported Boot Paths
-1. **UEFI EFI Stub Boot (Recommended & Standard):**
-   - The Linux kernel binary (`Image` or `vmlinuz`) contains a built-in PE/COFF header and ARM64 EFI stub.
-   - R8Q UEFI invokes the kernel using the standard UEFI `gBS->LoadImage()` and `gBS->StartImage()` services.
-   - The EFI stub handles memory allocation, relocates the kernel, installs the EFI Configuration Table containing the Device Tree Blob (DTB), calls `ExitBootServices()`, and transitions to the kernel entry point.
-2. **Direct Kernel Boot (Fallback / Custom Boot Loader):**
-   - R8Q Boot Manager loads the raw uncompressed kernel `Image` to 2 MB-aligned physical RAM (e.g., `0x80200000` or `0x88400000`).
-   - Copies the prepared DTB to an 8-byte aligned memory address.
-   - Updates the DTB `/chosen` node with kernel command line, `linux,initrd-start`, and `linux,initrd-end`.
-   - Calls `gBS->ExitBootServices()`.
-   - Sets CPU registers according to the ARM64 Boot Protocol:
-     - `x0`: Physical address of Device Tree Blob in RAM.
-     - `x1`: `0x0000000000000000` (reserved).
-     - `x2`: `0x0000000000000000` (reserved).
-     - `x3`: `0x0000000000000000` (reserved).
-   - Jumps directly to the kernel entry address.
+Linux is the primary operating-system target. The firmware should support two paths:
+
+1. **EFI stub (preferred):** the ARM64 kernel `Image` contains a PE/COFF header and EFI stub. UEFI loads it with `LoadImage()`/`StartImage()`, passes the DTB and initrd, and the stub calls `ExitBootServices()`.
+2. **Direct boot (fallback):** the firmware loads a raw `Image`, prepares the DTB, exits boot services, and jumps to the kernel entry with the ARM64 boot protocol registers.
+
+Neither path has been validated on this device.
 
 ---
 
-## 3. Device Tree Blob (DTB) Runtime Synthesis & Patching
+## 2. EFI-stub path
 
-Rather than relying on a static out-of-date DTB, R8Q UEFI implements dynamic device tree preparation:
-1. **Baseline Source:** The live hardware device tree inherited from ABL or loaded from the boot partition.
-2. **Dynamic Injections performed by R8Q UEFI:**
-   - **`/chosen/bootargs`**: Appends device-specific parameters (`console=ttyMSM0,115200n8 androidboot.hardware=qcom clk_ignore_unused pd_ignore_unused`).
-   - **`/chosen/linux,initrd-start` and `/chosen/linux,initrd-end`**: Injected when an initramfs payload is loaded.
-   - **`/reserved-memory`**: R8Q UEFI ensures that all Qualcomm TrustZone, modem, and continuous splash memory regions are strictly preserved in the DTB reserved-memory map to prevent kernel clobbering.
-   - **`simple-framebuffer` node**: Injected at `/chosen/framebuffer` to provide early kernel console output via the continuous splash buffer (`0x9C000000`) before the native Qualcomm DRM KMS driver initializes:
-     ```dts
-     framebuffer {
-         compatible = "simple-framebuffer";
-         reg = <0x00 0x9c000000 0x00 0x02300000>;
-         width = <1080>;
-         height = <2400>;
-         stride = <4320>;
-         format = "a8r8g8b8";
-     };
-     ```
+### 2.1 Prerequisites
+
+- A working GOP or serial console.
+- A block device and FAT driver to read the kernel, DTB, and initrd.
+- A file-backed or otherwise safe variable store.
+- A validated memory map that preserves all vendor carveouts.
+- An ARM64 kernel with EFI stub support.
+
+### 2.2 Flow
+
+```text
+Boot manager
+  → locate EFI/BOOT/BOOTAA64.EFI or a configured Linux entry
+  → LoadImage(kernel Image)
+  → build/patch DTB
+  → install EFI configuration table (DTB) and/or initrd
+  → StartImage()
+  → Linux EFI stub
+  → ExitBootServices()
+  → kernel entry
+```
+
+The exact mechanism for passing the DTB and initrd depends on the kernel configuration and the EFI stub. The firmware must not assume that a particular `/chosen` property or configuration-table GUID is accepted; it should follow the documented Linux arm64 EFI stub interface and test it.
+
+### 2.3 Kernel command line
+
+A candidate command line is:
+
+```text
+console=tty0 clk_ignore_unused pd_ignore_unused
+```
+
+This is a starting point, not a validated line. The final line must be derived from the kernel config, the display/console path, and the storage root device. Do not copy Android vendor bootargs blindly; many of them are Android-specific and may confuse a mainline kernel.
 
 ---
 
-## 4. ExitBootServices Protocol Compliance
+## 3. Direct-boot path
 
-A critical failure point on Qualcomm ARM64 devices during kernel handoff is improper handling of `ExitBootServices()`:
-1. **Timer Quiescence:** The UEFI architectural timer interrupt must be completely masked in the GIC before shutting down boot services.
-2. **Memory Map Stability:** The memory map key (`MapKey`) must be valid. R8Q UEFI ensures that no memory allocations or deallocations occur between `GetMemoryMap()` and `ExitBootServices()`.
-3. **Event Notification:** All registered `EVT_SIGNAL_EXIT_BOOT_SERVICES` events are signaled, allowing drivers (such as XHCI and UFS) to gracefully shut down DMA engines and place controllers in quiescent states.
+### 3.1 ARM64 boot protocol
+
+At kernel entry:
+
+| Register | Value |
+|---|---|
+| `x0` | Physical address of the DTB |
+| `x1` | 0 |
+| `x2` | 0 |
+| `x3` | 0 |
+| `PC` | Kernel entry point |
+
+The kernel must be loaded at a 2 MiB-aligned address (the arm64 `text_offset` rules apply). The exact load address is **unknown** for this device; the firmware must choose a free region from the live memory map and must not overlap the kernel/initrd/DTB or any carveout.
+
+### 3.2 Image header
+
+A raw ARM64 `Image` starts with a 64-byte header:
+
+| Offset | Field | Notes |
+|---:|---|---|
+| `0x00` | `code0` | Branch instruction |
+| `0x04` | `code1` | Reserved/NOP |
+| `0x08` | `text_offset` | Load offset from RAM base |
+| `0x10` | `image_size` | Effective image size |
+| `0x18` | `flags` | Endianness/page-size flags |
+| `0x20` | reserved | 24 bytes |
+| `0x38` | magic | `ARM\x64` |
+| `0x3C` | reserved | 4 bytes |
+
+The firmware should validate the magic and the image size before jumping. It must not assume that an arbitrary FD or EFI binary is a valid ARM64 `Image`.
+
+### 3.3 DTB preparation
+
+The firmware should:
+
+- start from the live FDT inherited from ABL, or a DTB stored on the ESP;
+- preserve all `/reserved-memory` nodes and `no-map` semantics;
+- update `/chosen/bootargs`;
+- add `linux,initrd-start`/`linux,initrd-end` if an initrd is used;
+- ensure the DTB itself is in a reserved, non-overlapping region;
+- keep the DTB size within the available space;
+- validate the FDT header and structure before use.
+
+Do not synthesize a minimal DTB from scratch for the first hardware boot. The vendor FDT contains critical carveouts and device descriptions that a minimal DTB would lose.
 
 ---
 
-*Authored by Antigravity Engineering for Project R8Q UEFI.*
+## 4. Memory and carveout handling
+
+The downstream map has a large number of reserved regions (hypervisor, XBL/AOP, SMEM, PIL firmware, splash, Samsung debug/log/TIMA, RDX, etc.). The kernel must receive a DTB whose `/reserved-memory` nodes match the live map. If the firmware passes a truncated map, the kernel may allocate over firmware or secure-world memory.
+
+Rules:
+
+- Never mark a vendor carveout as `EfiConventionalMemory`.
+- Never delete a `/reserved-memory` node to "free" memory.
+- Keep the framebuffer reserved even if a simple framebuffer is advertised.
+- If the kernel does not understand a vendor node, leave it reserved rather than dropping it.
+- Re-check the map after `ExitBootServices()` if the kernel/DTB is reloaded.
+
+---
+
+## 5. ExitBootServices
+
+Before calling `ExitBootServices()`:
+
+1. Stop the UEFI timer and mask timer interrupts.
+2. Quiesce DMA-capable controllers that the OS will reinitialize.
+3. Ensure the memory map key is current and no allocations occur between `GetMemoryMap()` and `ExitBootServices()`.
+4. Signal `EVT_SIGNAL_EXIT_BOOT_SERVICES` events.
+5. Preserve the DTB and initrd in memory that is not freed.
+6. Do not rely on boot-services file I/O after exit.
+
+The exact controller-quiesce sequence for UFS, USB, and PCIe is driver-specific and must be implemented and tested. A driver that leaves DMA active can corrupt memory after the OS takes over.
+
+---
+
+## 6. Open questions
+
+1. Does the stock ABL path accept an EFI-stub kernel directly, or does it require an Android boot-image wrapper?
+2. What load address and `text_offset` does ABL use?
+3. Is the inherited DTB complete enough for a mainline kernel, or does it need vendor fixups?
+4. Which console works first: inherited framebuffer, debug UART, or USB?
+5. Does the kernel need vendor firmware for UFS, display, or PMIC?
+6. What is the tested root filesystem and initrd layout?
+7. Can the kernel survive without the vendor's Android bootargs?
+
+These questions must be answered before claiming Linux boot support.
+
+---
+
+## 7. Non-claims
+
+- No Linux kernel has been booted on R8Q UEFI.
+- No root filesystem, initrd, or display handoff has been validated.
+- No performance, power, or thermal claim is made.
+- The `console=tty0` candidate line is not a guarantee that the inherited framebuffer works.

@@ -1,0 +1,34 @@
+## @file
+#  PrePi.inf
+#  Project R8Q UEFI Pre-Pi Entry Module.
+#  Target: Samsung Galaxy S20 FE 5G (SM-G781B)
+#
+#  Copyright (c) 2026, Antigravity Engineering. All rights reserved.
+##
+
+[Defines]
+  INF_VERSION                    = 0x0001001A
+  BASE_NAME                      = PrePi
+  FILE_GUID                      = 8f2b7405-2b4a-4d7a-8b31-89e4726c9b31
+  MODULE_TYPE                    = SEC
+  VERSION_STRING                 = 1.0
+
+[Sources.AARCH64]
+  ModuleEntryPoint.S
+  PrePi.c
+
+[Packages]
+  MdePkg/MdePkg.dec
+  ArmPkg/ArmPkg.dec
+  R8QPkg/R8QPkg.dec
+
+[LibraryClasses]
+  BaseLib
+  DebugLib
+  IoLib
+  ArmLib
+
+[FixedPcd]
+  gR8QPkgTokenSpaceGuid.PcdFrameBufferBase
+  gR8QPkgTokenSpaceGuid.PcdDisplayWidth
+  gR8QPkgTokenSpaceGuid.PcdDisplayHeight

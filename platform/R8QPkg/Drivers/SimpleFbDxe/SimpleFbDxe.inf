@@ -1,0 +1,40 @@
+## @file
+#  SimpleFbDxe.inf
+#  Project R8Q Continuous Splash Framebuffer Graphics Driver.
+#
+#  Copyright (c) 2026, Antigravity Engineering. All rights reserved.
+##
+
+[Defines]
+  INF_VERSION                    = 0x0001001A
+  BASE_NAME                      = SimpleFbDxe
+  FILE_GUID                      = d94b321a-4712-491b-8e12-785c491295b2
+  MODULE_TYPE                    = DXE_DRIVER
+  VERSION_STRING                 = 1.0
+  ENTRY_POINT                    = SimpleFbDxeInitialize
+
+[Sources]
+  SimpleFbDxe.c
+
+[Packages]
+  MdePkg/MdePkg.dec
+  R8QPkg/R8QPkg.dec
+
+[LibraryClasses]
+  UefiDriverEntryPoint
+  UefiBootServicesTableLib
+  BaseLib
+  DebugLib
+  PcdLib
+
+[Protocols]
+  gEfiGraphicsOutputProtocolGuid
+
+[FixedPcd]
+  gR8QPkgTokenSpaceGuid.PcdFrameBufferBase
+  gR8QPkgTokenSpaceGuid.PcdFrameBufferSize
+  gR8QPkgTokenSpaceGuid.PcdDisplayWidth
+  gR8QPkgTokenSpaceGuid.PcdDisplayHeight
+
+[Depex]
+  TRUE

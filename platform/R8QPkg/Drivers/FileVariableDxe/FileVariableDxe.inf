@@ -1,0 +1,33 @@
+## @file
+#  FileVariableDxe.inf
+#  Project R8Q File-Backed NVRAM Driver Module (Option A).
+#
+#  Copyright (c) 2026, Antigravity Engineering. All rights reserved.
+##
+
+[Defines]
+  INF_VERSION                    = 0x0001001A
+  BASE_NAME                      = FileVariableDxe
+  FILE_GUID                      = b67104a2-1925-4c6e-8214-8f92147c92b3
+  MODULE_TYPE                    = DXE_RUNTIME_DRIVER
+  VERSION_STRING                 = 1.0
+  ENTRY_POINT                    = FileVariableDxeInitialize
+
+[Sources]
+  FileVariableDxe.c
+
+[Packages]
+  MdePkg/MdePkg.dec
+  R8QPkg/R8QPkg.dec
+
+[LibraryClasses]
+  UefiDriverEntryPoint
+  UefiBootServicesTableLib
+  UefiRuntimeServicesTableLib
+  BaseLib
+  BaseMemoryLib
+  MemoryAllocationLib
+  DebugLib
+
+[Depex]
+  TRUE
