@@ -3,7 +3,7 @@
   "device": "Samsung Galaxy S20 FE 5G (SM-G781B)",
   "codename": "r8q",
   "soc": "Qualcomm Snapdragon 865 (SM8250)",
-  "generated_at": "2026-11-20T11:16:30.151007+00:00",
+  "generated_at": "2026-11-20T11:17:40.207231+00:00",
   "files": [
     {
       "path": "docs/BOOTCHAIN_FEASIBILITY_REPORT.md",
