@@ -46,8 +46,10 @@ real_entry_point:
     ic      iallu
     isb
 
-    // 5. Establish early stack at safe DRAM offset (descending from 0x80110000)
-    ldr     x2, =0x80110000
+    // 5. Establish early stack at safe DRAM offset in 12 MiB unreserved gap
+    // Base of stack buffer: 0x9E880000, Top of stack: 0x9E890000 (64 KiB, descending)
+    // Separated from loaded image (0x80080000) by >480 MiB and FV (0x9E400000-0x9E7FFFFF) by 512 KiB
+    ldr     x2, =0x9E890000
     mov     sp, x2
 
     // 6. Transition to PrePi C main with DTB pointer in x0
