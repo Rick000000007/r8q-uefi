@@ -1,0 +1,109 @@
+{
+  "project": "Project R8Q UEFI",
+  "device": "Samsung Galaxy S20 FE 5G (SM-G781B)",
+  "codename": "r8q",
+  "soc": "Qualcomm Snapdragon 865 (SM8250)",
+  "generated_at": "2026-11-20T07:26:02.454960+00:00",
+  "files": [
+    {
+      "path": "docs/EDK2_PLATFORM_DESIGN.md",
+      "size_bytes": 6638,
+      "sha256": "8debddf824ea95c9a98644b6b719e0418bcc1f6a8c86cfe8ecb7bcf47f601eb0"
+    },
+    {
+      "path": "docs/FIRMWARE_DRIVER_SUPPORT_MATRIX.md",
+      "size_bytes": 5433,
+      "sha256": "23a95d816b154cc41f5de8e41424c43e3fbe55045b94c9d1759d88add95a6e12"
+    },
+    {
+      "path": "docs/HARDWARE_DEPENDENCY_GRAPH.md",
+      "size_bytes": 6185,
+      "sha256": "77fbe1f52b37e4e934e149bb14f857697451803a24af11dd018ffc802761a90c"
+    },
+    {
+      "path": "docs/LINUX_BOOT_DESIGN.md",
+      "size_bytes": 3816,
+      "sha256": "bcc4472d9754ac758462bf3b7fce7ee23a7411534b66f577b56dc9baeefbb0ce"
+    },
+    {
+      "path": "docs/PHASED_IMPLEMENTATION_SCHEDULE.md",
+      "size_bytes": 7427,
+      "sha256": "a486f79ef6c3aa46d98c14d94ebad42313619711faab7bdce6f564f2f2875fbe"
+    },
+    {
+      "path": "docs/RECOVERY_AND_SAFETY_PLAN.md",
+      "size_bytes": 3549,
+      "sha256": "d79a581f9c268dd19160023c79791dd67d71efc98078a66337d564900f72ac18"
+    },
+    {
+      "path": "docs/REPRODUCIBLE_BUILD_STRATEGY.md",
+      "size_bytes": 2698,
+      "sha256": "fadf107b230e3fa33d20d5a9de52cecd967d021a414197a36e63d24104fcc20f"
+    },
+    {
+      "path": "docs/SHELL_COMMAND_SUITE.md",
+      "size_bytes": 5348,
+      "sha256": "dfb00e09f32cf871d7bb3744f187553f812c0226323b7a55f3b2969ede6bddac"
+    },
+    {
+      "path": "docs/UEFI_ARCHITECTURE.md",
+      "size_bytes": 12192,
+      "sha256": "2caa4a9e5ba6198146d202116e341a0cbd552a618e6aa24dc4afc5257673736a"
+    },
+    {
+      "path": "docs/WINDOWS_COMPATIBILITY_REPORT.md",
+      "size_bytes": 4298,
+      "sha256": "e5eba99ba2e2db4cfacd5be7dd5fae638d6932b7f630d06b872c21f9025c8de4"
+    },
+    {
+      "path": "config/platform.env",
+      "size_bytes": 1390,
+      "sha256": "bddb1032a1744e18bc39eadfb2930f03bb7a933700a7cbc444e39ab0fe77fcda"
+    },
+    {
+      "path": "shell/scripts/boot-linux.nsh",
+      "size_bytes": 674,
+      "sha256": "87194c5e233c18a3e8c7de1f73ce617b67280ab01d4d2bcbbf10db59d3bad1fe"
+    },
+    {
+      "path": "shell/scripts/boot-recovery.nsh",
+      "size_bytes": 461,
+      "sha256": "e38b40ca5e852afa796687bacbd9b62b390d692289cee53ec2294b1f25247565"
+    },
+    {
+      "path": "shell/scripts/hardware-audit.nsh",
+      "size_bytes": 713,
+      "sha256": "f320fdad69096389d27e20f709a72233e5276f575a1a992e8b7416e1bfde01d5"
+    },
+    {
+      "path": "shell/scripts/startup.nsh",
+      "size_bytes": 1111,
+      "sha256": "83b462fc965f14d328ebac2c0dc277dbeb07c28911bcd3c518fd776487674814"
+    },
+    {
+      "path": "shell/scripts/storage-audit.nsh",
+      "size_bytes": 355,
+      "sha256": "2b50edd5b6247e7c0dabece9fcc51151c0d311d4b05b7fee4f1448cfa11ae672"
+    },
+    {
+      "path": "scripts/build.sh",
+      "size_bytes": 1205,
+      "sha256": "f2b8f26192200517ca7f36e31d4fc2c79b786af043b0aea9ab027d07071aeb5e"
+    },
+    {
+      "path": "scripts/gen_manifest.py",
+      "size_bytes": 1850,
+      "sha256": "0f69ac1021df50f5129cd521ce4d180df4f42395913955fb882a30f5a6aac8b5"
+    },
+    {
+      "path": "scripts/verify_environment.sh",
+      "size_bytes": 1472,
+      "sha256": "1ccf422eab14c89d2214f418f003ebb10df914b8d7463ed10af3940d532c3596"
+    },
+    {
+      "path": "devicetree/r8q-live.dts",
+      "size_bytes": 1234562,
+      "sha256": "ee342423634a9e3f086f8cc355c388910b63309337db9a0f5ec0f77f7d556e7e"
+    }
+  ]
+}
