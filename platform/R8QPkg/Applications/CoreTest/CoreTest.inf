@@ -1,0 +1,33 @@
+## @file
+#  CoreTest.inf
+#  Project R8Q UEFI Core Services Validation Application.
+#
+#  Copyright (c) 2026, Antigravity Engineering. All rights reserved.
+##
+
+[Defines]
+  INF_VERSION                    = 0x0001001A
+  BASE_NAME                      = CoreTest
+  FILE_GUID                      = e7a151b2-1823-491a-9642-8a9d1871e84a
+  MODULE_TYPE                    = UEFI_APPLICATION
+  VERSION_STRING                 = 1.0
+  ENTRY_POINT                    = CoreTestMain
+
+[Sources]
+  CoreTest.c
+
+[Packages]
+  MdePkg/MdePkg.dec
+  R8QPkg/R8QPkg.dec
+
+[LibraryClasses]
+  UefiApplicationEntryPoint
+  UefiLib
+  UefiBootServicesTableLib
+  UefiRuntimeServicesTableLib
+  MemoryAllocationLib
+  BaseMemoryLib
+  DebugLib
+
+[Protocols]
+  gEfiGraphicsOutputProtocolGuid

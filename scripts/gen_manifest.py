@@ -48,15 +48,13 @@ def main():
                     "sha256": sha256
                 })
 
-    out_file = os.path.join(MANIFEST_DIR, "milestone2_manifest.json")
+    target_name = sys.argv[1] if len(sys.argv) > 1 else "milestone3_manifest.json"
+    if not target_name.endswith(".json"):
+        target_name += ".json"
+
+    out_file = os.path.join(MANIFEST_DIR, target_name)
     with open(out_file, "w") as f:
         json.dump(manifest, f, indent=2)
-
-    # Also write milestone1_manifest.json for historical preservation
-    legacy_file = os.path.join(MANIFEST_DIR, "milestone1_manifest.json")
-    if not os.path.exists(legacy_file):
-        with open(legacy_file, "w") as f:
-            json.dump(manifest, f, indent=2)
 
     print(f"Manifest generated successfully with {len(manifest['files'])} files.")
     print(f"Saved to: {out_file}")

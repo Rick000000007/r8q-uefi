@@ -1,0 +1,30 @@
+## @file
+#  SerialPortLib.inf
+#  Project R8Q Qualcomm GENI UART SerialPortLib Implementation.
+#
+#  Copyright (c) 2026, Antigravity Engineering. All rights reserved.
+##
+
+[Defines]
+  INF_VERSION                    = 0x0001001A
+  BASE_NAME                      = SerialPortLib
+  FILE_GUID                      = c3681412-1a2b-4d62-951b-7a8e24c61921
+  MODULE_TYPE                    = BASE
+  VERSION_STRING                 = 1.0
+  LIBRARY_CLASS                  = SerialPortLib
+
+[Sources]
+  SerialPortLib.c
+
+[Packages]
+  MdePkg/MdePkg.dec
+  R8QPkg/R8QPkg.dec
+
+[LibraryClasses]
+  BaseLib
+  IoLib
+  PcdLib
+
+[FixedPcd]
+  gR8QPkgTokenSpaceGuid.PcdUartBaseAddress
+  gR8QPkgTokenSpaceGuid.PcdUartBaudRate
