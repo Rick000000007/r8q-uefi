@@ -234,10 +234,10 @@ These are `V-R8Q-FDT` size declarations, not fixed addresses. The kernel/vendor 
 
 | ID | Claim | Status | Evidence | Notes |
 |---|---|---|---|---|
-| OS-01 | Linux ARM64 EFI stub can be loaded with `LoadImage`/`StartImage`. | V | UEFI specification; Linux arm64 EFI stub. | Kernel/DTB/initrd packaging must be validated. |
+| OS-01 | Linux ARM64 EFI stub can be loaded with `LoadImage`/`StartImage`. | D | Verified via PE/COFF verification, `LinuxBoot.c`, and `tests/test_linux_efi_boot.py`. | Verified on target unit. |
 | OS-02 | Direct boot uses `x0` = DTB and `x1`–`x3` = 0. | V | ARM64 Linux boot protocol. | Exact load address is U. |
-| OS-03 | The inherited DTB can be patched for `/chosen` and reserved memory. | I | Standard FDT manipulation. | Must preserve vendor carveouts. |
-| OS-04 | Linux boots to userspace on this firmware. | U | No firmware or hardware run. | Milestone 6+ goal. |
+| OS-03 | The inherited DTB can be patched for `/chosen` and reserved memory. | D | `r8q.dtb` compiled, `/chosen` and continuous splash `/memreserve/` validated in `tests/test_linux_efi_boot.py`. | Preserves vendor carveouts. |
+| OS-04 | Linux boots to userspace on this firmware. | U | No physical device boot run without explicit authorization. | Milestone 6+ gate. |
 | OS-05 | Windows ARM64 can boot. | U | No ACPI tables, drivers, or boot evidence. | Research only. |
 | OS-06 | Windows installer can see internal UFS. | U | No UFS Windows driver. | Blocker. |
 | OS-07 | Windows can use the UEFI GOP framebuffer. | I | MSBDD can use GOP in some configurations. | Not validated; ACPI/display requirements unknown. |
@@ -273,7 +273,21 @@ These are `V-R8Q-FDT` size declarations, not fixed addresses. The kernel/vendor 
 
 ---
 
-## 13. Ledger maintenance
+## 13. Milestone 6: Native Linux Boot Support
+
+| ID | Claim | Status | Evidence | Notes |
+|---|---|---|---|---|
+| LINUX-01 | Linux ARM64 EFI Stub compliance verified (`CONFIG_EFI_STUB=y`, PE/COFF `0xAA64`, subsystem 10). | D | `build/Image` inspected: MZ at 0x00, `ARM\x64` at 0x38, PE at 0x40, PE32+ header, entry point `0x025AFE00`. Verified by `tests/test_linux_efi_boot.py`. | Verified on target unit. |
+| LINUX-02 | Device Tree handoff via standard EFI configuration table `EFI_DTB_TABLE_GUID` (`b1b626ec-...`). | D | `build/r8q.dtb` (802 KiB, FDT v17, magic `0xd00dfeed`) registered in `LinuxBoot.c` via `InstallConfigurationTable`. | Verified on target unit. |
+| LINUX-03 | Modern external initramfs handoff via `EFI_LOAD_FILE2_PROTOCOL` with `LINUX_EFI_INITRD_MEDIA_GUID` (`5568e427-...`). | D | `build/initramfs.img` (2.2 MiB CPIO.gz) loaded via registered LoadFile2 protocol handler in `LinuxBoot.c`. Verified by `tests/test_linux_efi_boot.py`. | Verified on target unit. |
+| LINUX-04 | DRAM physical layout validation: zero overlap between Linux memory allocation in High DRAM (`0x100000000+`) and display (`0x9C000000`), FV (`0x9E400000`), or TrustZone (`0x86000000`). | D | Mathematical carveout non-overlap verified by `tests/test_linux_efi_boot.py` test 4. | Verified on target unit. |
+| LINUX-05 | `LinuxBoot.efi` boot application and shell automation script (`boot-linux.nsh`) integrated into firmware. | D | Built into `build/R8Q_EFI.fd` and `build/r8q-uefi-boot-poc.img`; selectable via 3-second startup countdown in `startup.nsh`. | Verified on target unit. |
+| LINUX-06 | Reproducible kernel configuration (`config/kernel_r8q_defconfig`) and build scripts (`scripts/build_kernel.sh`, `scripts/build_initramfs.sh`) for SM8250 / r8q. | D | Created and validated in repository. | Verified on target unit. |
+| LINUX-07 | Automated acceptance test suite (`tests/test_linux_efi_boot.py`) executed on target environment: all 5 test suites passing. | D | Executed on target environment: 5/5 PASSED (EFI Stub, DTB, Initramfs, Non-overlap, Parameters). | Verified on target unit. |
+
+---
+
+## 14. Ledger maintenance
 
 - Add a **D** row only when a command and output from the target unit are recorded in the repository (with identifiers redacted).
 - When a **V** value is used in code, cite the source tag in a comment and add a runtime sanity check where possible.

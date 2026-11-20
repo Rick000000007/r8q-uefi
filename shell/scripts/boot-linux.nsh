@@ -1,17 +1,26 @@
 # Project R8Q UEFI Linux Boot Script
-# Platform: Samsung Galaxy S20 FE 5G (SM-G781B)
+# Platform: Samsung Galaxy S20 FE 5G (SM-G781B / r8q)
+# Subsystem: Native ARM64 Linux EFI Stub Handoff
 
 @echo -off
-echo "Initiating Native Linux Boot on Samsung Galaxy S20 FE 5G..."
+cls
+echo "================================================================="
+echo "   PROJECT R8Q NATIVE LINUX BOOT ENGINE (MILESTONE 6)"
+echo "   Target Device: Samsung Galaxy S20 FE 5G (SM-G781B / r8q)"
+echo "   SoC:           Qualcomm Snapdragon 865 (SM8250 / Kona)"
+echo "   Standard:      Native ARM64 Linux EFI Stub (PE/COFF 0xAA64)"
+echo "================================================================="
+echo ""
+
+echo "Checking for dedicated Linux Bootloader Application (LinuxBoot.efi)..."
+LinuxBoot.efi
 
 if exist fs0:\EFI\Linux\Image then
-    echo "Found Linux Kernel Image on fs0:\EFI\Linux\Image"
-    fs0:\EFI\Linux\Image initrd=fs0:\EFI\Linux\initramfs.img console=tty0 clk_ignore_unused pd_ignore_unused
+    echo "Direct EFI Stub fallback: fs0:\EFI\Linux\Image"
+    fs0:\EFI\Linux\Image console=tty0 console=ttyHS8,115200n8 earlycon=msm_geni_serial,0x00A90000 clk_ignore_unused pd_ignore_unused root=/dev/ram0 rw
 else
     if exist fs1:\EFI\Linux\Image then
-        echo "Found Linux Kernel Image on MicroSD (fs1)"
-        fs1:\EFI\Linux\Image initrd=fs1:\EFI\Linux\initramfs.img console=tty0 clk_ignore_unused pd_ignore_unused
-    else
-        echo "ERROR: Linux kernel Image not found on fs0 or fs1."
+        echo "Direct EFI Stub fallback on MicroSD (fs1)"
+        fs1:\EFI\Linux\Image console=tty0 console=ttyHS8,115200n8 earlycon=msm_geni_serial,0x00A90000 clk_ignore_unused pd_ignore_unused root=/dev/ram0 rw
     endif
 endif

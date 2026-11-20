@@ -1,0 +1,41 @@
+## @file
+#  LinuxBoot.inf
+#  Project R8Q Native ARM64 Linux Bootloader & EFI Stub Handoff Application.
+#  Target: Samsung Galaxy S20 FE 5G (SM-G781B / r8q)
+#
+#  Copyright (c) 2026, Antigravity Engineering. All rights reserved.
+##
+
+[Defines]
+  INF_VERSION                    = 0x0001001A
+  BASE_NAME                      = LinuxBoot
+  FILE_GUID                      = 39f1c4e0-91a4-47b2-8491-729ab5141940
+  MODULE_TYPE                    = UEFI_APPLICATION
+  VERSION_STRING                 = 1.0
+  ENTRY_POINT                    = LinuxBootMain
+
+[Sources]
+  LinuxBoot.c
+
+[Packages]
+  MdePkg/MdePkg.dec
+  MdeModulePkg/MdeModulePkg.dec
+  R8QPkg/R8QPkg.dec
+
+[LibraryClasses]
+  UefiApplicationEntryPoint
+  UefiLib
+  UefiBootServicesTableLib
+  UefiRuntimeServicesTableLib
+  MemoryAllocationLib
+  BaseMemoryLib
+  PrintLib
+  DevicePathLib
+  DebugLib
+
+[Protocols]
+  gEfiLoadedImageProtocolGuid
+  gEfiSimpleFileSystemProtocolGuid
+  gEfiLoadFile2ProtocolGuid
+  gEfiDevicePathProtocolGuid
+  gEfiSimpleTextInProtocolGuid

@@ -62,6 +62,7 @@ INF R8QPkg/Applications/Thermal/Thermal.inf
 INF R8QPkg/Applications/Firmware/Firmware.inf
 INF R8QPkg/Applications/Diagnostics/Diagnostics.inf
 INF R8QPkg/Applications/ShellTest/ShellTest.inf
+INF R8QPkg/Applications/LinuxBoot/LinuxBoot.inf
 
 [Rule.Common.SEC]
   FILE SEC = $(NAMED_GUID) RELOCS_STRIPPED {
