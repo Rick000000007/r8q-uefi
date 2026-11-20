@@ -208,13 +208,21 @@ EOF
 echo "r8q ALL=(ALL:ALL) NOPASSWD: ALL" > "$STAGING_DIR"/etc/sudoers.d/r8q
 chmod 0440 "$STAGING_DIR"/etc/sudoers.d/r8q
 
-# Generate cryptographic Ed25519 SSH test key pair
-SSH_TEST_KEY="$BUILD_DIR/r8q_test_id_ed25519"
-rm -f "$SSH_TEST_KEY" "$SSH_TEST_KEY.pub"
-ssh-keygen -t ed25519 -f "$SSH_TEST_KEY" -N "" -C "r8q-automated-test-key" -q
-cp "$SSH_TEST_KEY.pub" "$STAGING_DIR"/home/r8q/.ssh/authorized_keys
-cp "$SSH_TEST_KEY.pub" "$STAGING_DIR"/root/.ssh/authorized_keys
-chmod 0600 "$STAGING_DIR"/home/r8q/.ssh/authorized_keys "$STAGING_DIR"/root/.ssh/authorized_keys
+# Security Cleanup & Credential Management Policy
+if [ "${PRODUCTION_BUILD:-0}" = "1" ]; then
+    echo "[SECURITY] Production mode enabled: Eradicating test credentials and isolating keys."
+    rm -f "$STAGING_DIR"/home/r8q/.ssh/authorized_keys "$STAGING_DIR"/root/.ssh/authorized_keys
+    rm -f "$BUILD_DIR"/r8q_test_id_ed25519 "$BUILD_DIR"/r8q_test_id_ed25519.pub
+    echo "[SECURITY] Authorized keys left clean for user provisioning."
+else
+    # Ephemeral Ed25519 test key for automated virtual QEMU testing ONLY
+    SSH_TEST_KEY="$BUILD_DIR/r8q_test_id_ed25519"
+    rm -f "$SSH_TEST_KEY" "$SSH_TEST_KEY.pub"
+    ssh-keygen -t ed25519 -f "$SSH_TEST_KEY" -N "" -C "r8q-automated-test-key" -q
+    cp "$SSH_TEST_KEY.pub" "$STAGING_DIR"/home/r8q/.ssh/authorized_keys
+    cp "$SSH_TEST_KEY.pub" "$STAGING_DIR"/root/.ssh/authorized_keys
+    chmod 0600 "$STAGING_DIR"/home/r8q/.ssh/authorized_keys "$STAGING_DIR"/root/.ssh/authorized_keys
+fi
 
 # 8. Hardware & Udev Rules for Snapdragon 865 (SM8250) & QEMU
 echo "[ROOTFS] Installing SM8250 & QEMU platform udev rules..."
@@ -307,13 +315,35 @@ AuthorizedKeysFile .ssh/authorized_keys
 Subsystem sftp /usr/lib/openssh/sftp-server
 EOF
 
-# Regenerate fresh, unique SSH host keys
-rm -f "$STAGING_DIR"/etc/ssh/ssh_host_*_key*
-ssh-keygen -t rsa -b 3072 -f "$STAGING_DIR"/etc/ssh/ssh_host_rsa_key -N "" -q
-ssh-keygen -t ecdsa -b 256 -f "$STAGING_DIR"/etc/ssh/ssh_host_ecdsa_key -N "" -q
-ssh-keygen -t ed25519 -f "$STAGING_DIR"/etc/ssh/ssh_host_ed25519_key -N "" -q
-chmod 0600 "$STAGING_DIR"/etc/ssh/ssh_host_*_key
-chmod 0644 "$STAGING_DIR"/etc/ssh/ssh_host_*_key.pub
+# Host Key Generation & Production Dynamic Provisioning Policy
+if [ "${PRODUCTION_BUILD:-0}" = "1" ]; then
+    echo "[SECURITY] Production mode: Removing static host keys; enabling dynamic firstboot generation."
+    rm -f "$STAGING_DIR"/etc/ssh/ssh_host_*_key*
+    cat << 'EOF_SVC' > "$STAGING_DIR"/etc/systemd/system/r8q-ssh-keygen.service
+[Unit]
+Description=Generate Unique SSH Host Keys on First Boot
+Before=ssh.service
+ConditionFileNotEmpty=!/etc/ssh/ssh_host_ed25519_key
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/ssh-keygen -A
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
+EOF_SVC
+    mkdir -p "$STAGING_DIR"/etc/systemd/system/multi-user.target.wants
+    ln -sf /etc/systemd/system/r8q-ssh-keygen.service "$STAGING_DIR"/etc/systemd/system/multi-user.target.wants/r8q-ssh-keygen.service
+else
+    # Development / QEMU Virtual Test Harness: Pre-populate unique ephemeral keys
+    rm -f "$STAGING_DIR"/etc/ssh/ssh_host_*_key*
+    ssh-keygen -t rsa -b 3072 -f "$STAGING_DIR"/etc/ssh/ssh_host_rsa_key -N "" -q
+    ssh-keygen -t ecdsa -b 256 -f "$STAGING_DIR"/etc/ssh/ssh_host_ecdsa_key -N "" -q
+    ssh-keygen -t ed25519 -f "$STAGING_DIR"/etc/ssh/ssh_host_ed25519_key -N "" -q
+    chmod 0600 "$STAGING_DIR"/etc/ssh/ssh_host_*_key
+    chmod 0644 "$STAGING_DIR"/etc/ssh/ssh_host_*_key.pub
+fi
 
 # 12. APT Package Manager Configuration
 echo "[ROOTFS] Configuring Debian APT sources..."
