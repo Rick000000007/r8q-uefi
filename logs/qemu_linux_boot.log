@@ -49,136 +49,136 @@
 [    0.000000] clocksource: jiffies: mask: 0xffffffff max_cycles: 0xffffffff, max_idle_ns: 7645041785100000 ns
 [    0.000000] arch_timer: cp15 timer running at 62.50MHz (virt).
 [    0.000000] clocksource: arch_sys_counter: mask: 0x1ffffffffffffff max_cycles: 0x1cd42e208c, max_idle_ns: 881590405314 ns
-[    0.000078] sched_clock: 57 bits at 63MHz, resolution 16ns, wraps every 4398046511096ns
-[    0.020656] Console: colour dummy device 80x25
-[    0.023560] Calibrating delay loop (skipped), value calculated using timer frequency.. 125.00 BogoMIPS (lpj=250000)
-[    0.024174] pid_max: default: 32768 minimum: 301
-[    0.028728] Mount-cache hash table entries: 2048 (order: 2, 16384 bytes, linear)
-[    0.029147] Mountpoint-cache hash table entries: 2048 (order: 2, 16384 bytes, linear)
-[    0.042346] VFS: Finished mounting rootfs on nullfs
-[    0.086774] rcu: Hierarchical SRCU implementation.
-[    0.087136] rcu: 	Max phase no-delay instances is 1000.
-[    0.091511] EFI services will not be available.
-[    0.093363] smp: Bringing up secondary CPUs ...
-[    0.105625] Detected PIPT I-cache on CPU1
-[    0.122319] CPU1: Booted secondary processor 0x0000000001 [0x411fd070]
-[    0.167592] Detected PIPT I-cache on CPU2
-[    0.172483] CPU2: Booted secondary processor 0x0000000002 [0x411fd070]
-[    0.187813] Detected PIPT I-cache on CPU3
-[    0.192514] CPU3: Booted secondary processor 0x0000000003 [0x411fd070]
-[    0.196559] smp: Brought up 1 node, 4 CPUs
-[    0.204415] SMP: Total of 4 processors activated.
-[    0.205330] CPU: All CPU(s) started at EL1
-[    0.207651] CPU features: detected: 32-bit EL0 Support
-[    0.208879] CPU features: detected: CRC32 instructions
-[    0.260116] alternatives: applying system-wide alternatives
-[    0.306467] Memory: 1003408K/1048576K available (9856K kernel code, 1304K rwdata, 3992K rodata, 1152K init, 299K bss, 42120K reserved, 0K cma-reserved)
-[    0.448609] devtmpfs: initialized
-[    0.530912] posixtimers hash table entries: 2048 (order: 3, 32768 bytes, linear)
-[    0.534096] futex hash table entries: 1024 (65536 bytes on 1 NUMA nodes, total 64 KiB, linear).
-[    0.555245] DMI: not present or invalid.
-[    0.571458] DMA: preallocated 128 KiB GFP_KERNEL|GFP_DMA pool for atomic allocations
-[    0.581590] thermal_sys: Registered thermal governor 'step_wise'
-[    0.581798] thermal_sys: Registered thermal governor 'user_space'
-[    0.603057] cpuidle: using governor ladder
-[    0.607553] ASID allocator initialised with 65536 entries
-[    0.616641] Serial: AMBA PL011 UART driver
-[    0.684532] 9000000.pl011: ttyAMA0 at MMIO 0x9000000 (irq = 13, base_baud = 0) is a PL011 rev1
-[    0.689211] printk: console [ttyAMA0] enabled
-[    0.689211] printk: console [ttyAMA0] enabled
-[    0.691604] printk: legacy bootconsole [pl11] disabled
-[    0.691604] printk: legacy bootconsole [pl11] disabled
-[    0.859794] raid6: using neon recovery algorithm
-[    0.937965] raid6: int64x1  gen()   202 MB/s
-[    1.016276] raid6: int64x2  gen()  1198 MB/s
-[    1.109672] raid6: int64x4  gen()  1719 MB/s
-[    1.192542] raid6: int64x8  gen()   920 MB/s
-[    1.276265] raid6: neonx1   gen()  1134 MB/s
-[    1.351584] raid6: neonx2   gen()  1463 MB/s
-[    1.432127] raid6: neonx4   gen()  1628 MB/s
-[    1.524638] raid6: neonx8   gen()  2269 MB/s
-[    1.527467] raid6: using algorithm neonx8 gen() 2269 MB/s
-[    1.613844] raid6: .... xor() 826 MB/s, rmw enabled
-[    1.622357] ACPI: Interpreter disabled.
-[    1.627035] iommu: Default domain type: Translated
-[    1.627414] iommu: DMA domain TLB invalidation policy: strict mode
-[    1.657609] SCSI subsystem initialized
-[    1.661146] usbcore: registered new interface driver usbfs
-[    1.663378] usbcore: registered new interface driver hub
-[    1.664405] usbcore: registered new device driver usb
-[    1.683233] Advanced Linux Sound Architecture Driver Initialized.
-[    1.693030] vgaarb: loaded
-[    1.705059] clocksource: Switched to clocksource arch_sys_counter
-[    1.728972] pnp: PnP ACPI: disabled
-[    2.066429] PCI: CLS 0 bytes, default 64
-[    2.132796] workingset: timestamp_bits=46 (anon: 41) max_order=18 bucket_order=0 (anon: 0)
-[    2.142456] Unpacking initramfs...
-[    2.157759] Block layer SCSI generic (bsg) driver version 0.4 loaded (major 252)
-[    2.158159] io scheduler mq-deadline registered
-[    2.158303] io scheduler kyber registered
-[    2.158968] io scheduler bfq registered
-[    2.159520] xor: measuring software checksum speed
-[    2.162444]    neon            :  1198 MB/sec
-[    2.164522]    32regs          :  1691 MB/sec
-[    2.165829]    8regs           :  2623 MB/sec
-[    2.165884] xor: using function: 8regs (2623 MB/sec)
-[    2.178360] pci-host-generic 4010000000.pcie: host bridge /pcie@10000000 ranges:
-[    2.179732] pci-host-generic 4010000000.pcie:       IO 0x003eff0000..0x003effffff -> 0x0000000000
-[    2.181350] pci-host-generic 4010000000.pcie:      MEM 0x0010000000..0x003efeffff -> 0x0010000000
-[    2.181591] pci-host-generic 4010000000.pcie:      MEM 0x8000000000..0xffffffffff -> 0x8000000000
-[    2.182548] pci-host-generic 4010000000.pcie: Memory resource size exceeds max for 32 bits
-[    2.183653] pci-host-generic 4010000000.pcie: ECAM at [mem 0x4010000000-0x401fffffff] for [bus 00-ff]
-[    2.187470] pci-host-generic 4010000000.pcie: PCI host bridge to bus 0000:00
-[    2.188460] pci_bus 0000:00: root bus resource [bus 00-ff]
-[    2.188620] pci_bus 0000:00: root bus resource [io  0x0000-0xffff]
-[    2.188726] pci_bus 0000:00: root bus resource [mem 0x10000000-0x3efeffff]
-[    2.188781] pci_bus 0000:00: root bus resource [mem 0x8000000000-0xffffffffff]
-[    2.191392] pci 0000:00:00.0: [1b36:0008] type 00 class 0x060000 conventional PCI endpoint
-[    2.202436] pci 0000:00:01.0: [1af4:1000] type 00 class 0x020000 conventional PCI endpoint
-[    2.203004] pci 0000:00:01.0: BAR 0 [io  0x0000-0x001f]
-[    2.203216] pci 0000:00:01.0: BAR 1 [mem 0x00000000-0x00000fff]
-[    2.203317] pci 0000:00:01.0: BAR 4 [mem 0x00000000-0x00003fff 64bit pref]
-[    2.203502] pci 0000:00:01.0: ROM [mem 0x00000000-0x0003ffff pref]
-[    2.206313] pci 0000:00:02.0: [1af4:1001] type 00 class 0x010000 conventional PCI endpoint
-[    2.206565] pci 0000:00:02.0: BAR 0 [io  0x0000-0x007f]
-[    2.206611] pci 0000:00:02.0: BAR 1 [mem 0x00000000-0x00000fff]
-[    2.206701] pci 0000:00:02.0: BAR 4 [mem 0x00000000-0x00003fff 64bit pref]
-[    2.207561] pci 0000:00:03.0: [1af4:1001] type 00 class 0x010000 conventional PCI endpoint
-[    2.208669] pci 0000:00:03.0: BAR 0 [io  0x0000-0x007f]
-[    2.208720] pci 0000:00:03.0: BAR 1 [mem 0x00000000-0x00000fff]
-[    2.208869] pci 0000:00:03.0: BAR 4 [mem 0x00000000-0x00003fff 64bit pref]
-[    2.214548] pci 0000:00:01.0: ROM [mem 0x10000000-0x1003ffff pref]: assigned
-[    2.214984] pci 0000:00:01.0: BAR 4 [mem 0x8000000000-0x8000003fff 64bit pref]: assigned
-[    2.215432] pci 0000:00:02.0: BAR 4 [mem 0x8000004000-0x8000007fff 64bit pref]: assigned
-[    2.215653] pci 0000:00:03.0: BAR 4 [mem 0x8000008000-0x800000bfff 64bit pref]: assigned
-[    2.215845] pci 0000:00:01.0: BAR 1 [mem 0x10040000-0x10040fff]: assigned
-[    2.216110] pci 0000:00:02.0: BAR 1 [mem 0x10041000-0x10041fff]: assigned
-[    2.216747] pci 0000:00:03.0: BAR 1 [mem 0x10042000-0x10042fff]: assigned
-[    2.216881] pci 0000:00:02.0: BAR 0 [io  0x1000-0x107f]: assigned
-[    2.217001] pci 0000:00:03.0: BAR 0 [io  0x1080-0x10ff]: assigned
-[    2.217074] pci 0000:00:01.0: BAR 0 [io  0x1100-0x111f]: assigned
-[    2.217585] pci_bus 0000:00: resource 4 [io  0x0000-0xffff]
-[    2.217659] pci_bus 0000:00: resource 5 [mem 0x10000000-0x3efeffff]
-[    2.217838] pci_bus 0000:00: resource 6 [mem 0x8000000000-0xffffffffff]
-[    2.244808] virtio-pci 0000:00:01.0: enabling device (0000 -> 0003)
-[    2.252683] virtio-pci 0000:00:02.0: enabling device (0000 -> 0003)
-[    2.257802] virtio-pci 0000:00:03.0: enabling device (0000 -> 0003)
-[    2.379493] Freeing initrd memory: 2876K
-[    3.349233] virtio_blk virtio1: 4/0/0 default/read/poll queues
-[    3.467548] virtio_blk virtio1: [vda] 4194304 512-byte logical blocks (2.15 GB/2.00 GiB)
-[    3.529304] virtio_blk virtio2: 4/0/0 default/read/poll queues
-[    3.538481] virtio_blk virtio2: [vdb] 524288 512-byte logical blocks (268 MB/256 MiB)
-[    3.563795]  vdb: vdb1
-[    3.575432] usbcore: registered new interface driver usb-storage
-[    3.658413] usbcore: registered new interface driver usbhid
-[    3.658955] usbhid: USB HID core driver
-[    3.826069] Btrfs loaded, zoned=no, fsverity=no
-[    3.848709] clk: Disabling unused clocks
-[    3.849138] PM: genpd: Disabling unused power domains
-[    3.849488] ALSA device list:
-[    3.849630]   No soundcards found.
-[    3.960929] Freeing unused kernel memory: 1152K
-[    4.066468] Run /init as init process
+[    0.000079] sched_clock: 57 bits at 63MHz, resolution 16ns, wraps every 4398046511096ns
+[    0.012394] Console: colour dummy device 80x25
+[    0.015216] Calibrating delay loop (skipped), value calculated using timer frequency.. 125.00 BogoMIPS (lpj=250000)
+[    0.015902] pid_max: default: 32768 minimum: 301
+[    0.020586] Mount-cache hash table entries: 2048 (order: 2, 16384 bytes, linear)
+[    0.021905] Mountpoint-cache hash table entries: 2048 (order: 2, 16384 bytes, linear)
+[    0.036058] VFS: Finished mounting rootfs on nullfs
+[    0.082109] rcu: Hierarchical SRCU implementation.
+[    0.082698] rcu: 	Max phase no-delay instances is 1000.
+[    0.089169] EFI services will not be available.
+[    0.091510] smp: Bringing up secondary CPUs ...
+[    0.099739] Detected PIPT I-cache on CPU1
+[    0.109920] CPU1: Booted secondary processor 0x0000000001 [0x411fd070]
+[    0.139598] Detected PIPT I-cache on CPU2
+[    0.144457] CPU2: Booted secondary processor 0x0000000002 [0x411fd070]
+[    0.154709] Detected PIPT I-cache on CPU3
+[    0.159718] CPU3: Booted secondary processor 0x0000000003 [0x411fd070]
+[    0.164333] smp: Brought up 1 node, 4 CPUs
+[    0.167189] SMP: Total of 4 processors activated.
+[    0.167817] CPU: All CPU(s) started at EL1
+[    0.168244] CPU features: detected: 32-bit EL0 Support
+[    0.168698] CPU features: detected: CRC32 instructions
+[    0.204544] alternatives: applying system-wide alternatives
+[    0.255574] Memory: 1003408K/1048576K available (9856K kernel code, 1304K rwdata, 3992K rodata, 1152K init, 299K bss, 42120K reserved, 0K cma-reserved)
+[    0.347011] devtmpfs: initialized
+[    0.393725] posixtimers hash table entries: 2048 (order: 3, 32768 bytes, linear)
+[    0.395231] futex hash table entries: 1024 (65536 bytes on 1 NUMA nodes, total 64 KiB, linear).
+[    0.418401] DMI: not present or invalid.
+[    0.440055] DMA: preallocated 128 KiB GFP_KERNEL|GFP_DMA pool for atomic allocations
+[    0.453511] thermal_sys: Registered thermal governor 'step_wise'
+[    0.453702] thermal_sys: Registered thermal governor 'user_space'
+[    0.468774] cpuidle: using governor ladder
+[    0.471755] ASID allocator initialised with 65536 entries
+[    0.481576] Serial: AMBA PL011 UART driver
+[    0.550151] 9000000.pl011: ttyAMA0 at MMIO 0x9000000 (irq = 13, base_baud = 0) is a PL011 rev1
+[    0.553603] printk: console [ttyAMA0] enabled
+[    0.553603] printk: console [ttyAMA0] enabled
+[    0.555414] printk: legacy bootconsole [pl11] disabled
+[    0.555414] printk: legacy bootconsole [pl11] disabled
+[    0.663159] raid6: using neon recovery algorithm
+[    0.737923] raid6: int64x1  gen()   475 MB/s
+[    0.811146] raid6: int64x2  gen()  1313 MB/s
+[    0.887826] raid6: int64x4  gen()  1340 MB/s
+[    0.966349] raid6: int64x8  gen()   985 MB/s
+[    1.041683] raid6: neonx1   gen()  1393 MB/s
+[    1.117506] raid6: neonx2   gen()  2118 MB/s
+[    1.195588] raid6: neonx4   gen()  2576 MB/s
+[    1.272941] raid6: neonx8   gen()  2795 MB/s
+[    1.273081] raid6: using algorithm neonx8 gen() 2795 MB/s
+[    1.347109] raid6: .... xor() 1022 MB/s, rmw enabled
+[    1.349374] ACPI: Interpreter disabled.
+[    1.350400] iommu: Default domain type: Translated
+[    1.350456] iommu: DMA domain TLB invalidation policy: strict mode
+[    1.367448] SCSI subsystem initialized
+[    1.368729] usbcore: registered new interface driver usbfs
+[    1.369249] usbcore: registered new interface driver hub
+[    1.369532] usbcore: registered new device driver usb
+[    1.377907] Advanced Linux Sound Architecture Driver Initialized.
+[    1.381836] vgaarb: loaded
+[    1.393811] clocksource: Switched to clocksource arch_sys_counter
+[    1.397988] pnp: PnP ACPI: disabled
+[    1.534080] PCI: CLS 0 bytes, default 64
+[    1.545880] Unpacking initramfs...
+[    1.554032] workingset: timestamp_bits=46 (anon: 41) max_order=18 bucket_order=0 (anon: 0)
+[    1.576734] Block layer SCSI generic (bsg) driver version 0.4 loaded (major 252)
+[    1.577095] io scheduler mq-deadline registered
+[    1.577227] io scheduler kyber registered
+[    1.577886] io scheduler bfq registered
+[    1.578416] xor: measuring software checksum speed
+[    1.581256]    neon            :  1215 MB/sec
+[    1.583928]    32regs          :  1309 MB/sec
+[    1.586081]    8regs           :  2618 MB/sec
+[    1.586206] xor: using function: 8regs (2618 MB/sec)
+[    1.609066] pci-host-generic 4010000000.pcie: host bridge /pcie@10000000 ranges:
+[    1.610405] pci-host-generic 4010000000.pcie:       IO 0x003eff0000..0x003effffff -> 0x0000000000
+[    1.611247] pci-host-generic 4010000000.pcie:      MEM 0x0010000000..0x003efeffff -> 0x0010000000
+[    1.611394] pci-host-generic 4010000000.pcie:      MEM 0x8000000000..0xffffffffff -> 0x8000000000
+[    1.613359] pci-host-generic 4010000000.pcie: Memory resource size exceeds max for 32 bits
+[    1.615346] pci-host-generic 4010000000.pcie: ECAM at [mem 0x4010000000-0x401fffffff] for [bus 00-ff]
+[    1.619056] pci-host-generic 4010000000.pcie: PCI host bridge to bus 0000:00
+[    1.620551] pci_bus 0000:00: root bus resource [bus 00-ff]
+[    1.621079] pci_bus 0000:00: root bus resource [io  0x0000-0xffff]
+[    1.621203] pci_bus 0000:00: root bus resource [mem 0x10000000-0x3efeffff]
+[    1.621259] pci_bus 0000:00: root bus resource [mem 0x8000000000-0xffffffffff]
+[    1.624038] pci 0000:00:00.0: [1b36:0008] type 00 class 0x060000 conventional PCI endpoint
+[    1.637512] pci 0000:00:01.0: [1af4:1000] type 00 class 0x020000 conventional PCI endpoint
+[    1.637948] pci 0000:00:01.0: BAR 0 [io  0x0000-0x001f]
+[    1.638085] pci 0000:00:01.0: BAR 1 [mem 0x00000000-0x00000fff]
+[    1.638176] pci 0000:00:01.0: BAR 4 [mem 0x00000000-0x00003fff 64bit pref]
+[    1.638312] pci 0000:00:01.0: ROM [mem 0x00000000-0x0003ffff pref]
+[    1.639429] pci 0000:00:02.0: [1af4:1001] type 00 class 0x010000 conventional PCI endpoint
+[    1.639543] pci 0000:00:02.0: BAR 0 [io  0x0000-0x007f]
+[    1.639591] pci 0000:00:02.0: BAR 1 [mem 0x00000000-0x00000fff]
+[    1.639617] pci 0000:00:02.0: BAR 4 [mem 0x00000000-0x00003fff 64bit pref]
+[    1.643165] pci 0000:00:03.0: [1af4:1001] type 00 class 0x010000 conventional PCI endpoint
+[    1.643810] pci 0000:00:03.0: BAR 0 [io  0x0000-0x007f]
+[    1.643903] pci 0000:00:03.0: BAR 1 [mem 0x00000000-0x00000fff]
+[    1.644312] pci 0000:00:03.0: BAR 4 [mem 0x00000000-0x00003fff 64bit pref]
+[    1.651163] pci 0000:00:01.0: ROM [mem 0x10000000-0x1003ffff pref]: assigned
+[    1.651734] pci 0000:00:01.0: BAR 4 [mem 0x8000000000-0x8000003fff 64bit pref]: assigned
+[    1.652149] pci 0000:00:02.0: BAR 4 [mem 0x8000004000-0x8000007fff 64bit pref]: assigned
+[    1.652313] pci 0000:00:03.0: BAR 4 [mem 0x8000008000-0x800000bfff 64bit pref]: assigned
+[    1.652395] pci 0000:00:01.0: BAR 1 [mem 0x10040000-0x10040fff]: assigned
+[    1.652482] pci 0000:00:02.0: BAR 1 [mem 0x10041000-0x10041fff]: assigned
+[    1.652526] pci 0000:00:03.0: BAR 1 [mem 0x10042000-0x10042fff]: assigned
+[    1.652595] pci 0000:00:02.0: BAR 0 [io  0x1000-0x107f]: assigned
+[    1.652707] pci 0000:00:03.0: BAR 0 [io  0x1080-0x10ff]: assigned
+[    1.652759] pci 0000:00:01.0: BAR 0 [io  0x1100-0x111f]: assigned
+[    1.653257] pci_bus 0000:00: resource 4 [io  0x0000-0xffff]
+[    1.653340] pci_bus 0000:00: resource 5 [mem 0x10000000-0x3efeffff]
+[    1.653375] pci_bus 0000:00: resource 6 [mem 0x8000000000-0xffffffffff]
+[    1.684802] virtio-pci 0000:00:01.0: enabling device (0000 -> 0003)
+[    1.692508] virtio-pci 0000:00:02.0: enabling device (0000 -> 0003)
+[    1.696419] virtio-pci 0000:00:03.0: enabling device (0000 -> 0003)
+[    1.784127] Freeing initrd memory: 2876K
+[    2.218698] virtio_blk virtio1: 4/0/0 default/read/poll queues
+[    2.253815] virtio_blk virtio1: [vda] 4194304 512-byte logical blocks (2.15 GB/2.00 GiB)
+[    2.283161] virtio_blk virtio2: 4/0/0 default/read/poll queues
+[    2.290538] virtio_blk virtio2: [vdb] 524288 512-byte logical blocks (268 MB/256 MiB)
+[    2.314634]  vdb: vdb1
+[    2.325777] usbcore: registered new interface driver usb-storage
+[    2.336124] usbcore: registered new interface driver usbhid
+[    2.336202] usbhid: USB HID core driver
+[    2.418275] Btrfs loaded, zoned=no, fsverity=no
+[    2.437707] clk: Disabling unused clocks
+[    2.438114] PM: genpd: Disabling unused power domains
+[    2.438392] ALSA device list:
+[    2.438507]   No soundcards found.
+[    2.537067] Freeing unused kernel memory: 1152K
+[    2.566776] Run /init as init process
 [H[J=================================================================
    PROJECT R8Q NATIVE LINUX OPERATING SYSTEM
    Target: Samsung Galaxy S20 FE 5G (SM-G781B / r8q)
@@ -193,25 +193,25 @@ Cmdline: console=ttyAMA0 root=/dev/vda rw earlycon
 [INIT] Resolving specified root: /dev/vda...
 [INIT] Resolved /dev/vda -> /dev/vda
 [INIT] Mounting root device /dev/vda onto /newroot (rw)...
-[    8.849361] EXT4-fs (vda): recovery complete
-[    8.862530] EXT4-fs (vda): mounted filesystem e2c75f4c-ddde-447d-ad2b-454e1e2796b1 r/w with ordered data mode. Quota mode: disabled.
+[    6.473832] EXT4-fs (vda): recovery complete
+[    6.489878] EXT4-fs (vda): mounted filesystem e2c75f4c-ddde-447d-ad2b-454e1e2796b1 r/w with ordered data mode. Quota mode: disabled.
 [INIT] Target root verified successfully. Init binary: /usr/lib/systemd/systemd
 [INIT] Cleanly unmounting early virtual filesystems...
 [INIT] Executing switch_root to /usr/lib/systemd/systemd...
-[    9.964568] systemd[1]: System time advanced to built-in epoch: Tue 2026-09-22 13:21:47 UTC
-P+q6E616D65\[   10.468902] systemd[1]: Failed to initialize kmod context: Operation not supported
-[18t7[32766;32766H[6n8[!p]104\[0m[?7h[1G[0J[   11.490040] systemd[1]: systemd 262-1 running in system mode (+PAM +AUDIT +SELINUX +APPARMOR +IMA +IPE +SMACK +SECCOMP -GNUTLS +OPENSSL +ACL +BLKID +CURL +ELFUTILS +FIDO2 +IDN2 +KMOD +LIBCRYPTSETUP +LIBCRYPTSETUP_PLUGINS +LIBFDISK +PCRE2 +PWQUALITY +P11KIT +QRENCODE +TPM2 +BZIP2 +LZ4 +XZ +ZLIB +ZSTD +BPF_FRAMEWORK +BTF -XKBCOMMON -UTMP +LIBARCHIVE)
-[   11.559142] systemd[1]: Detected virtualization qemu.
-[   11.570723] systemd[1]: Detected architecture arm64.
+[    7.790652] systemd[1]: System time advanced to built-in epoch: Tue 2026-09-22 13:21:47 UTC
+P+q6E616D65\[    8.267474] systemd[1]: Failed to initialize kmod context: Operation not supported
+[18t7[32766;32766H[6n8[!p]104\[0m[?7h[1G[0J[    9.206574] systemd[1]: systemd 262-1 running in system mode (+PAM +AUDIT +SELINUX +APPARMOR +IMA +IPE +SMACK +SECCOMP -GNUTLS +OPENSSL +ACL +BLKID +CURL +ELFUTILS +FIDO2 +IDN2 +KMOD +LIBCRYPTSETUP +LIBCRYPTSETUP_PLUGINS +LIBFDISK +PCRE2 +PWQUALITY +P11KIT +QRENCODE +TPM2 +BZIP2 +LZ4 +XZ +ZLIB +ZSTD +BPF_FRAMEWORK +BTF -XKBCOMMON -UTMP +LIBARCHIVE)
+[    9.230181] systemd[1]: Detected virtualization qemu.
+[    9.234361] systemd[1]: Detected architecture arm64.
 
 [0;1;39mWelcome to [0m[1mDebian GNU/Linux 12 (bookworm)[0m[0;1;39m![0m
 
-[   11.706815] systemd[1]: Hostname set to <r8q-linux>.
-[   11.711579] systemd[1]: Failed to open netlink, ignoring: Function not implemented
-]3008;start=d208c9fad170401682b040f3903ccd0b;user=root;hostname=r8q-linux;machineid=3545c804de604f57a834c6264e9386a9;bootid=264c860e9e264113a695a563ecc792f6;pid=1;pidfdid=1;comm=systemd;type=boot\[   12.158647] systemd[1]: Neither libbpf.so.1 nor libbpf.so.0 are installed, cgroup BPF features disabled.
-[   13.477174] systemd[1]: Failed to allocate device monitor: Function not implemented
-[   15.281116] systemd[1]: Failed to allocate notification socket: Function not implemented
-[   15.318595] systemd[1]: Caught <ABRT>, from our own process.
-[   15.512878] systemd[1]: Caught <ABRT>, dumped core as pid 91.
-[   15.514896] systemd[1]: Freezing execution.
-qemu-system-aarch64: terminating on signal 15 from pid 29730 (python3)
+[    9.314413] systemd[1]: Hostname set to <r8q-linux>.
+[    9.317493] systemd[1]: Failed to open netlink, ignoring: Function not implemented
+]3008;start=ed13aa1983d54f028f42dffd1b02a170;user=root;hostname=r8q-linux;machineid=3545c804de604f57a834c6264e9386a9;bootid=fc1b59896a784628879a459fbde8fac3;pid=1;pidfdid=1;comm=systemd;type=boot\[    9.519461] systemd[1]: Neither libbpf.so.1 nor libbpf.so.0 are installed, cgroup BPF features disabled.
+[   10.691413] systemd[1]: Failed to allocate device monitor: Function not implemented
+[   12.071526] systemd[1]: Failed to allocate notification socket: Function not implemented
+[   12.091738] systemd[1]: Caught <ABRT>, from our own process.
+[   12.244188] systemd[1]: Caught <ABRT>, dumped core as pid 91.
+[   12.249082] systemd[1]: Freezing execution.
+qemu-system-aarch64: terminating on signal 15 from pid 22429 (python3)

@@ -52,7 +52,28 @@ real_entry_point:
     mov     sp, x2
 
     // 6. Check if firmware volume needs relocation to compiled base (0x9E400000)
-    adr     x20, _ModuleEntryPoint      // Current execution base (e.g. 0x80080000)
+    // CRITICAL-01 FIX: In AArch64, entry offset is subtracted using register arithmetic
+    // Primary TE entry offset is 0x1418 (5,144 bytes).
+    adr     x20, _ModuleEntryPoint      // Current entry point in DRAM
+    movz    x22, #0x1418                // TE entry offset within FV: 0x1418 (5,144 bytes)
+    sub     x20, x20, x22               // x20 = Calculated Firmware Volume Base (offset 0)
+
+    // Bulletproof signature check: Confirm '_FVH' (0x4856465F) at offset 0x28 of computed base
+    ldr     w23, [x20, #0x28]
+    ldr     w24, =0x4856465F
+    cmp     w23, w24
+    b.eq    .Lfv_confirmed
+
+    // Fallback scan: if TE entry offset shifted across builds, scan backwards page-by-page
+    and     x20, x20, #~0xFFF
+.Lscan_fvh:
+    ldr     w23, [x20, #0x28]
+    cmp     w23, w24
+    b.eq    .Lfv_confirmed
+    sub     x20, x20, #0x1000
+    b       .Lscan_fvh
+
+.Lfv_confirmed:
     ldr     x21, =0x9E400000            // Target relocation base
     cmp     x20, x21
     b.eq    .Lalready_relocated
@@ -67,11 +88,22 @@ real_entry_point:
     subs    x24, x24, #16
     b.gt    .Lreloc_loop
 
-    // Invalidate caches across relocated memory
-    ic      iallu
-    isb
+    // Clean data cache to Point of Unification (PoU) across relocated memory
+    mov     x22, x21
+    ldr     x23, =0x00400000
+.Lclean_pou_loop:
+    dc      cvau, x22                   // Clean data cache by VA to PoU
+    add     x22, x22, #64               // Stride by 64-byte cache line
+    subs    x23, x23, #64
+    b.gt    .Lclean_pou_loop
 
-    // Jump to the relocated code at 0x9E400000
+    // Memory barriers and instruction cache invalidation
+    dsb     ish                         // Ensure all cache clean operations complete
+    ic      iallu                       // Invalidate all instruction caches to PoU
+    dsb     ish                         // Wait for I-cache invalidation to complete
+    isb                                 // Flush instruction pipeline
+
+    // Jump to the relocated code at 0x9E400000 (Exact match, delta = 0)
     ldr     x25, =.Lalready_relocated
     mov     x0, x19
     br      x25

@@ -86,9 +86,12 @@ CEntryPoint (
   LINUX_ENTRY_POINT LinuxEntry = NULL;
   UINT64            KernelCandidate = 0;
   UINT64            CandidateAddresses[] = {
+                      0xA0561040ULL, // Container-offset compound payload (P_load 0xA0160000 + 0x401040)
+                      0xA0560040ULL, // Immediate compound payload offset (P_load 0xA0160000 + 0x400040)
+                      0xA0561000ULL, // 4K-aligned compound payload offset (P_load 0xA0160000 + 0x401000)
+                      0xA0160000ULL, // Direct Window F Kernel Base
                       0x90A00000ULL, // Window D: 182 MiB free System RAM
-                      0xA0002000ULL, // Window F: 256.9 MiB free System RAM
-                      0x9E890000ULL  // High RAM directly above stack
+                      0xA0002000ULL  // Window F: 256.9 MiB free System RAM
                     };
   UINTN             Index;
 
@@ -128,6 +131,32 @@ CEntryPoint (
     }
   }
 
+  // Dynamic Scan: If not found in primary candidates, scan Window F (0xA0000000 - 0xAB000000)
+  if (KernelCandidate == 0) {
+    UINT64 Probe;
+    for (Probe = 0xA0000000ULL; Probe < 0xAB000000ULL; Probe += 0x1000) {
+      // Check page-aligned candidate
+      volatile UINT32 *MagicPtr = (volatile UINT32 *)(UINTN)(Probe + 0x38);
+      if (*MagicPtr == LINUX_ARM64_MAGIC) {
+        volatile UINT64 *ImgSizePtr = (volatile UINT64 *)(UINTN)(Probe + 0x10);
+        // Distinguish the 16.02 MiB mainline Linux kernel from the 4 MiB firmware envelope
+        if (*ImgSizePtr > 0x00800000ULL) {
+          KernelCandidate = Probe;
+          break;
+        }
+      }
+      // Check 0x40-offset candidate (covering payload offsets like 0xA0560040 and 0xA0561040)
+      volatile UINT32 *MagicPtr40 = (volatile UINT32 *)(UINTN)(Probe + 0x40 + 0x38);
+      if (*MagicPtr40 == LINUX_ARM64_MAGIC) {
+        volatile UINT64 *ImgSizePtr40 = (volatile UINT64 *)(UINTN)(Probe + 0x40 + 0x10);
+        if (*ImgSizePtr40 > 0x00800000ULL) {
+          KernelCandidate = Probe + 0x40;
+          break;
+        }
+      }
+    }
+  }
+
   // 5. Transfer execution to Linux EFI Stub / ARM64 Kernel Entry
   if (KernelCandidate != 0) {
     volatile UINT64 *TextOffsetPtr = (volatile UINT64 *)(UINTN)(KernelCandidate + 0x08);
@@ -135,6 +164,17 @@ CEntryPoint (
 
     // Handoff badge: Emerald Green full block indicating successful dispatch
     DrawColorBlock(440, 1300, 200, 60, 0x0000FF00);
+
+    // Perform Point-of-Coherence (PoC) cache maintenance for DTB and Kernel ranges
+    // Ensuring data written by firmware is clean to memory for MMU=0 Linux handoff
+    if (DtbPhysBase != 0) {
+      UINT64 DtbCleanAddr = DtbPhysBase;
+      UINT64 DtbCleanEnd = DtbPhysBase + 0x100000ULL; // 1 MiB DTB buffer
+      for (; DtbCleanAddr < DtbCleanEnd; DtbCleanAddr += 64) {
+        __asm__ __volatile__ ("dc civac, %0" : : "r" (DtbCleanAddr) : "memory");
+      }
+    }
+    __asm__ __volatile__ ("dsb sy\n\tisb" : : : "memory");
 
     // Calling convention for Linux ARM64 kernel:
     // x0 = Physical address of Device Tree Blob (FDT)
