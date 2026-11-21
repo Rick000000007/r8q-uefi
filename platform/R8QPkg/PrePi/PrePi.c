@@ -28,6 +28,14 @@
 #define TRUSTZONE_BASE    0x80B00000ULL
 #define TRUSTZONE_END     0x88400000ULL
 
+#define FB_BASE_LIMIT      (FB_BASE_PHYS + 0x02300000ULL) // 35 MiB Carveout (0x9E300000)
+#define FIRMWARE_STACK_TOP 0x9E890000ULL
+#define DRAM_BASE_PHYS     0x80000000ULL
+#define DRAM_LIMIT_PHYS    0x200000000ULL // 6GB / 8GB boundary ceiling
+#define KERNEL_MIN_SIZE    0x00800000ULL  // 8 MiB (distinguishes Linux kernel from 4 MiB wrapper)
+#define KERNEL_MAX_SIZE    0x04000000ULL  // 64 MiB ceiling
+#define KERNEL_MAX_OFFSET  0x02000000ULL  // 32 MiB max text_offset
+
 STATIC UINT64 gPassedDtbBase = 0;
 
 typedef VOID (*LINUX_ENTRY_POINT)(
@@ -71,6 +79,68 @@ Swap32 (
          (((Val >> 16) & 0xFF) << 8) |
          (((Val >> 8) & 0xFF) << 16) |
          ((Val & 0xFF) << 24);
+}
+
+/**
+  Validate that a candidate memory address hosts a genuine Linux ARM64 kernel Image
+  and does not collide with TrustZone, Framebuffer, or Firmware execution envelopes.
+  Prevents firmware wrapper (4 MiB) false-positives (MAJOR-01 Remediation).
+**/
+STATIC
+BOOLEAN
+IsValidLinuxKernel (
+  IN UINT64 Candidate
+  )
+{
+  volatile UINT32 *MagicPtr;
+  volatile UINT64 *ImgSizePtr;
+  volatile UINT64 *TextOffsetPtr;
+  UINT64          ImageSize;
+  UINT64          TextOffset;
+
+  // 1. Boundary check: Candidate must reside within valid physical DRAM
+  if (Candidate < DRAM_BASE_PHYS || Candidate >= DRAM_LIMIT_PHYS) {
+    return FALSE;
+  }
+
+  // 2. ARM64 Image Magic check: 'ARM\x64' (0x644D5241) at offset +0x38
+  MagicPtr = (volatile UINT32 *)(UINTN)(Candidate + 0x38);
+  if (*MagicPtr != LINUX_ARM64_MAGIC) {
+    return FALSE;
+  }
+
+  // 3. Image size check:
+  // Distinguishes the 16.02 MiB mainline Linux kernel from the 4 MiB firmware envelope
+  // (ModuleEntryPoint.S wrapper declares image_size = 0x00400000 = 4 MiB).
+  ImgSizePtr = (volatile UINT64 *)(UINTN)(Candidate + 0x10);
+  ImageSize = *ImgSizePtr;
+  if (ImageSize < KERNEL_MIN_SIZE || ImageSize > KERNEL_MAX_SIZE) {
+    return FALSE;
+  }
+
+  // 4. Text offset sanity check
+  TextOffsetPtr = (volatile UINT64 *)(UINTN)(Candidate + 0x08);
+  TextOffset = *TextOffsetPtr;
+  if (TextOffset > KERNEL_MAX_OFFSET) {
+    return FALSE;
+  }
+
+  // 5. Memory collision check: Must not intersect TrustZone reservation [0x80B00000, 0x88400000)
+  if (Candidate < TRUSTZONE_END && (Candidate + ImageSize) > TRUSTZONE_BASE) {
+    return FALSE;
+  }
+
+  // 6. Memory collision check: Must not intersect Framebuffer carveout [0x9C000000, 0x9E300000)
+  if (Candidate < FB_BASE_LIMIT && (Candidate + ImageSize) > FB_BASE_PHYS) {
+    return FALSE;
+  }
+
+  // 7. Memory collision check: Must not intersect Firmware/Heap/Stack envelope [0x9E400000, 0x9E890000)
+  if (Candidate < FIRMWARE_STACK_TOP && (Candidate + ImageSize) > FIRMWARE_BASE) {
+    return FALSE;
+  }
+
+  return TRUE;
 }
 
 /**
@@ -122,10 +192,9 @@ CEntryPoint (
     DrawColorBlock(200, 40, 80, 40, 0x0000A86B);
   }
 
-  // 4. Scan candidate staging ranges for Linux ARM64 kernel Image
+  // 4. Scan candidate staging ranges for Linux ARM64 kernel Image (MAJOR-01 Remediation)
   for (Index = 0; Index < sizeof(CandidateAddresses)/sizeof(CandidateAddresses[0]); Index++) {
-    volatile UINT32 *MagicPtr = (volatile UINT32 *)(UINTN)(CandidateAddresses[Index] + 0x38);
-    if (*MagicPtr == LINUX_ARM64_MAGIC) {
+    if (IsValidLinuxKernel(CandidateAddresses[Index])) {
       KernelCandidate = CandidateAddresses[Index];
       break;
     }
@@ -136,23 +205,14 @@ CEntryPoint (
     UINT64 Probe;
     for (Probe = 0xA0000000ULL; Probe < 0xAB000000ULL; Probe += 0x1000) {
       // Check page-aligned candidate
-      volatile UINT32 *MagicPtr = (volatile UINT32 *)(UINTN)(Probe + 0x38);
-      if (*MagicPtr == LINUX_ARM64_MAGIC) {
-        volatile UINT64 *ImgSizePtr = (volatile UINT64 *)(UINTN)(Probe + 0x10);
-        // Distinguish the 16.02 MiB mainline Linux kernel from the 4 MiB firmware envelope
-        if (*ImgSizePtr > 0x00800000ULL) {
-          KernelCandidate = Probe;
-          break;
-        }
+      if (IsValidLinuxKernel(Probe)) {
+        KernelCandidate = Probe;
+        break;
       }
-      // Check 0x40-offset candidate (covering payload offsets like 0xA0560040 and 0xA0561040)
-      volatile UINT32 *MagicPtr40 = (volatile UINT32 *)(UINTN)(Probe + 0x40 + 0x38);
-      if (*MagicPtr40 == LINUX_ARM64_MAGIC) {
-        volatile UINT64 *ImgSizePtr40 = (volatile UINT64 *)(UINTN)(Probe + 0x40 + 0x10);
-        if (*ImgSizePtr40 > 0x00800000ULL) {
-          KernelCandidate = Probe + 0x40;
-          break;
-        }
+      // Check 0x40-offset candidate (covering compound payload offsets like 0xA0560040 and 0xA0561040, probing Probe + 0x40 + 0x38)
+      if (IsValidLinuxKernel(Probe + 0x40)) {
+        KernelCandidate = Probe + 0x40;
+        break;
       }
     }
   }

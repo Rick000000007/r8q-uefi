@@ -342,7 +342,10 @@ chmod +x "$INITRAMFS_ROOT/init"
 
 # 5. Package into reproducible CPIO gzip archive
 cd "$INITRAMFS_ROOT"
-find . -print0 | cpio --null -ov --format=newc | gzip -9 > "$OUTPUT_IMG"
+# Normalize metadata, timestamps, and order for bit-for-bit reproducible builds
+export SOURCE_DATE_EPOCH=1795219515
+find . -exec touch -h -d "@1795219515" {} +
+find . -print0 | LC_ALL=C sort -z | cpio --null --reproducible -R 0:0 -ov --format=newc | gzip -9 -n > "$OUTPUT_IMG"
 cd "$PROJECT_ROOT"
 rm -rf "$INITRAMFS_ROOT"
 

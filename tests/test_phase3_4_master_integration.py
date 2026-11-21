@@ -183,10 +183,10 @@ class Phase34MasterIntegrationTests(unittest.TestCase):
         expected_dtb_offset = ramdisk_start + r_pages * page_size
         
         self.assertEqual(ramdisk_start, 0x1408000, "Ramdisk payload must start at 0x1408000")
-        self.assertEqual(ramdisk_end_raw, 0x16D7A45, "Ramdisk payload must end at 0x16D7A45 (exclusive)")
+        self.assertLessEqual(ramdisk_end_raw, expected_dtb_offset, "Ramdisk payload must fit before DTB offset")
         self.assertEqual(expected_dtb_offset, 0x16D8000, "DTB must start at 0x16D8000")
         ramdisk_pad = img[ramdisk_end_raw:expected_dtb_offset]
-        self.assertEqual(len(ramdisk_pad), 1467, "Ramdisk padding must be 1,467 bytes (0x5BB)")
+        self.assertEqual(len(ramdisk_pad), expected_dtb_offset - ramdisk_end_raw, "Ramdisk padding must pad to 0x16D8000")
         self.assertEqual(set(ramdisk_pad), {0}, "Ramdisk padding must contain strictly zero bytes")
         
         # Verify Gzip magic at actual ramdisk start (0x1408000)

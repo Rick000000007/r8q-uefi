@@ -557,7 +557,7 @@ Before any live hardware flashing or boot attempts on the Samsung Galaxy S20 FE 
 2. **Deterministic Initramfs Build:** Update `scripts/build_initramfs.sh` to use `--reproducible` or fixed timestamps, and update `package_complete_boot_img.py` assertion to verify page-boundary alignment rather than brittle byte-exact sizing.
 3. **Partition Backup Protocol:** Boot device into Samsung Download Mode / root shell and create byte-for-byte SHA-256 verified images of:
    * Partition `sda24` (`recovery`)
-   * Partition `sda25` (`cache`)
+   * Partition `sda25` (`keyrefuge`, Knox hardware keystore)
    * Partition `sda23` (`boot`)
 4. **Samsung Odin / Heimdall Accessibility Check:** Confirm the physical handset enters Samsung Odin Mode (`Volume Down + Power` while connected to USB) and responds to `heimdall detect`.
 5. **Phase 3.6 Controlled Physical Staging:** Flash the image exclusively to the isolated recovery partition (`sda24`), preserving the primary boot partition (`sda23`) untouched.
