@@ -119,29 +119,50 @@ def build_complete_boot_image():
         dtb_size, dtb_addr
     )
 
+    # Calculate and verify exact page-aligned component offsets
+    header_offset = 0
+    kernel_offset = BOOT_PAGE_SIZE
+    kernel_end_raw = kernel_offset + compound_kernel_size
+    pad_kernel = align(compound_kernel_size, BOOT_PAGE_SIZE) - compound_kernel_size
+    ramdisk_offset = kernel_end_raw + pad_kernel
+    ramdisk_end_raw = ramdisk_offset + ramdisk_size
+    pad_ramdisk = align(ramdisk_size, BOOT_PAGE_SIZE) - ramdisk_size
+    dtb_offset = ramdisk_end_raw + pad_ramdisk
+    dtb_end_raw = dtb_offset + dtb_size
+    pad_dtb = align(dtb_size, BOOT_PAGE_SIZE) - dtb_size
+    expected_total_size = dtb_end_raw + pad_dtb
+
+    # Assert exact expected component layout geometry
+    assert kernel_offset == 0x1000, f"Kernel start must be 0x1000, got 0x{kernel_offset:x}"
+    assert kernel_end_raw == 0x1407240, f"Kernel raw end must be 0x1407240, got 0x{kernel_end_raw:x}"
+    assert ramdisk_offset == 0x1408000, f"Ramdisk start must be 0x1408000, got 0x{ramdisk_offset:x}"
+    assert ramdisk_end_raw == 0x16D7A45, f"Ramdisk raw end must be 0x16D7A45, got 0x{ramdisk_end_raw:x}"
+    assert dtb_offset == 0x16D8000, f"DTB start must be 0x16D8000, got 0x{dtb_offset:x}"
+    assert dtb_end_raw == 0x16F3620, f"DTB raw end must be 0x16F3620, got 0x{dtb_end_raw:x}"
+    assert expected_total_size == 0x16F4000, f"Total image size must be 0x16F4000, got 0x{expected_total_size:x}"
+
     with open(output_path, "wb") as out:
         # 1. Header (Page 0)
         out.write(header)
         
         # 2. Compound Kernel Payload
         out.write(compound_kernel)
-        pad_kernel = align(compound_kernel_size, BOOT_PAGE_SIZE) - compound_kernel_size
         if pad_kernel > 0:
             out.write(b"\x00" * pad_kernel)
 
         # 3. Ramdisk Payload
         out.write(initrd_data)
-        pad_ramdisk = align(ramdisk_size, BOOT_PAGE_SIZE) - ramdisk_size
         if pad_ramdisk > 0:
             out.write(b"\x00" * pad_ramdisk)
 
         # 4. DTB Payload
         out.write(dtb_data)
-        pad_dtb = align(dtb_size, BOOT_PAGE_SIZE) - dtb_size
         if pad_dtb > 0:
             out.write(b"\x00" * pad_dtb)
 
     total_bytes = os.path.getsize(output_path)
+    assert total_bytes == expected_total_size, f"File size mismatch: {total_bytes} != {expected_total_size}"
+
     MAX_SDA24_CAPACITY = 82694144  # Exactly 161,512 sectors * 512 bytes on physical UFS storage
     if total_bytes > MAX_SDA24_CAPACITY:
         os.remove(output_path)
@@ -159,12 +180,18 @@ def build_complete_boot_image():
     print(f"[SUCCESS] Complete compound boot image built: {output_path}")
     print(f"  Container Format:      Android Boot Image Header v{BOOT_HEADER_VERSION}")
     print(f"  Page Size:             {BOOT_PAGE_SIZE} bytes")
-    print(f"  Firmware Kernel Size:  {compound_kernel_size} bytes ({compound_kernel_size/(1024*1024):.2f} MiB)")
-    print(f"    - Wrapper Header:    64 bytes")
-    print(f"    - R8Q_EFI.fd Volume: {len(fd_data)} bytes ({len(fd_data)/(1024*1024):.2f} MiB)")
-    print(f"  Ramdisk Size:          {ramdisk_size} bytes ({ramdisk_size/(1024*1024):.2f} MiB)")
-    print(f"  DTB Size:              {dtb_size} bytes ({dtb_size/1024:.1f} KiB)")
-    print(f"  Total Container Size:  {total_bytes} bytes ({total_bytes/(1024*1024):.2f} MiB)")
+    print(f"  Component Layout Offsets (Page-Aligned):")
+    print(f"    - Header (Page 0):   0x00000000 - 0x00000FFF (4,096 bytes)")
+    print(f"    - Kernel Payload:    0x{kernel_offset:08X} - 0x{kernel_end_raw:08X} ({compound_kernel_size} bytes)")
+    print(f"      ├─ Wrapper Header: 64 bytes (0x00001000 - 0x0000103F)")
+    print(f"      ├─ R8Q_EFI.fd:     {len(fd_data)} bytes (0x00001040 - 0x0040103F)")
+    print(f"      └─ Linux Image:    {len(kernel_data)} bytes (0x00401040 - 0x0140403F)")
+    print(f"      └─ Zero Padding:   {pad_kernel} bytes (0x{kernel_end_raw:08X} - 0x{ramdisk_offset:08X})")
+    print(f"    - Ramdisk Payload:   0x{ramdisk_offset:08X} - 0x{ramdisk_end_raw:08X} ({ramdisk_size} bytes)")
+    print(f"      └─ Zero Padding:   {pad_ramdisk} bytes (0x{ramdisk_end_raw:08X} - 0x{dtb_offset:08X})")
+    print(f"    - DTB Payload:       0x{dtb_offset:08X} - 0x{dtb_end_raw:08X} ({dtb_size} bytes)")
+    print(f"      └─ Zero Padding:   {pad_dtb} bytes (0x{dtb_end_raw:08X} - 0x{expected_total_size:08X})")
+    print(f"  Total Container Size:  {total_bytes} bytes (0x{total_bytes:08X} / {total_bytes/(1024*1024):.2f} MiB)")
     print(f"  Headroom in sda24:     {(MAX_SDA24_CAPACITY - total_bytes)/(1024*1024):.2f} MiB remaining before sda25 boundary")
 
 if __name__ == "__main__":

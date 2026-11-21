@@ -160,16 +160,64 @@ class Phase34MasterIntegrationTests(unittest.TestCase):
         linux_img_size = struct.unpack("<Q", img[linux_start + 16:linux_start + 24])[0]
         self.assertGreater(linux_img_size, 8 * 1024 * 1024, "Mainline Linux kernel image_size must exceed 8 MiB")
 
-        # 4. Ramdisk starts after compound kernel page alignment
+        # 4. Independent arithmetic derivation of component boundaries
+        # Header is Page 0 (0x00000000 - 0x00000FFF)
+        # Kernel starts at Page 1 (0x00001000)
+        kernel_start = page_size
+        kernel_end_raw = kernel_start + k_size
         k_pages = (k_size + page_size - 1) // page_size
-        ramdisk_offset = 4096 + k_pages * page_size
-        self.assertLess(ramdisk_offset, total_size, "Ramdisk offset within image bounds")
+        expected_ramdisk_offset = kernel_start + k_pages * page_size
+        
+        # Verify kernel bounds and exact zero-padding
+        self.assertEqual(kernel_start, 0x1000, "Kernel must start at 0x1000")
+        self.assertEqual(kernel_end_raw, 0x1407240, "Kernel payload must end at 0x1407240 (exclusive)")
+        self.assertEqual(expected_ramdisk_offset, 0x1408000, "Ramdisk must start at 0x1408000")
+        kernel_pad = img[kernel_end_raw:expected_ramdisk_offset]
+        self.assertEqual(len(kernel_pad), 3520, "Kernel padding must be 3,520 bytes (0xDC0)")
+        self.assertEqual(set(kernel_pad), {0}, "Kernel padding must contain strictly zero bytes")
 
-        # 5. DTB payload starts after ramdisk page alignment
+        # Verify Ramdisk bounds and exact zero-padding
+        ramdisk_start = expected_ramdisk_offset
+        ramdisk_end_raw = ramdisk_start + r_size
         r_pages = (r_size + page_size - 1) // page_size
-        dtb_offset = ramdisk_offset + r_pages * page_size
-        dtb_magic = struct.unpack(">I", img[dtb_offset:dtb_offset+4])[0]
-        self.assertEqual(dtb_magic, 0xD00DFEED, "DTB payload must have valid FDT magic 0xD00DFEED")
+        expected_dtb_offset = ramdisk_start + r_pages * page_size
+        
+        self.assertEqual(ramdisk_start, 0x1408000, "Ramdisk payload must start at 0x1408000")
+        self.assertEqual(ramdisk_end_raw, 0x16D7A45, "Ramdisk payload must end at 0x16D7A45 (exclusive)")
+        self.assertEqual(expected_dtb_offset, 0x16D8000, "DTB must start at 0x16D8000")
+        ramdisk_pad = img[ramdisk_end_raw:expected_dtb_offset]
+        self.assertEqual(len(ramdisk_pad), 1467, "Ramdisk padding must be 1,467 bytes (0x5BB)")
+        self.assertEqual(set(ramdisk_pad), {0}, "Ramdisk padding must contain strictly zero bytes")
+        
+        # Verify Gzip magic at actual ramdisk start (0x1408000)
+        ramdisk_magic = img[ramdisk_start:ramdisk_start+3]
+        self.assertEqual(ramdisk_magic, b"\x1f\x8b\x08", "Ramdisk start must contain valid gzip magic (0x1F8B08)")
+
+        # Verify DTB bounds and exact zero-padding
+        dtb_start = expected_dtb_offset
+        dtb_end_raw = dtb_start + dtb_size
+        d_pages = (dtb_size + page_size - 1) // page_size
+        expected_total_size = dtb_start + d_pages * page_size
+        
+        self.assertEqual(dtb_start, 0x16D8000, "DTB payload must start at 0x16D8000")
+        self.assertEqual(dtb_end_raw, 0x16F3620, "DTB payload must end at 0x16F3620 (exclusive)")
+        self.assertEqual(expected_total_size, 0x16F4000, "Final container size must be 0x16F4000 (24,068,096 bytes)")
+        dtb_pad = img[dtb_end_raw:expected_total_size]
+        self.assertEqual(len(dtb_pad), 2528, "DTB padding must be 2,528 bytes (0x9E0)")
+        self.assertEqual(set(dtb_pad), {0}, "DTB padding must contain strictly zero bytes")
+        self.assertEqual(total_size, expected_total_size, "Actual file size on disk must equal derived 0x16F4000")
+
+        # Verify FDT magic at actual DTB start (0x16D8000)
+        dtb_magic = struct.unpack(">I", img[dtb_start:dtb_start+4])[0]
+        self.assertEqual(dtb_magic, 0xD00DFEED, "DTB start must contain valid FDT magic 0xD00DFEED")
+
+        # 5. Regression Check for Erroneous Documentation Offsets:
+        # Prove that offset 0x1405000 is invalid and overlaps kernel payload by 0x2240 bytes
+        erroneous_ramdisk_offset = 0x1405000
+        overlap_bytes = kernel_end_raw - erroneous_ramdisk_offset
+        self.assertEqual(overlap_bytes, 0x2240, "Discrepancy: 0x1405000 would overlap kernel payload by exactly 0x2240 bytes (8,768 bytes)")
+        self.assertNotEqual(img[erroneous_ramdisk_offset:erroneous_ramdisk_offset+3], b"\x1f\x8b\x08",
+                            "Offset 0x1405000 does NOT contain gzip magic; it resides inside the Linux kernel image")
 
     def test_05_reconciled_memory_map_comprehensive_audit(self):
         """3. MEMORY SAFETY: Pairwise non-overlap validation of all 20 memory regions and 12 carveouts."""

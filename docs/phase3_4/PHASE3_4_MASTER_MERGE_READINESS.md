@@ -171,23 +171,25 @@ The compound image container is packaged as a standard Android Boot Image v2 con
 | Image Region | Start Offset (Hex) | End Offset (Hex) | Size (Bytes) | Alignment | Component Description |
 |:---|:---|:---|:---|:---|:---|
 | **Header (Page 0)** | `0x00000000` | `0x00000FFF` | 4,096 | 4 KiB | Android Boot Header v2 (`BOOT_MAGIC = "ANDROID!"`) |
-| **Compound Kernel** | `0x00001000` | `0x01404FFF` | 20,996,672 | 4 KiB | Combined Wrapper + Firmware Volume + Mainline Kernel |
+| **Compound Kernel** | `0x00001000` | `0x01407FFF` | 21,000,192 | 4 KiB | Combined Wrapper + Firmware Volume + Mainline Kernel + Pad |
 | ├─ *Wrapper Header* | `0x00001000` | `0x0000103F` | 64 | 8 B | 64-byte ARM64 wrapper (`code0=0x14000010`, `ARM\x64`) |
 | ├─ *R8Q Firmware* | `0x00001040` | `0x0040103F` | 4,194,304 | 64 B | Complete EDK II Firmware Volume (`R8Q_EFI.fd`) |
-| └─ *Mainline Kernel* | `0x00401040` | `0x0140403F` | 16,802,304 | 64 B | Upstream Linux ARM64 Kernel (`build/Image`) |
-| └─ *Kernel Padding* | `0x01404040` | `0x01404FFF` | 3,968 | 4 KiB | Page alignment zero padding |
-| **Rescue Ramdisk** | `0x01405000` | `0x016D4AE4` | 2,947,653 | 4 KiB | Gzip-compressed cpio rescue initramfs |
-| └─ *Ramdisk Padding*| `0x016D4AE5` | `0x016D4FFF` | 1,307 | 4 KiB | Page alignment zero padding |
-| **Device Tree (DTB)**| `0x016D5000` | `0x016F065F` | 112,160 | 4 KiB | Mainline Device Tree (`sm8250-samsung-r8q.dtb`) |
-| └─ *DTB Padding* | `0x016F0660` | `0x016F0FFF` | 2,464 | 4 KiB | Page alignment zero padding |
-| **TOTAL CONTAINER** | `0x00000000` | `0x016F0FFF` | **24,068,096** | **4 KiB** | **Occupies 5,876 Pages (47,008 Sectors / 22.95 MiB)** |
+| ├─ *Mainline Kernel* | `0x00401040` | `0x0140403F` | 16,802,304 | 64 B | Upstream Linux ARM64 Kernel (`build/Image`) |
+| └─ *Kernel Padding* | `0x01407240` | `0x01407FFF` | 3,520 | 4 KiB | Page alignment zero padding (0xDC0 bytes) |
+| **Rescue Ramdisk** | `0x01408000` | `0x016D7FFF` | 2,949,120 | 4 KiB | Gzip rescue initramfs payload + page zero padding |
+| ├─ *Ramdisk Data* | `0x01408000` | `0x016D7A44` | 2,947,653 | 4 KiB | Gzip-compressed cpio rescue initramfs |
+| └─ *Ramdisk Padding*| `0x016D7A45` | `0x016D7FFF` | 1,467 | 4 KiB | Page alignment zero padding (0x5BB bytes) |
+| **Device Tree (DTB)**| `0x016D8000` | `0x016F3FFF` | 114,688 | 4 KiB | Mainline Device Tree Blob + page zero padding |
+| ├─ *DTB Data* | `0x016D8000` | `0x016F361F` | 112,160 | 4 KiB | Mainline Device Tree (`sm8250-samsung-r8q.dtb`) |
+| └─ *DTB Padding* | `0x016F3620` | `0x016F3FFF` | 2,528 | 4 KiB | Page alignment zero padding (0x9E0 bytes) |
+| **TOTAL CONTAINER** | `0x00000000` | `0x016F3FFF` | **24,068,096** | **4 KiB** | **Occupies 5,876 Pages (47,008 Sectors / 22.95 MiB / 0x16F4000)** |
 
 ### 2.2 Boot Header v2 Struct Breakdown
 The header occupies Page 0 (`0x00000000 - 0x00000FFF`):
 - `magic`: `b"ANDROID!"` (offset `0x00`, 8 bytes)
 - `kernel_size`: `20996672` (`0x01406240`, 20.02 MiB)
 - `kernel_addr`: `0x00008000`
-- `ramdisk_size`: `2947653` (`0x002CFAC5`, 2.81 MiB)
+- `ramdisk_size`: `2947653` (`0x002CFA45`, 2.81 MiB)
 - `ramdisk_addr`: `0x01000000`
 - `page_size`: `4096`
 - `header_version`: `2`
