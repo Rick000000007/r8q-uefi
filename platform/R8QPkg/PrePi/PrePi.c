@@ -136,6 +136,11 @@ IsValidLinuxKernel (
     return FALSE;
   }
 
+  // Arithmetic overflow and physical DRAM ceiling check: [Candidate, Candidate + ImageSize)
+  if ((Candidate + ImageSize) <= Candidate || (Candidate + ImageSize) > DRAM_LIMIT_PHYS) {
+    return FALSE;
+  }
+
   // 4. Text offset sanity check
   TextOffsetPtr = (volatile UINT64 *)(UINTN)(Candidate + 0x08);
   TextOffset = *TextOffsetPtr;
@@ -302,6 +307,14 @@ CEntryPoint (
         DtbDst[i] = DtbSrc[i];
       }
       ValidatedDtbBase = DTB_REALLOC_BASE;
+
+      // Re-validate DTB at new destination to prove copy integrity
+      UINT32 PostRelocSize = 0;
+      if (!IsValidDeviceTree(ValidatedDtbBase, &PostRelocSize) || PostRelocSize != ValidatedDtbSize) {
+        // Post-relocation DTB verification failed!
+        DrawColorBlock(100, 40, 80, 40, 0x00FF0000);
+        ValidatedDtbBase = DtbPhysBase; // Fall back to source
+      }
     }
   } else {
     // DTB invalid or corrupted: Draw Warning badge (Red: 0x00FF0000)
@@ -362,14 +375,17 @@ CEntryPoint (
     // When text_offset = 0, Image must be at an address where (Base % 0x200000) == 0.
     // If Candidate is misaligned relative to 2 MiB boundary, relocate to KERNEL_ALIGNED_BASE (0xA2000000).
     if ((KernelCandidate & 0x001FFFFFULL) != 0) {
-      volatile UINT64 *Src = (volatile UINT64 *)(UINTN)KernelCandidate;
-      volatile UINT64 *Dst = (volatile UINT64 *)(UINTN)KERNEL_ALIGNED_BASE;
-      UINT64 Words = (KernelSize + 7) / 8;
-      UINT64 Idx;
-      for (Idx = 0; Idx < Words; Idx++) {
-        Dst[Idx] = Src[Idx];
+      UINT64 DstEnd = KERNEL_ALIGNED_BASE + KernelSize;
+      if (DstEnd <= DRAM_LIMIT_PHYS && DstEnd > KERNEL_ALIGNED_BASE) {
+        volatile UINT64 *Src = (volatile UINT64 *)(UINTN)KernelCandidate;
+        volatile UINT64 *Dst = (volatile UINT64 *)(UINTN)KERNEL_ALIGNED_BASE;
+        UINT64 Words = (KernelSize + 7) / 8;
+        UINT64 Idx;
+        for (Idx = 0; Idx < Words; Idx++) {
+          Dst[Idx] = Src[Idx];
+        }
+        KernelRunBase = KERNEL_ALIGNED_BASE;
       }
-      KernelRunBase = KERNEL_ALIGNED_BASE;
     }
 
     // 1. Perform Point-of-Coherence (PoC) cache maintenance for validated DTB
