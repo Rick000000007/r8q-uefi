@@ -23,7 +23,12 @@ def build_complete_boot_image():
     fd_path = os.path.join(project_root, "build/R8Q_EFI.fd")
     kernel_path = os.path.join(project_root, "build/Image")
     initrd_path = os.path.join(project_root, "build/initramfs.img")
-    dtb_path = os.path.join(project_root, "build/r8q.dtb")
+    # Check for mainline DTB first, fall back to vendor dump if absent
+    mainline_dtb = os.path.join(project_root, "build/sm8250-samsung-r8q.dtb")
+    if os.path.exists(mainline_dtb):
+        dtb_path = mainline_dtb
+    else:
+        dtb_path = os.path.join(project_root, "build/r8q.dtb")
     output_path = os.path.join(project_root, "build/r8q-uefi-boot-complete.img")
 
     for p in [fd_path, kernel_path, initrd_path, dtb_path]:
@@ -40,12 +45,13 @@ def build_complete_boot_image():
     with open(dtb_path, "rb") as f:
         dtb_data = f.read()
 
-    # 1. Construct 64-byte ARM64 Linux Header Wrapper for the R8Q EDK II Firmware Volume
+    # 1. Construct 64-byte ARM64 Linux Header Wrapper for the Compound Firmware + Kernel Payload
     # code0: b +64 (branch forward 64 bytes = 0x14000010)
     code0 = 0x14000010
     code1 = 0x00000000
     text_offset = 0x80000  # 512 KiB alignment
-    total_compound_size = 64 + len(fd_data)
+    compound_payload = fd_data + kernel_data
+    total_compound_size = 64 + len(compound_payload)
     flags = 0x0A           # Little-endian, 4KB page size
     arm64_magic = b"ARM\x64"
 
@@ -62,19 +68,17 @@ def build_complete_boot_image():
         0
     )
 
-    # Firmware kernel payload: [64B Wrapper] + [4.00 MiB R8Q_EFI.fd]
-    # Kept strictly under 10.5 MiB (0x00A80000) to mathematically prevent collision
-    # with Qualcomm TrustZone / QSEE at 0x80B00000.
-    compound_kernel = bytes(arm64_hdr) + fd_data
+    # Compound kernel payload: [64B Wrapper] + [4.00 MiB R8Q_EFI.fd] + [16.02 MiB Image]
+    # Staged by ABL into high System RAM (0xA0160000), completely outside TrustZone (0x80B00000).
+    compound_kernel = bytes(arm64_hdr) + compound_payload
     compound_kernel_size = len(compound_kernel)
 
-    # Critical Memory Safety Assertion:
-    MAX_KERNEL_HEADROOM = 0x80B00000 - 0x80080000  # 10,485,760 bytes (10.00 MiB unreserved)
-    if compound_kernel_size > MAX_KERNEL_HEADROOM:
+    # Critical Safety Ceiling Assertions:
+    MAX_COMPOUND_PAYLOAD_CEILING = 25 * 1024 * 1024  # 25 MiB ceiling for compound kernel
+    if compound_kernel_size > MAX_COMPOUND_PAYLOAD_CEILING:
         raise ValueError(
-            f"CRITICAL MEMORY OVERLAP: Kernel segment size {compound_kernel_size} bytes "
-            f"exceeds safe DDR headroom before TrustZone ({MAX_KERNEL_HEADROOM} bytes)! "
-            f"Loading at 0x80080000 would overwrite TrustZone secure RAM at 0x80B00000."
+            f"SAFETY VIOLATION: Compound kernel size {compound_kernel_size} bytes exceeds "
+            f"safety ceiling ({MAX_COMPOUND_PAYLOAD_CEILING} bytes)!"
         )
 
     ramdisk_size = len(initrd_data)

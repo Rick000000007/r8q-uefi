@@ -52,7 +52,9 @@ real_entry_point:
     mov     sp, x2
 
     // 6. Check if firmware volume needs relocation to compiled base (0x9E400000)
-    adr     x20, _ModuleEntryPoint      // Current execution base (e.g. 0x80080000)
+    adr     x20, _ModuleEntryPoint      // Current entry point in DRAM (e.g. 0x800813E0)
+    movz    x22, #0x13e0                // Entry offset within FV: 0x13E0 (5,088 bytes)
+    sub     x20, x20, x22               // x20 = True Firmware Volume Base (offset 0)
     ldr     x21, =0x9E400000            // Target relocation base
     cmp     x20, x21
     b.eq    .Lalready_relocated
@@ -67,11 +69,22 @@ real_entry_point:
     subs    x24, x24, #16
     b.gt    .Lreloc_loop
 
-    // Invalidate caches across relocated memory
-    ic      iallu
-    isb
+    // Clean data cache to Point of Unification (PoU) across relocated memory
+    mov     x22, x21
+    ldr     x23, =0x00400000
+.Lclean_pou_loop:
+    dc      cvau, x22                   // Clean data cache by VA to PoU
+    add     x22, x22, #64               // Stride by 64-byte cache line
+    subs    x23, x23, #64
+    b.gt    .Lclean_pou_loop
 
-    // Jump to the relocated code at 0x9E400000
+    // Memory barriers and instruction cache invalidation
+    dsb     ish                         // Ensure all cache clean operations complete
+    ic      iallu                       // Invalidate all instruction caches to PoU
+    dsb     ish                         // Wait for I-cache invalidation to complete
+    isb                                 // Flush instruction pipeline
+
+    // Jump to the relocated code at 0x9E400000 (Exact match, delta = 0)
     ldr     x25, =.Lalready_relocated
     mov     x0, x19
     br      x25
