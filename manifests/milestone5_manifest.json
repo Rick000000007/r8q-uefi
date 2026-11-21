@@ -3,7 +3,7 @@
   "device": "Samsung Galaxy S20 FE 5G (SM-G781B)",
   "codename": "r8q",
   "soc": "Qualcomm Snapdragon 865 (SM8250)",
-  "generated_at": "2026-11-21T09:28:53.797341+00:00",
+  "generated_at": "2026-11-21T10:49:26.787884+00:00",
   "security_policy": "Strict zero-private-key credential isolation",
   "files": [
     {
@@ -407,9 +407,19 @@
       "sha256": "93b2231ebf156a5f01014207428c610d7e98df7b5321d14613653f3648369eb9"
     },
     {
+      "path": "docs/phase3_4/PHASE3_4_FINAL_BINARY_INTEGRITY_VALIDATION.md",
+      "size_bytes": 21188,
+      "sha256": "50c2a07060c33082758ede162865008e268c78ba44e4b74a0e17d5fce97f0745"
+    },
+    {
       "path": "docs/phase3_4/PHASE3_4_IMPLEMENTATION_GATE_VALIDATION.md",
       "size_bytes": 23893,
       "sha256": "d0329246afcae5633b0389e246202b27e872bbba0fd1cce4593d7f80caa29c64"
+    },
+    {
+      "path": "docs/phase3_4/PHASE3_4_MASTER_MERGE_READINESS.md",
+      "size_bytes": 37094,
+      "sha256": "352c82a3291cd14f28c53b1f6c0d7b326f91ce82c9d7963c2705e7d92e686acb"
     },
     {
       "path": "config/kernel_r8q_defconfig",
@@ -483,8 +493,8 @@
     },
     {
       "path": "scripts/package_complete_boot_img.py",
-      "size_bytes": 6816,
-      "sha256": "5babe7459268c60fa13c3d0f85eba1774e7474ea4fdacca5f9fa3a33f9a33c64"
+      "size_bytes": 8722,
+      "sha256": "39e2e10b660727731bd610c8fb2f8d9dc8cf0036c01a58056b136bceaefe8b08"
     },
     {
       "path": "scripts/run_qemu_test.sh",
@@ -528,13 +538,13 @@
     },
     {
       "path": "tests/test_phase3_4_implementation_gate.py",
-      "size_bytes": 10265,
-      "sha256": "b2930fcf77ac57a1a675d767ab1bbfe4b08dfd7d500cedd350948b1235cd9dec"
+      "size_bytes": 10289,
+      "sha256": "ff46b093964a33cb6b8b41e8eda7c082ba6d0f9902334afeddf5993aa060a777"
     },
     {
       "path": "tests/test_phase3_4_master_integration.py",
-      "size_bytes": 16926,
-      "sha256": "7f8467529ad7ec26d8234f65106502b9892d9cd9642cef39154d0455d9b6531b"
+      "size_bytes": 20163,
+      "sha256": "35068f06df90209dbe089b48c03407afc69de8ce3603173c905ae5a07a21c54c"
     },
     {
       "path": "tests/test_phase3_hardware_readiness.py",
@@ -593,8 +603,8 @@
     },
     {
       "path": "tests/__pycache__/test_phase3_4_master_integration.cpython-314.pyc",
-      "size_bytes": 19948,
-      "sha256": "6cf52932cd10c15ec4181f8367e88b7ab822b2e30166eecb565ad503e02b6044"
+      "size_bytes": 22774,
+      "sha256": "e95387882a2a33ef6a696bc6b56bac72c3058cd17d8fd7176b844f2c9e444c81"
     },
     {
       "path": "tests/__pycache__/test_phase3_hardware_readiness.cpython-314.pyc",
@@ -643,8 +653,8 @@
     },
     {
       "path": "platform/R8QPkg/PrePi/PrePi.c",
-      "size_bytes": 5841,
-      "sha256": "5da52471187808d55b048c431351d56202dc0db96c01bfa7651d56a3f4b61cc8"
+      "size_bytes": 6421,
+      "sha256": "dc1b864cfd8843b2d9096d0478065ccb80e4f6b63db2f25e73a78a6c99b30f44"
     },
     {
       "path": "platform/R8QPkg/PrePi/PrePi.inf",
@@ -859,7 +869,7 @@
     {
       "path": "build/R8Q_EFI.fd",
       "size_bytes": 4194304,
-      "sha256": "8d8d160a9d9f667a96dbf8fa6d3d34879abe4608597603d6f7e0be11d3e4c1b9"
+      "sha256": "5e196d685fc4f59797bc07bf4e1d03281e2a47a1abad4def8b46b02bf7e380f2"
     },
     {
       "path": "build/esp.img",
@@ -884,12 +894,12 @@
     {
       "path": "build/r8q-uefi-boot-complete.img",
       "size_bytes": 24068096,
-      "sha256": "b3a95412009af5e5b18608ece6ec043a162000872c5036907676c14c13a1df43"
+      "sha256": "072c4b4f3f38659f22eca3d92835a0ac27f0e8fc6ea202253c1c0cfabcab1baa"
     },
     {
       "path": "build/r8q-uefi-boot-poc.img",
       "size_bytes": 4202496,
-      "sha256": "40aff499ea6ca802a3f3c7b21b8f46036ae8dd29585051a75b06964a43feb426"
+      "sha256": "56069429ec6fe1ad74716dacee6b2c2c4ec6ec5e6dceffbc4a5a4c3b27879206"
     },
     {
       "path": "build/r8q.dtb",

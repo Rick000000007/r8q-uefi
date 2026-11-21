@@ -86,6 +86,7 @@ CEntryPoint (
   LINUX_ENTRY_POINT LinuxEntry = NULL;
   UINT64            KernelCandidate = 0;
   UINT64            CandidateAddresses[] = {
+                      0xA0561040ULL, // Container-offset compound payload (P_load 0xA0160000 + 0x401040)
                       0xA0560040ULL, // Immediate compound payload offset (P_load 0xA0160000 + 0x400040)
                       0xA0561000ULL, // 4K-aligned compound payload offset (P_load 0xA0160000 + 0x401000)
                       0xA0160000ULL, // Direct Window F Kernel Base
@@ -134,12 +135,22 @@ CEntryPoint (
   if (KernelCandidate == 0) {
     UINT64 Probe;
     for (Probe = 0xA0000000ULL; Probe < 0xAB000000ULL; Probe += 0x1000) {
+      // Check page-aligned candidate
       volatile UINT32 *MagicPtr = (volatile UINT32 *)(UINTN)(Probe + 0x38);
       if (*MagicPtr == LINUX_ARM64_MAGIC) {
         volatile UINT64 *ImgSizePtr = (volatile UINT64 *)(UINTN)(Probe + 0x10);
         // Distinguish the 16.02 MiB mainline Linux kernel from the 4 MiB firmware envelope
         if (*ImgSizePtr > 0x00800000ULL) {
           KernelCandidate = Probe;
+          break;
+        }
+      }
+      // Check 0x40-offset candidate (covering payload offsets like 0xA0560040 and 0xA0561040)
+      volatile UINT32 *MagicPtr40 = (volatile UINT32 *)(UINTN)(Probe + 0x40 + 0x38);
+      if (*MagicPtr40 == LINUX_ARM64_MAGIC) {
+        volatile UINT64 *ImgSizePtr40 = (volatile UINT64 *)(UINTN)(Probe + 0x40 + 0x10);
+        if (*ImgSizePtr40 > 0x00800000ULL) {
+          KernelCandidate = Probe + 0x40;
           break;
         }
       }

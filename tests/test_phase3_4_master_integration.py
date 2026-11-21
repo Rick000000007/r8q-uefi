@@ -247,7 +247,7 @@ class Phase34MasterIntegrationTests(unittest.TestCase):
             
             # High System RAM (Window F: 0xA0000000 - 0xBBFFFFFF, 448 MiB)
             (0xA0001000, 0xA0001FFF, "Hardware KASLR Seed Carveout (kaslr_region)"),
-            (0xA0160000, 0xA116FFFF, "Linux Kernel Staging Region (16.06 MiB Image)"),
+            (0xA0160000, 0xA1567FFF, "Compound Kernel Staging Region (20.03 MiB Envelope: FW + Image)"),
             (0xA3000000, 0xA30FFFFF, "DTB Handoff Staging Region (1.00 MiB buffer)"),
             (0xA3100000, 0xA34FFFFF, "Initramfs Staging Region (4.00 MiB buffer)"),
         ]
@@ -345,6 +345,51 @@ class Phase34MasterIntegrationTests(unittest.TestCase):
         self.assertIn("EXT4-fs (vda): mounted filesystem", log, "Ext4 rootfs mounted rw")
         self.assertIn("Debian GNU/Linux 12 (bookworm)", log, "Systemd PID 1 banner displayed")
         self.assertIn("Hostname set to <r8q-linux>", log, "Systemd set hostname to r8q-linux")
+
+    def test_10_physical_execution_address_derivation(self):
+        """7. EXECUTION ADDRESS DERIVATION: Validate physical Linux discovery addresses (0xA0561040 and 0xA0560040)."""
+        # 1. Inspect PrePi.c candidate addresses
+        with open(PREPI_C, "r") as f:
+            prepi_src = f.read()
+
+        self.assertIn("0xA0561040ULL", prepi_src, "PrePi must probe container-relative offset address 0xA0561040")
+        self.assertIn("0xA0560040ULL", prepi_src, "PrePi must probe payload-relative offset address 0xA0560040")
+        self.assertIn("Probe + 0x40 + 0x38", prepi_src, "PrePi dynamic scan must probe 0x40-offset candidate magic")
+
+        # 2. Arithmetic derivation of the 0x1000-byte discrepancy
+        CONTAINER_RELATIVE_ADDR = 0xA0561040
+        PAYLOAD_RELATIVE_ADDR = 0xA0560040
+        discrepancy_delta = CONTAINER_RELATIVE_ADDR - PAYLOAD_RELATIVE_ADDR
+        self.assertEqual(discrepancy_delta, 0x1000, "Delta must be exactly 0x1000 (4,096 bytes / Page 0 size)")
+
+        # In container file:
+        # Page 0: Boot Header (0x0000 to 0x1000)
+        # Page 1: Compound Kernel Payload (starts at 0x1000)
+        # Inside Compound Kernel Payload:
+        # 0x00 - 0x3F (64 B): Linux wrapper header
+        # 0x40 - 0x40003F (4 MiB): R8Q_EFI.fd
+        # 0x400040+: Mainline Linux Image
+        # Therefore:
+        # Compound payload relative offset = 0x40 + 0x400000 = 0x400040
+        # Container file relative offset = 0x1000 + 0x400040 = 0x401040
+        
+        # 3. Verify magic bytes in complete boot image on disk
+        with open(BOOT_COMPLETE_IMG, "rb") as f:
+            img_data = f.read()
+
+        CONTAINER_IMAGE_OFFSET = 0x401040
+        image_magic = img_data[CONTAINER_IMAGE_OFFSET + 0x38:CONTAINER_IMAGE_OFFSET + 0x3C]
+        self.assertEqual(image_magic, b"ARM\x64", "Container file at offset 0x401040 must contain 'ARM\\x64' magic")
+
+        # 4. Verify compound kernel envelope allocation and safety gap before DTB
+        COMPOUND_START = 0xA0160000
+        COMPOUND_PADDED_SIZE = 21004288  # 0x1408000 (page-aligned envelope)
+        COMPOUND_END = COMPOUND_START + COMPOUND_PADDED_SIZE - 1  # 0xA1567FFF
+        
+        DTB_START = 0xA3000000
+        safety_gap = DTB_START - (COMPOUND_END + 1)
+        self.assertEqual(safety_gap, 27885568, "Safety gap between compound kernel and DTB must be 27,885,568 bytes (26.59 MiB)")
+        self.assertGreater(safety_gap, 25 * 1024 * 1024, "Safety buffer must exceed 25 MiB")
 
 if __name__ == "__main__":
     unittest.main()

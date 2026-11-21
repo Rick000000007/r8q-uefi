@@ -131,7 +131,7 @@ class Phase34ImplementationGateTests(unittest.TestCase):
             
             # Staged Linux Kernel & Components (Window F: 0xA0000000+)
             (0xA0001000, 0xA0001FFF, "KASLR Seed Carveout (kaslr_region)"),
-            (0xA0160000, 0xA116FFFF, "Kernel Staging Region (16.06 MiB Image)"),
+            (0xA0160000, 0xA1567FFF, "Compound Kernel Staging Region (20.03 MiB Envelope: FW + Image)"),
             (0xA3000000, 0xA30FFFFF, "DTB Staging Region (1.00 MiB buffer)"),
             (0xA3100000, 0xA34FFFFF, "Initramfs Staging Region (4.00 MiB buffer)"),
         ]
