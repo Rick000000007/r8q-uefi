@@ -36,6 +36,7 @@
 #define KERNEL_MIN_SIZE    0x00800000ULL  // 8 MiB (distinguishes Linux kernel from 4 MiB wrapper)
 #define KERNEL_MAX_SIZE    0x04000000ULL  // 64 MiB ceiling
 #define KERNEL_MAX_OFFSET  0x02000000ULL  // 32 MiB max text_offset
+#define KERNEL_ALIGNED_BASE 0xA2000000ULL // 2 MiB-aligned destination in Window F (modulo 0x200000 == 0)
 
 STATIC UINT64 gPassedDtbBase = 0;
 
@@ -324,16 +325,40 @@ CEntryPoint (
   if (KernelCandidate != 0) {
     volatile UINT64 *ImgSizePtr = (volatile UINT64 *)(UINTN)(KernelCandidate + 0x10);
     UINT64          KernelSize = *ImgSizePtr;
+    UINT64          KernelRunBase = KernelCandidate;
+    UINT64          Ctr;
+    UINT64          DminLine;
+    UINT64          CacheLineSize;
+
+    // Derive data cache line size dynamically from CTR_EL0.DminLine
+    __asm__ __volatile__ ("mrs %0, ctr_el0" : "=r" (Ctr));
+    DminLine = (Ctr >> 16) & 0xF;
+    CacheLineSize = 4ULL << DminLine; // Standard 64 bytes on Cortex-A77/A55
 
     // Handoff badge: Emerald Green full block indicating successful dispatch
     DrawColorBlock(440, 1300, 200, 60, 0x0000FF00);
 
+    // 0. Kernel Placement Protocol Check (Documentation/arm64/booting.rst)
+    // The Image must be located at text_offset bytes from a 2 MiB-aligned base.
+    // When text_offset = 0, Image must be at an address where (Base % 0x200000) == 0.
+    // If Candidate is misaligned relative to 2 MiB boundary, relocate to KERNEL_ALIGNED_BASE (0xA2000000).
+    if ((KernelCandidate & 0x001FFFFFULL) != 0) {
+      volatile UINT64 *Src = (volatile UINT64 *)(UINTN)KernelCandidate;
+      volatile UINT64 *Dst = (volatile UINT64 *)(UINTN)KERNEL_ALIGNED_BASE;
+      UINT64 Words = (KernelSize + 7) / 8;
+      UINT64 Idx;
+      for (Idx = 0; Idx < Words; Idx++) {
+        Dst[Idx] = Src[Idx];
+      }
+      KernelRunBase = KERNEL_ALIGNED_BASE;
+    }
+
     // 1. Perform Point-of-Coherence (PoC) cache maintenance for validated DTB
     if (DtbPhysBase != 0 && ValidatedDtbSize != 0) {
-      UINT64 DtbCleanAddr = DtbPhysBase;
-      UINT64 DtbCleanLimit = DtbPhysBase + ((ValidatedDtbSize + 63) & ~63ULL);
+      UINT64 DtbCleanAddr = DtbPhysBase & ~(CacheLineSize - 1);
+      UINT64 DtbCleanLimit = (DtbPhysBase + ValidatedDtbSize + CacheLineSize - 1) & ~(CacheLineSize - 1);
       if (DtbCleanLimit <= DRAM_LIMIT_PHYS && DtbCleanLimit > DtbCleanAddr) {
-        for (; DtbCleanAddr < DtbCleanLimit; DtbCleanAddr += 64) {
+        for (; DtbCleanAddr < DtbCleanLimit; DtbCleanAddr += CacheLineSize) {
           __asm__ __volatile__ ("dc civac, %0" : : "r" (DtbCleanAddr) : "memory");
         }
       }
@@ -342,10 +367,10 @@ CEntryPoint (
     // 2. Perform Point-of-Coherence (PoC) cache maintenance for entire loaded Linux Image
     // Mandated by Linux ARM64 Boot Protocol (Documentation/arm64/booting.rst)
     if (KernelSize >= KERNEL_MIN_SIZE && KernelSize <= KERNEL_MAX_SIZE) {
-      UINT64 KernelCleanAddr = KernelCandidate;
-      UINT64 KernelCleanLimit = KernelCandidate + ((KernelSize + 63) & ~63ULL);
+      UINT64 KernelCleanAddr = KernelRunBase & ~(CacheLineSize - 1);
+      UINT64 KernelCleanLimit = (KernelRunBase + KernelSize + CacheLineSize - 1) & ~(CacheLineSize - 1);
       if (KernelCleanLimit <= DRAM_LIMIT_PHYS && KernelCleanLimit > KernelCleanAddr) {
-        for (; KernelCleanAddr < KernelCleanLimit; KernelCleanAddr += 64) {
+        for (; KernelCleanAddr < KernelCleanLimit; KernelCleanAddr += CacheLineSize) {
           __asm__ __volatile__ ("dc civac, %0" : : "r" (KernelCleanAddr) : "memory");
         }
       }
@@ -359,6 +384,7 @@ CEntryPoint (
     // text_offset in the header specifies load offset relative to 2 MiB alignment, NOT an offset within Image.
     // x0 = Physical address of Device Tree Blob (FDT)
     // x1 = 0, x2 = 0, x3 = 0 (Reserved)
+    KernelCandidate = KernelRunBase;
     LinuxEntry = (LINUX_ENTRY_POINT)(UINTN)KernelCandidate;
     LinuxEntry(DtbPhysBase, 0, 0, 0);
   }
