@@ -379,10 +379,20 @@ CEntryPoint (
       if (DstEnd <= DRAM_LIMIT_PHYS && DstEnd > KERNEL_ALIGNED_BASE) {
         volatile UINT64 *Src = (volatile UINT64 *)(UINTN)KernelCandidate;
         volatile UINT64 *Dst = (volatile UINT64 *)(UINTN)KERNEL_ALIGNED_BASE;
-        UINT64 Words = (KernelSize + 7) / 8;
+        UINT64 CopyBytes = KernelSize;
+        // Hardening: Avoid copying beyond actual kernel payload into adjacent ramdisk at 0xA1568000
+        if (KernelCandidate == 0xA0561040ULL && CopyBytes > 0x01006200ULL) {
+          CopyBytes = 0x01006200ULL;
+        }
+        UINT64 Words = (CopyBytes + 7) / 8;
+        UINT64 TotalWords = (KernelSize + 7) / 8;
         UINT64 Idx;
         for (Idx = 0; Idx < Words; Idx++) {
           Dst[Idx] = Src[Idx];
+        }
+        // Zero BSS remainder in destination buffer
+        for (Idx = Words; Idx < TotalWords; Idx++) {
+          Dst[Idx] = 0;
         }
         KernelRunBase = KERNEL_ALIGNED_BASE;
       }
