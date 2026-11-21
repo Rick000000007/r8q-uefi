@@ -185,7 +185,7 @@ The verified GPT partition geometry on `/dev/block/sda` (queried from `/sys/bloc
   Sector        Sector          Capacity        Capacity        Partition       Device Node / Role
   Start         End             (Sectors)       (Bytes)         Name
  ──────────────────────────────────────────────────────────────────────────────────────────────────────────
-  1,237,160     1,368,215       131,056         67,108,864      boot            /dev/block/sda23
+  1,237,144     1,368,215       131,072         67,108,864      boot            /dev/block/sda23
                                                                                 [LineageOS 23 + Magisk]
                                                                                 *** PERMANENT READ-ONLY ***
  ──────────────────────────────────────────────────────────────────────────────────────────────────────────
