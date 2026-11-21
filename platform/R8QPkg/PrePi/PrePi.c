@@ -81,6 +81,21 @@ Swap32 (
          ((Val & 0xFF) << 24);
 }
 
+#pragma pack(1)
+typedef struct {
+  UINT32 Magic;
+  UINT32 TotalSize;
+  UINT32 OffDtStruct;
+  UINT32 OffDtStrings;
+  UINT32 OffMemRsvmap;
+  UINT32 Version;
+  UINT32 LastCompVersion;
+  UINT32 BootCpuidPhys;
+  UINT32 SizeDtStrings;
+  UINT32 SizeDtStruct;
+} FDT_HEADER;
+#pragma pack()
+
 /**
   Validate that a candidate memory address hosts a genuine Linux ARM64 kernel Image
   and does not collide with TrustZone, Framebuffer, or Firmware execution envelopes.
@@ -144,6 +159,88 @@ IsValidLinuxKernel (
 }
 
 /**
+  Validate that a physical address points to a valid, well-formed Device Tree Blob (FDT).
+  Verifies:
+  1. Pointer non-null and 8-byte alignment (Devicetree Spec & ARM64 boot protocol).
+  2. Base resides within physical DRAM boundaries.
+  3. FDT Magic matches 0xD00DFEED (big-endian).
+  4. TotalSize is within valid bounds (at least 40 bytes header, max 8 MiB).
+  5. Complete DTB memory span does not overflow DRAM.
+  6. Memory isolation: Does not intersect TrustZone, Framebuffer, Firmware, or Stack.
+**/
+STATIC
+BOOLEAN
+IsValidDeviceTree (
+  IN UINT64 DtbPhysBase,
+  OUT UINT32 *DtbTotalSize OPTIONAL
+  )
+{
+  volatile FDT_HEADER *FdtHdr;
+  UINT32              Magic;
+  UINT32              TotalSize;
+  UINT64              DtbEnd;
+
+  if (DtbTotalSize != NULL) {
+    *DtbTotalSize = 0;
+  }
+
+  // 1. Non-null and 8-byte alignment check
+  if (DtbPhysBase == 0 || (DtbPhysBase & 0x7ULL) != 0) {
+    return FALSE;
+  }
+
+  // 2. Boundary check: DTB base must reside within valid physical DRAM
+  if (DtbPhysBase < DRAM_BASE_PHYS || DtbPhysBase >= DRAM_LIMIT_PHYS) {
+    return FALSE;
+  }
+
+  FdtHdr = (volatile FDT_HEADER *)(UINTN)DtbPhysBase;
+
+  // 3. Magic check: 0xD00DFEED in big-endian
+  Magic = FdtHdr->Magic;
+  if (Magic != Swap32(FDT_MAGIC) && Magic != FDT_MAGIC) {
+    return FALSE;
+  }
+
+  // 4. TotalSize bounds check (big-endian in standard FDT)
+  TotalSize = Swap32(FdtHdr->TotalSize);
+  if (TotalSize < sizeof(FDT_HEADER) || TotalSize > 0x00800000ULL) { // 8 MiB max ceiling
+    return FALSE;
+  }
+
+  DtbEnd = DtbPhysBase + TotalSize;
+  if (DtbEnd <= DtbPhysBase || DtbEnd > DRAM_LIMIT_PHYS) {
+    return FALSE;
+  }
+
+  // 5. Memory collision check: Must not intersect TrustZone reservation [0x80B00000, 0x88400000)
+  if (DtbPhysBase < TRUSTZONE_END && DtbEnd > TRUSTZONE_BASE) {
+    return FALSE;
+  }
+
+  // 6. Memory collision check: Must not intersect Framebuffer carveout [0x9C000000, 0x9E300000)
+  if (DtbPhysBase < FB_BASE_LIMIT && DtbEnd > FB_BASE_PHYS) {
+    return FALSE;
+  }
+
+  // 7. Memory collision check: Must not intersect Firmware/Heap envelope [0x9E400000, 0x9E880000)
+  if (DtbPhysBase < 0x9E880000ULL && DtbEnd > FIRMWARE_BASE) {
+    return FALSE;
+  }
+
+  // 8. Memory collision check: Must not intersect Stack [0x9E880000, 0x9E890000)
+  if (DtbPhysBase < FIRMWARE_STACK_TOP && DtbEnd > 0x9E880000ULL) {
+    return FALSE;
+  }
+
+  if (DtbTotalSize != NULL) {
+    *DtbTotalSize = TotalSize;
+  }
+
+  return TRUE;
+}
+
+/**
   C Entry point invoked from ModuleEntryPoint.S after self-relocation to 0x9E400000.
   x0 contains the DTB physical base address passed by Samsung ABL.
 **/
@@ -155,6 +252,7 @@ CEntryPoint (
 {
   LINUX_ENTRY_POINT LinuxEntry = NULL;
   UINT64            KernelCandidate = 0;
+  UINT32            ValidatedDtbSize = 0;
   UINT64            CandidateAddresses[] = {
                       0xA0561040ULL, // Container-offset compound payload (P_load 0xA0160000 + 0x401040)
                       0xA0560040ULL, // Immediate compound payload offset (P_load 0xA0160000 + 0x400040)
@@ -176,13 +274,13 @@ CEntryPoint (
   // Status indicator: Center confirmation block (PrePi active)
   DrawColorBlock(440, 1150, 200, 100, 0x0000A86B);
 
-  // 2. Validate Device Tree Blob passed by ABL
-  if (DtbPhysBase != 0) {
-    volatile UINT32 *DtbMagicPtr = (volatile UINT32 *)(UINTN)DtbPhysBase;
-    if (*DtbMagicPtr == Swap32(FDT_MAGIC) || *DtbMagicPtr == FDT_MAGIC) {
-      // Draw small DTB confirmation badge (Cyan: 0x0000CED1)
-      DrawColorBlock(100, 40, 80, 40, 0x0000CED1);
-    }
+  // 2. Validate Device Tree Blob passed by ABL (Full Structural, Alignment, and Bounds Check)
+  if (IsValidDeviceTree(DtbPhysBase, &ValidatedDtbSize)) {
+    // Draw small DTB confirmation badge (Cyan: 0x0000CED1)
+    DrawColorBlock(100, 40, 80, 40, 0x0000CED1);
+  } else {
+    // DTB invalid or corrupted: Draw Warning badge (Red: 0x00FF0000)
+    DrawColorBlock(100, 40, 80, 40, 0x00FF0000);
   }
 
   // 3. Mathematical non-overlap verification
@@ -229,8 +327,8 @@ CEntryPoint (
     // Ensuring data written by firmware is clean to memory for MMU=0 Linux handoff
     if (DtbPhysBase != 0) {
       UINT64 DtbCleanAddr = DtbPhysBase;
-      UINT64 DtbCleanEnd = DtbPhysBase + 0x100000ULL; // 1 MiB DTB buffer
-      for (; DtbCleanAddr < DtbCleanEnd; DtbCleanAddr += 64) {
+      UINT64 DtbCleanLimit = (ValidatedDtbSize != 0) ? (DtbPhysBase + ((ValidatedDtbSize + 63) & ~63ULL)) : (DtbPhysBase + 0x100000ULL);
+      for (; DtbCleanAddr < DtbCleanLimit; DtbCleanAddr += 64) {
         __asm__ __volatile__ ("dc civac, %0" : : "r" (DtbCleanAddr) : "memory");
       }
     }
