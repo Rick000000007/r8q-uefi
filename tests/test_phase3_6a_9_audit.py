@@ -61,6 +61,16 @@ class MemoryInterval:
         """Half-open interval overlap check: [s1, e1) intersects [s2, e2) iff s1 < e2 and e1 > s2."""
         return self.start < other.end and self.end > other.start
 
+    def clearance(self, other):
+        """Returns positive distance if disjoint, or negative overlap amount."""
+        if self.overlaps(other):
+            overlap_start = max(self.start, other.start)
+            overlap_end = min(self.end, other.end)
+            return -(overlap_end - overlap_start)
+        if self.end <= other.start:
+            return other.start - self.end
+        return self.start - other.end
+
     def contains(self, other):
         """Interval containment check: other is strictly within self."""
         return other.start >= self.start and other.end <= self.end
