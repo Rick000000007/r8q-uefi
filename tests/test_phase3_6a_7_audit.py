@@ -125,8 +125,9 @@ class Phase36A7AuditTests(unittest.TestCase):
             self.assertGreater(size, 0, f"Size must be positive in region {r['name']}")
             self.assertLess(end, 0x200000000, f"Region {r['name']} exceeds DRAM upper boundary 0x200000000")
 
-        # Sort and verify strict non-overlap
-        sorted_regions = sorted(regions, key=lambda x: int(x["start"], 16))
+        # Sort and verify strict non-overlap across independent top-level regions
+        independent_regions = [r for r in regions if r.get("hierarchy") != "child_allocation"]
+        sorted_regions = sorted(independent_regions, key=lambda x: int(x["start"], 16))
         for i in range(len(sorted_regions) - 1):
             cur = sorted_regions[i]
             nxt = sorted_regions[i+1]
