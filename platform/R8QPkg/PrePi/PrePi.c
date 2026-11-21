@@ -189,8 +189,11 @@ IsValidDeviceTree (
     return FALSE;
   }
 
-  // 2. Boundary check: DTB base must reside within valid physical DRAM
-  if (DtbPhysBase < DRAM_BASE_PHYS || DtbPhysBase >= DRAM_LIMIT_PHYS) {
+  // 2. Boundary check: Entire initial FDT header must reside within valid physical DRAM
+  // Prevents dereferencing truncated or out-of-bounds header past DRAM boundary
+  if (DtbPhysBase < DRAM_BASE_PHYS ||
+      (DtbPhysBase + sizeof(FDT_HEADER)) > DRAM_LIMIT_PHYS ||
+      (DtbPhysBase + sizeof(FDT_HEADER)) < DtbPhysBase) {
     return FALSE;
   }
 
@@ -325,11 +328,13 @@ CEntryPoint (
 
     // Perform Point-of-Coherence (PoC) cache maintenance for DTB and Kernel ranges
     // Ensuring data written by firmware is clean to memory for MMU=0 Linux handoff
-    if (DtbPhysBase != 0) {
+    if (DtbPhysBase != 0 && ValidatedDtbSize != 0) {
       UINT64 DtbCleanAddr = DtbPhysBase;
-      UINT64 DtbCleanLimit = (ValidatedDtbSize != 0) ? (DtbPhysBase + ((ValidatedDtbSize + 63) & ~63ULL)) : (DtbPhysBase + 0x100000ULL);
-      for (; DtbCleanAddr < DtbCleanLimit; DtbCleanAddr += 64) {
-        __asm__ __volatile__ ("dc civac, %0" : : "r" (DtbCleanAddr) : "memory");
+      UINT64 DtbCleanLimit = DtbPhysBase + ((ValidatedDtbSize + 63) & ~63ULL);
+      if (DtbCleanLimit <= DRAM_LIMIT_PHYS && DtbCleanLimit > DtbCleanAddr) {
+        for (; DtbCleanAddr < DtbCleanLimit; DtbCleanAddr += 64) {
+          __asm__ __volatile__ ("dc civac, %0" : : "r" (DtbCleanAddr) : "memory");
+        }
       }
     }
     __asm__ __volatile__ ("dsb sy\n\tisb" : : : "memory");
