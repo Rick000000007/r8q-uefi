@@ -40,12 +40,12 @@ def build_complete_boot_image():
     with open(dtb_path, "rb") as f:
         dtb_data = f.read()
 
-    # 1. Construct 64-byte ARM64 Linux Header Wrapper for the compound kernel
+    # 1. Construct 64-byte ARM64 Linux Header Wrapper for the R8Q EDK II Firmware Volume
     # code0: b +64 (branch forward 64 bytes = 0x14000010)
     code0 = 0x14000010
     code1 = 0x00000000
     text_offset = 0x80000  # 512 KiB alignment
-    total_compound_size = 64 + len(fd_data) + len(kernel_data)
+    total_compound_size = 64 + len(fd_data)
     flags = 0x0A           # Little-endian, 4KB page size
     arm64_magic = b"ARM\x64"
 
@@ -62,9 +62,20 @@ def build_complete_boot_image():
         0
     )
 
-    # Compound kernel payload: [64B Wrapper] + [4.00 MiB R8Q_EFI.fd] + [46.03 MiB build/Image]
-    compound_kernel = bytes(arm64_hdr) + fd_data + kernel_data
+    # Firmware kernel payload: [64B Wrapper] + [4.00 MiB R8Q_EFI.fd]
+    # Kept strictly under 10.5 MiB (0x00A80000) to mathematically prevent collision
+    # with Qualcomm TrustZone / QSEE at 0x80B00000.
+    compound_kernel = bytes(arm64_hdr) + fd_data
     compound_kernel_size = len(compound_kernel)
+
+    # Critical Memory Safety Assertion:
+    MAX_KERNEL_HEADROOM = 0x80B00000 - 0x80080000  # 10,485,760 bytes (10.00 MiB unreserved)
+    if compound_kernel_size > MAX_KERNEL_HEADROOM:
+        raise ValueError(
+            f"CRITICAL MEMORY OVERLAP: Kernel segment size {compound_kernel_size} bytes "
+            f"exceeds safe DDR headroom before TrustZone ({MAX_KERNEL_HEADROOM} bytes)! "
+            f"Loading at 0x80080000 would overwrite TrustZone secure RAM at 0x80B00000."
+        )
 
     ramdisk_size = len(initrd_data)
     dtb_size = len(dtb_data)
@@ -127,6 +138,16 @@ def build_complete_boot_image():
             out.write(b"\x00" * pad_dtb)
 
     total_bytes = os.path.getsize(output_path)
+    MAX_SDA24_CAPACITY = 82694144  # Exactly 161,512 sectors * 512 bytes on physical UFS storage
+    if total_bytes > MAX_SDA24_CAPACITY:
+        os.remove(output_path)
+        raise ValueError(
+            f"CRITICAL SAFETY OVERRUN: Output boot image size {total_bytes} bytes exceeds "
+            f"exact physical capacity of recovery partition sda24 ({MAX_SDA24_CAPACITY} bytes)! "
+            f"Staging this image would overwrite {total_bytes - MAX_SDA24_CAPACITY} bytes into "
+            f"sda25 (keyrefuge), causing permanent cryptographic bricking of hardware Knox keys."
+        )
+
     print("=================================================================")
     print("   PROJECT R8Q: COMPLETE COMPOUND BOOT IMAGE GENERATOR")
     print("   Target: Samsung Galaxy S20 FE 5G (SM-G781B / r8q / SM8250)")
@@ -134,14 +155,13 @@ def build_complete_boot_image():
     print(f"[SUCCESS] Complete compound boot image built: {output_path}")
     print(f"  Container Format:      Android Boot Image Header v{BOOT_HEADER_VERSION}")
     print(f"  Page Size:             {BOOT_PAGE_SIZE} bytes")
-    print(f"  Compound Kernel Size:  {compound_kernel_size} bytes ({compound_kernel_size/(1024*1024):.2f} MiB)")
+    print(f"  Firmware Kernel Size:  {compound_kernel_size} bytes ({compound_kernel_size/(1024*1024):.2f} MiB)")
     print(f"    - Wrapper Header:    64 bytes")
     print(f"    - R8Q_EFI.fd Volume: {len(fd_data)} bytes ({len(fd_data)/(1024*1024):.2f} MiB)")
-    print(f"    - Linux Kernel Image:{len(kernel_data)} bytes ({len(kernel_data)/(1024*1024):.2f} MiB)")
     print(f"  Ramdisk Size:          {ramdisk_size} bytes ({ramdisk_size/(1024*1024):.2f} MiB)")
     print(f"  DTB Size:              {dtb_size} bytes ({dtb_size/1024:.1f} KiB)")
     print(f"  Total Container Size:  {total_bytes} bytes ({total_bytes/(1024*1024):.2f} MiB)")
-    print(f"  Headroom in sda24:     {(82739200 - total_bytes)/(1024*1024):.2f} MiB remaining in recovery partition")
+    print(f"  Headroom in sda24:     {(MAX_SDA24_CAPACITY - total_bytes)/(1024*1024):.2f} MiB remaining before sda25 boundary")
 
 if __name__ == "__main__":
     build_complete_boot_image()

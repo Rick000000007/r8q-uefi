@@ -42,20 +42,46 @@ real_entry_point:
     msr     cpacr_el1, x1
     isb
 
-    // 4. Invalidate instruction cache and data caches
+    // 4. Invalidate instruction cache
     ic      iallu
     isb
 
     // 5. Establish early stack at safe DRAM offset in 12 MiB unreserved gap
     // Base of stack buffer: 0x9E880000, Top of stack: 0x9E890000 (64 KiB, descending)
-    // Separated from loaded image (0x80080000) by >480 MiB and FV (0x9E400000-0x9E7FFFFF) by 512 KiB
     ldr     x2, =0x9E890000
     mov     sp, x2
 
-    // 6. Transition to PrePi C main with DTB pointer in x0
+    // 6. Check if firmware volume needs relocation to compiled base (0x9E400000)
+    adr     x20, _ModuleEntryPoint      // Current execution base (e.g. 0x80080000)
+    ldr     x21, =0x9E400000            // Target relocation base
+    cmp     x20, x21
+    b.eq    .Lalready_relocated
+
+    // Relocate 4 MiB (0x00400000 bytes) from x20 to x21 using 16-byte ldp/stp
+    mov     x22, x20
+    mov     x23, x21
+    ldr     x24, =0x00400000
+.Lreloc_loop:
+    ldp     x25, x26, [x22], #16
+    stp     x25, x26, [x23], #16
+    subs    x24, x24, #16
+    b.gt    .Lreloc_loop
+
+    // Invalidate caches across relocated memory
+    ic      iallu
+    isb
+
+    // Jump to the relocated code at 0x9E400000
+    ldr     x25, =.Lalready_relocated
+    mov     x0, x19
+    br      x25
+
+.Lalready_relocated:
+    // Transition to PrePi C main with DTB pointer in x0
     mov     x0, x19
     bl      CEntryPoint
 
-dead_loop:
-    wfe
-    b       dead_loop
+    // If CEntryPoint ever returns, park core in safe WFI loop
+.Lhalt:
+    wfi
+    b       .Lhalt

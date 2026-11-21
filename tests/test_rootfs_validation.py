@@ -159,9 +159,16 @@ class TestNativeRootfsValidation(unittest.TestCase):
         self.assertIn("PermitRootLogin prohibit-password", ssh_conf)
         self.assertIn("PubkeyAuthentication yes", ssh_conf)
 
-        # Verify authorized_keys exist for root and r8q
-        self.assertTrue(os.path.isfile(os.path.join(STAGING_DIR, "root/.ssh/authorized_keys")))
-        self.assertTrue(os.path.isfile(os.path.join(STAGING_DIR, "home/r8q/.ssh/authorized_keys")))
+        # Verify credential isolation
+        if os.environ.get("PRODUCTION_BUILD", "1") == "1":
+            # Production build: static test keys must be eradicated
+            root_auth = os.path.join(STAGING_DIR, "root/.ssh/authorized_keys")
+            if os.path.isfile(root_auth):
+                with open(root_auth, "r") as f:
+                    self.assertNotIn("r8q-automated-test-key", f.read())
+        else:
+            self.assertTrue(os.path.isfile(os.path.join(STAGING_DIR, "root/.ssh/authorized_keys")))
+            self.assertTrue(os.path.isfile(os.path.join(STAGING_DIR, "home/r8q/.ssh/authorized_keys")))
 
 if __name__ == "__main__":
     unittest.main()

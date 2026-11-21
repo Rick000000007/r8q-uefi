@@ -43,7 +43,7 @@ cd "$KERNEL_SRC"
 make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- olddefconfig
 
 echo "[2/4] Compiling ARM64 Kernel with EFI Stub..."
-make -j"$(nproc)" ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- Image modules dtbs
+make -j"$(nproc)" ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- Image
 
 echo "[3/4] Copying Output Artifacts..."
 cp arch/arm64/boot/Image "$OUTPUT_IMAGE"

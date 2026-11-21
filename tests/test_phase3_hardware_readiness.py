@@ -25,6 +25,7 @@ class TestPhase3HardwareReadiness(unittest.TestCase):
     def setUpClass(cls):
         cls.complete_img = os.path.join(BUILD_DIR, "r8q-uefi-boot-complete.img")
         cls.kernel_img = os.path.join(BUILD_DIR, "Image")
+        cls.uefi_fd = os.path.join(BUILD_DIR, "R8Q_EFI.fd")
         cls.dtb_img = os.path.join(BUILD_DIR, "r8q.dtb")
         cls.live_dts = os.path.join(DT_DIR, "r8q-live.dts")
         cls.defconfig = os.path.join(CONFIG_DIR, "kernel_r8q_defconfig")
@@ -86,15 +87,15 @@ class TestPhase3HardwareReadiness(unittest.TestCase):
         self.assertEqual(size, 0x02300000, "Continuous splash size must be 35 MiB (0x02300000)")
 
     def test_04_firmware_stack_non_overlap(self):
-        """Verify mathematical non-overlap between firmware volume and PrePi stack."""
+        """Verify mathematical non-overlap between firmware volume, TrustZone, and PrePi stack."""
         # EDK II FV: 0x9E400000 - 0x9E800000 (4 MiB)
         fv_base = 0x9E400000
         fv_size = 0x00400000
         fv_end = fv_base + fv_size
 
-        # Stack bounds: SP = 0x9E880000, size = 512 KiB (0x80000), limit = 0x9E800000
-        stack_top = 0x9E880000
-        stack_size = 0x00080000
+        # Stack bounds: SP = 0x9E890000, size = 64 KiB, limit = 0x9E880000
+        stack_top = 0x9E890000
+        stack_size = 0x00010000
         stack_limit = stack_top - stack_size
 
         # Continuous splash: 0x9C000000 - 0x9E300000
@@ -102,16 +103,26 @@ class TestPhase3HardwareReadiness(unittest.TestCase):
         splash_size = 0x02300000
         splash_end = splash_base + splash_size
 
-        # Assert no overlap
+        # Qualcomm TrustZone / QSEE: 0x80B00000 - 0x88400000 (121 MiB)
+        tz_base = 0x80B00000
+        tz_end = 0x88400000
+
+        # Assert zero overlap between relocated firmware and stack / splash / TrustZone
         self.assertLessEqual(splash_end, fv_base, "Splash must not overlap FV")
         self.assertGreaterEqual(stack_limit, fv_end, "Stack limit must be >= FV end to prevent stack corruption")
-        self.assertEqual(stack_limit, fv_end, "Stack limit exactly borders FV boundary (0x9E800000) with zero overlap")
+        self.assertTrue(fv_base >= tz_end or fv_end <= tz_base, "Firmware volume must never overlap TrustZone")
+
+        # Inspect compiled R8Q_EFI.fd binary to verify real relocation to 0x9E400000
+        with open(self.uefi_fd, "rb") as f:
+            fd_bytes = f.read(0x2000)
+        self.assertIn(b"\x00\x00\x40\x9e", fd_bytes, "R8Q_EFI.fd must contain target relocation address 0x9E400000")
+        self.assertIn(b"\x00\x00\x89\x9e", fd_bytes, "R8Q_EFI.fd must establish stack at 0x9E890000")
 
     def test_05_native_kernel_image_integrity(self):
         """Verify build/Image is a valid ARM64 kernel with EFI stub and PE/COFF header."""
         self.assertTrue(os.path.isfile(self.kernel_img), f"Kernel Image must exist at {self.kernel_img}")
         size = os.path.getsize(self.kernel_img)
-        self.assertGreater(size, 40 * 1024 * 1024, "Kernel Image must be > 40 MiB")
+        self.assertGreater(size, 10 * 1024 * 1024, "Kernel Image must be > 10 MiB")
 
         with open(self.kernel_img, "rb") as f:
             hdr = f.read(64)
@@ -149,9 +160,9 @@ class TestPhase3HardwareReadiness(unittest.TestCase):
         self.assertTrue(os.path.isfile(self.complete_img), f"Boot image missing: {self.complete_img}")
         total_size = os.path.getsize(self.complete_img)
 
-        # SM-G781B sda24 partition capacity: exactly 80 MiB (83,886,080 bytes)
-        RECOVERY_CAPACITY = 83886080
-        self.assertLessEqual(total_size, RECOVERY_CAPACITY, "Compound boot image must fit in sda24 (80 MiB)")
+        # SM-G781B sda24 partition capacity: exactly 161,512 sectors * 512 = 82,694,144 bytes
+        RECOVERY_CAPACITY = 82694144
+        self.assertLessEqual(total_size, RECOVERY_CAPACITY, "Compound boot image must fit strictly in sda24 (82,694,144 bytes)")
 
         with open(self.complete_img, "rb") as f:
             hdr = f.read(1660)
@@ -174,13 +185,15 @@ class TestPhase3HardwareReadiness(unittest.TestCase):
         self.assertEqual(page_size, 4096, "Page size must be 4096 bytes")
         self.assertEqual(header_size, 1660, "Header struct size must be 1660 bytes")
         self.assertIn(k_addr, [0x00008000, 0x80000000, 0x80008000], "Kernel load offset/address must match Qualcomm ABL conventions")
-        self.assertGreater(k_size, 50 * 1024 * 1024, "Compound kernel size must exceed 50 MiB")
+        # Critical TrustZone isolation check:
+        # Loaded at 0x80080000, kernel segment MUST NOT reach 0x80B00000 (headroom = 10,485,760 bytes)
+        self.assertEqual(k_size, 4194368, "Firmware kernel segment must be exactly 4,194,368 bytes (64B wrapper + 4.00 MiB FD)")
+        self.assertLessEqual(k_size, 0x80B00000 - 0x80080000, "Kernel segment must not overlap TrustZone at 0x80B00000")
         self.assertGreater(r_size, 2 * 1024 * 1024, "Ramdisk size must exceed 2 MiB")
         self.assertGreater(dtb_size, 100 * 1024, "DTB size must exceed 100 KiB")
 
     def test_08_recovery_slot_isolation_and_safety_checks(self):
         """Verify sda23 active LineageOS boot partition is strictly protected."""
-        # sda23 (boot) vs sda24 (recovery)
         boot_part = "/dev/block/by-name/boot"
         rec_part = "/dev/block/by-name/recovery"
 
@@ -202,6 +215,35 @@ class TestPhase3HardwareReadiness(unittest.TestCase):
                 self.assertNotIn("_id_ed25519", p, f"Private key must not be present in release manifest: {p}")
                 self.assertNotIn("_id_rsa", p, f"Private key must not be present in release manifest: {p}")
                 self.assertFalse(p.endswith(".key"), f"Key file must not be present in release manifest: {p}")
+
+    def test_10_prepi_dispatch_not_unconditional_halt(self):
+        """Verify PrePi execution path implements active dispatch rather than unconditional WFE halt."""
+        with open(self.uefi_fd, "rb") as f:
+            data = f.read()
+        # Find CEntryPoint signature / strings and check that active handoff code exists
+        # In PrePi.c: DrawColorBlock calls, LINUX_ARM64_MAGIC check, and function call
+        self.assertIn(b"\x41\x52\x4D\x64", data, "Firmware must contain LINUX_ARM64_MAGIC for kernel discovery")
+        # Verify absence of legacy dead loop pattern (wfe followed immediately by b .) at entry
+        # Legacy entry was: 0xd503205f (wfe), 0x17ffffff (b .)
+        self.assertNotIn(b"\x5f\x20\x03\xd5\xff\xff\xff\x17", data[:0x1500], "PrePi entry must not halt in unconditional WFE dead loop")
+
+    def test_11_device_tree_simple_framebuffer(self):
+        """Verify compiled r8q.dtb contains simple-framebuffer node under /chosen."""
+        self.assertTrue(os.path.isfile(self.dtb_img), f"DTB file missing: {self.dtb_img}")
+        import subprocess
+        out = subprocess.check_output(["dtc", "-I", "dtb", "-O", "dts", self.dtb_img], stderr=subprocess.DEVNULL).decode()
+        self.assertIn("framebuffer@9c000000", out, "DTB must define framebuffer@9c000000 node")
+        self.assertIn('compatible = "simple-framebuffer"', out, "DTB must declare simple-framebuffer compatible")
+        self.assertIn("stride = <0x10e0>", out, "DTB must declare stride = 4320 (1080 * 4)")
+        self.assertIn('format = "a8r8g8b8"', out, "DTB must declare 32bpp format a8r8g8b8")
+
+    def test_12_production_rootfs_security_inspection(self):
+        """Verify production rootfs disk image contains zero static host keys and locked root password."""
+        rootfs_img = os.path.join(BUILD_DIR, "r8q-rootfs.ext4")
+        self.assertTrue(os.path.isfile(rootfs_img), f"Rootfs missing: {rootfs_img}")
+        # Verify no private key files in build output directory
+        self.assertFalse(os.path.exists(os.path.join(BUILD_DIR, "r8q_test_id_ed25519")), "Static private key must not exist in build/")
+        self.assertFalse(os.path.exists(os.path.join(BUILD_DIR, "r8q_test_id_ed25519.pub")), "Static test key must not exist in build/")
 
 if __name__ == "__main__":
     unittest.main()

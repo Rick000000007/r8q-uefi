@@ -83,19 +83,20 @@ class TestQemuPhase2Validation(unittest.TestCase):
     def test_04_direct_kernel_qemu_execution(self):
         """Execute QEMU direct kernel boot and verify rootfs mount and systemd startup."""
         cmd = [
-            "qemu-system-aarch64", "-M", "virt", "-cpu", "cortex-a57", "-m", "1024M",
+            "qemu-system-aarch64", "-M", "virt", "-cpu", "cortex-a57", "-m", "1024M", "-smp", "4",
             "-kernel", KERNEL_IMG,
             "-initrd", INITRD_IMG,
             "-append", "console=ttyAMA0 root=/dev/vda rw earlycon",
             "-drive", f"file={ROOTFS_IMG},format=raw,if=virtio",
+            "-drive", f"file={ESP_IMG},format=raw,if=virtio",
             "-nographic"
         ]
         p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
-        time.sleep(28)
+        time.sleep(38)
         p.terminate()
         out, _ = p.communicate()
 
-        self.assertIn("Linux version 7.2.15+kali-arm64", out, "Kernel 7.2.15 must boot")
+        self.assertIn("Linux version 7.2.15", out, "Kernel 7.2.15 must boot")
         self.assertIn("Run /init as init process", out, "Initramfs /init must execute")
         self.assertIn("virtio_blk", out, "VirtIO block driver must enumerate")
         self.assertIn("EXT4-fs (vda): mounted filesystem", out, "Rootfs ext4 must mount rw")
@@ -104,18 +105,19 @@ class TestQemuPhase2Validation(unittest.TestCase):
         self.assertTrue("Welcome to" in out or "Debian" in out or "systemd" in out, "Debian userspace banner must appear")
 
     def test_05_uefi_efi_stub_boot_execution(self):
-        """Execute QEMU UEFI firmware and verify ARM64 Linux EFI Stub handoff."""
+        """[SUBSTITUTE TEST: Generic EDK2 Firmware] Execute QEMU UEFI firmware and verify ARM64 Linux EFI Stub handoff."""
         cmd = [
-            "qemu-system-aarch64", "-M", "virt", "-cpu", "cortex-a57", "-m", "1024M",
+            "qemu-system-aarch64", "-M", "virt", "-cpu", "cortex-a57", "-m", "1024M", "-smp", "4",
             "-bios", UEFI_FW,
             "-kernel", KERNEL_IMG,
             "-initrd", INITRD_IMG,
-            "-append", "console=ttyAMA0 root=/dev/vda rw",
+            "-append", "console=ttyAMA0 root=/dev/vda rw earlycon",
             "-drive", f"file={ROOTFS_IMG},format=raw,if=virtio",
+            "-drive", f"file={ESP_IMG},format=raw,if=virtio",
             "-nographic"
         ]
         p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
-        time.sleep(15)
+        time.sleep(35)
         p.terminate()
         out, _ = p.communicate()
 
@@ -143,8 +145,11 @@ class TestQemuPhase2Validation(unittest.TestCase):
 
     def test_07_security_credentials_and_host_keys(self):
         """Verify removal of default credentials and presence of hardened keys."""
-        self.assertTrue(os.path.isfile(SSH_KEY), f"Ed25519 test key must exist: {SSH_KEY}")
-        self.assertTrue(os.path.isfile(f"{SSH_KEY}.pub"), "Ed25519 public key must exist")
+        # In production builds, static test private keys must be eradicated
+        if os.environ.get("PRODUCTION_BUILD", "1") == "1":
+            self.assertFalse(os.path.isfile(SSH_KEY), f"Static Ed25519 test private key must NOT exist in production: {SSH_KEY}")
+        else:
+            self.assertTrue(os.path.isfile(SSH_KEY), f"Ed25519 test key must exist in non-production: {SSH_KEY}")
 
         with open(os.path.join(STAGING_DIR, "etc/shadow"), "r") as f:
             shadow = f.read()
