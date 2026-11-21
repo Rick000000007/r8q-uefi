@@ -19,6 +19,7 @@
 #define FB_STRIDE         (FB_WIDTH * (FB_BPP / 8))
 
 #define FDT_MAGIC         0xD00DFEED
+#define FDT_MAX_SIZE      0x00200000ULL // 2 MiB maximum DTB size per Linux ARM64 boot protocol
 #define LINUX_ARM64_MAGIC 0x644D5241 // 'ARM\x64'
 
 #define FIRMWARE_BASE     0x9E400000ULL
@@ -206,8 +207,9 @@ IsValidDeviceTree (
   }
 
   // 4. TotalSize bounds check (big-endian in standard FDT)
+  // Maximum size tightened from 8 MiB to 2 MiB per Linux ARM64 boot protocol (TotalSize > 0x00800000ULL)
   TotalSize = Swap32(FdtHdr->TotalSize);
-  if (TotalSize < sizeof(FDT_HEADER) || TotalSize > 0x00800000ULL) { // 8 MiB max ceiling
+  if (TotalSize < sizeof(FDT_HEADER) || TotalSize > FDT_MAX_SIZE) { // 2 MiB max ceiling per protocol
     return FALSE;
   }
 
@@ -320,14 +322,13 @@ CEntryPoint (
 
   // 5. Transfer execution to Linux EFI Stub / ARM64 Kernel Entry
   if (KernelCandidate != 0) {
-    volatile UINT64 *TextOffsetPtr = (volatile UINT64 *)(UINTN)(KernelCandidate + 0x08);
-    UINT64 EntryOffset = *TextOffsetPtr;
+    volatile UINT64 *ImgSizePtr = (volatile UINT64 *)(UINTN)(KernelCandidate + 0x10);
+    UINT64          KernelSize = *ImgSizePtr;
 
     // Handoff badge: Emerald Green full block indicating successful dispatch
     DrawColorBlock(440, 1300, 200, 60, 0x0000FF00);
 
-    // Perform Point-of-Coherence (PoC) cache maintenance for DTB and Kernel ranges
-    // Ensuring data written by firmware is clean to memory for MMU=0 Linux handoff
+    // 1. Perform Point-of-Coherence (PoC) cache maintenance for validated DTB
     if (DtbPhysBase != 0 && ValidatedDtbSize != 0) {
       UINT64 DtbCleanAddr = DtbPhysBase;
       UINT64 DtbCleanLimit = DtbPhysBase + ((ValidatedDtbSize + 63) & ~63ULL);
@@ -337,12 +338,28 @@ CEntryPoint (
         }
       }
     }
+
+    // 2. Perform Point-of-Coherence (PoC) cache maintenance for entire loaded Linux Image
+    // Mandated by Linux ARM64 Boot Protocol (Documentation/arm64/booting.rst)
+    if (KernelSize >= KERNEL_MIN_SIZE && KernelSize <= KERNEL_MAX_SIZE) {
+      UINT64 KernelCleanAddr = KernelCandidate;
+      UINT64 KernelCleanLimit = KernelCandidate + ((KernelSize + 63) & ~63ULL);
+      if (KernelCleanLimit <= DRAM_LIMIT_PHYS && KernelCleanLimit > KernelCleanAddr) {
+        for (; KernelCleanAddr < KernelCleanLimit; KernelCleanAddr += 64) {
+          __asm__ __volatile__ ("dc civac, %0" : : "r" (KernelCleanAddr) : "memory");
+        }
+      }
+    }
+
+    // Full system data barrier and instruction pipeline barrier before kernel branch
     __asm__ __volatile__ ("dsb sy\n\tisb" : : : "memory");
 
-    // Calling convention for Linux ARM64 kernel:
+    // Calling convention for Linux ARM64 kernel (Documentation/arm64/booting.rst):
+    // Execution begins at the very first instruction of the Image (offset +0x00 / code0).
+    // text_offset in the header specifies load offset relative to 2 MiB alignment, NOT an offset within Image.
     // x0 = Physical address of Device Tree Blob (FDT)
     // x1 = 0, x2 = 0, x3 = 0 (Reserved)
-    LinuxEntry = (LINUX_ENTRY_POINT)(UINTN)(KernelCandidate + EntryOffset);
+    LinuxEntry = (LINUX_ENTRY_POINT)(UINTN)KernelCandidate;
     LinuxEntry(DtbPhysBase, 0, 0, 0);
   }
 
