@@ -37,6 +37,7 @@
 #define KERNEL_MAX_SIZE    0x04000000ULL  // 64 MiB ceiling
 #define KERNEL_MAX_OFFSET  0x02000000ULL  // 32 MiB max text_offset
 #define KERNEL_ALIGNED_BASE 0xA2000000ULL // 2 MiB-aligned destination in Window F (modulo 0x200000 == 0)
+#define DTB_REALLOC_BASE    0xA4000000ULL // 2 MiB-aligned non-overlapping DTB buffer in Window F
 
 STATIC UINT64 gPassedDtbBase = 0;
 
@@ -259,7 +260,9 @@ CEntryPoint (
   LINUX_ENTRY_POINT LinuxEntry = NULL;
   UINT64            KernelCandidate = 0;
   UINT32            ValidatedDtbSize = 0;
+  UINT64            ValidatedDtbBase = DtbPhysBase;
   UINT64            CandidateAddresses[] = {
+                      0xA2000000ULL, // 2 MiB-aligned Window F destination (KERNEL_ALIGNED_BASE)
                       0xA0561040ULL, // Container-offset compound payload (P_load 0xA0160000 + 0x401040)
                       0xA0560040ULL, // Immediate compound payload offset (P_load 0xA0160000 + 0x400040)
                       0xA0561000ULL, // 4K-aligned compound payload offset (P_load 0xA0160000 + 0x401000)
@@ -284,6 +287,22 @@ CEntryPoint (
   if (IsValidDeviceTree(DtbPhysBase, &ValidatedDtbSize)) {
     // Draw small DTB confirmation badge (Cyan: 0x0000CED1)
     DrawColorBlock(100, 40, 80, 40, 0x0000CED1);
+
+    // CRITICAL (Phase 3.6A.7): Prevent Kernel / DTB Collision!
+    // The relocated kernel occupies [KERNEL_ALIGNED_BASE, KERNEL_ALIGNED_BASE + KernelSize)
+    // with execution envelope up to 0xA4000000.
+    // If incoming DTB is located in [0xA2000000, 0xA4000000), e.g. legacy 0xA3000000,
+    // the kernel copy will overwrite the DTB!
+    // Relocate the validated DTB to DTB_REALLOC_BASE (0xA4000000) BEFORE kernel relocation.
+    if (DtbPhysBase < DTB_REALLOC_BASE && (DtbPhysBase + ValidatedDtbSize) > KERNEL_ALIGNED_BASE) {
+      volatile UINT8 *DtbSrc = (volatile UINT8 *)(UINTN)DtbPhysBase;
+      volatile UINT8 *DtbDst = (volatile UINT8 *)(UINTN)DTB_REALLOC_BASE;
+      UINT32 i;
+      for (i = 0; i < ValidatedDtbSize; i++) {
+        DtbDst[i] = DtbSrc[i];
+      }
+      ValidatedDtbBase = DTB_REALLOC_BASE;
+    }
   } else {
     // DTB invalid or corrupted: Draw Warning badge (Red: 0x00FF0000)
     DrawColorBlock(100, 40, 80, 40, 0x00FF0000);
@@ -354,9 +373,9 @@ CEntryPoint (
     }
 
     // 1. Perform Point-of-Coherence (PoC) cache maintenance for validated DTB
-    if (DtbPhysBase != 0 && ValidatedDtbSize != 0) {
-      UINT64 DtbCleanAddr = DtbPhysBase & ~(CacheLineSize - 1);
-      UINT64 DtbCleanLimit = (DtbPhysBase + ValidatedDtbSize + CacheLineSize - 1) & ~(CacheLineSize - 1);
+    if (ValidatedDtbBase != 0 && ValidatedDtbSize != 0) {
+      UINT64 DtbCleanAddr = ValidatedDtbBase & ~(CacheLineSize - 1);
+      UINT64 DtbCleanLimit = (ValidatedDtbBase + ValidatedDtbSize + CacheLineSize - 1) & ~(CacheLineSize - 1);
       if (DtbCleanLimit <= DRAM_LIMIT_PHYS && DtbCleanLimit > DtbCleanAddr) {
         for (; DtbCleanAddr < DtbCleanLimit; DtbCleanAddr += CacheLineSize) {
           __asm__ __volatile__ ("dc civac, %0" : : "r" (DtbCleanAddr) : "memory");
@@ -386,7 +405,7 @@ CEntryPoint (
     // x1 = 0, x2 = 0, x3 = 0 (Reserved)
     KernelCandidate = KernelRunBase;
     LinuxEntry = (LINUX_ENTRY_POINT)(UINTN)KernelCandidate;
-    LinuxEntry(DtbPhysBase, 0, 0, 0);
+    LinuxEntry(ValidatedDtbBase, 0, 0, 0);
   }
 
   // In production firmware without embedded kernel, handoff is completed via BDS/LinuxBoot

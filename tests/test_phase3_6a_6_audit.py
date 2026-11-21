@@ -141,7 +141,8 @@ class TestPhase36A6Audit(unittest.TestCase):
         self.assertIn("ic      iallu", asm, "Instruction cache must be invalidated")
 
         # Linux entry branch
-        self.assertIn("LinuxEntry(DtbPhysBase, 0, 0, 0);", c_code, "Final register call x0=DTB, x1-x3=0")
+        self.assertTrue("LinuxEntry(ValidatedDtbBase, 0, 0, 0);" in c_code or "LinuxEntry(DtbPhysBase, 0, 0, 0);" in c_code,
+                        "Final register call x0=DTB, x1-x3=0")
 
     def test_05_dma_quiescence_and_1gib_window(self):
         """Workstream 5 & 6: Verify DMA quiescence classification and 1 GiB window."""

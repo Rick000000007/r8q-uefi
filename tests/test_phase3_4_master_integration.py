@@ -313,7 +313,8 @@ class Phase34MasterIntegrationTests(unittest.TestCase):
         self.assertIn("isb", prepi_c, "PrePi must issue isb")
 
         # Register protocol at handoff: x0 = DTB, x1=0, x2=0, x3=0
-        self.assertIn("LinuxEntry(DtbPhysBase, 0, 0, 0)", prepi_c, "PrePi must invoke LinuxEntry with (DtbPhysBase, 0, 0, 0)")
+        self.assertTrue("LinuxEntry(ValidatedDtbBase, 0, 0, 0)" in prepi_c or "LinuxEntry(DtbPhysBase, 0, 0, 0)" in prepi_c,
+                        "PrePi must invoke LinuxEntry with DTB in x0 and (0, 0, 0) in x1-x3")
 
     def test_08_phase3_3_defect_resolution_proof(self):
         """6. INTEGRATION TESTING: Formally prove resolution of all Phase 3.3 audit findings."""
