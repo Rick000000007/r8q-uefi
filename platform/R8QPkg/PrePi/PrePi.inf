@@ -20,13 +20,16 @@
 [Packages]
   MdePkg/MdePkg.dec
   ArmPkg/ArmPkg.dec
+  EmbeddedPkg/EmbeddedPkg.dec
   R8QPkg/R8QPkg.dec
 
 [LibraryClasses]
   BaseLib
+  BaseMemoryLib
   DebugLib
   IoLib
   ArmLib
+  FdtLib
 
 [FixedPcd]
   gR8QPkgTokenSpaceGuid.PcdFrameBufferBase

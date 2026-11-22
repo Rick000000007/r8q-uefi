@@ -21,6 +21,7 @@
 [LibraryClasses.common]
   BaseLib|MdePkg/Library/BaseLib/BaseLib.inf
   BaseMemoryLib|MdePkg/Library/BaseMemoryLib/BaseMemoryLib.inf
+  FdtLib|EmbeddedPkg/Library/FdtLib/FdtLib.inf
   PrintLib|MdePkg/Library/BasePrintLib/BasePrintLib.inf
   SerialPortLib|R8QPkg/Library/SerialPortLib/SerialPortLib.inf
   DebugLib|MdePkg/Library/BaseDebugLibSerialPort/BaseDebugLibSerialPort.inf

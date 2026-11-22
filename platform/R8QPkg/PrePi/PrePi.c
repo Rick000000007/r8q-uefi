@@ -8,9 +8,11 @@
 
 #include <PiPei.h>
 #include <Library/BaseLib.h>
+#include <Library/BaseMemoryLib.h>
 #include <Library/DebugLib.h>
 #include <Library/IoLib.h>
 #include <Library/ArmLib.h>
+#include <libfdt.h>
 
 #define FB_BASE_PHYS      0x9C000000ULL
 #define FB_WIDTH          1080
@@ -18,7 +20,6 @@
 #define FB_BPP            32
 #define FB_STRIDE         (FB_WIDTH * (FB_BPP / 8))
 
-#define FDT_MAGIC         0xD00DFEED
 #define FDT_MAX_SIZE      0x00200000ULL // 2 MiB maximum DTB size per Linux ARM64 boot protocol
 #define LINUX_ARM64_MAGIC 0x644D5241 // 'ARM\x64'
 
@@ -256,20 +257,41 @@ IsValidDeviceTree (
   return TRUE;
 }
 
+STATIC
+BOOLEAN
+IsValidInitrd (
+  IN UINT64 Addr
+  )
+{
+  volatile UINT8 *Bytes;
+  if (Addr < DRAM_BASE_PHYS || (Addr + INITRD_PAYLOAD_SIZE) > DRAM_LIMIT_PHYS) {
+    return FALSE;
+  }
+  Bytes = (volatile UINT8 *)(UINTN)Addr;
+  // Verify Gzip compressed CPIO magic: 0x1F, 0x8B, 0x08
+  if (Bytes[0] == 0x1F && Bytes[1] == 0x8B && Bytes[2] == 0x08) {
+    return TRUE;
+  }
+  return FALSE;
+}
+
 /**
   C Entry point invoked from ModuleEntryPoint.S after self-relocation to 0x9E400000.
   x0 contains the DTB physical base address passed by Samsung ABL.
+  x1 contains the actual physical staging base address of the compound kernel payload.
 **/
 VOID
 EFIAPI
 CEntryPoint (
-  IN UINT64 DtbPhysBase
+  IN UINT64 DtbPhysBase,
+  IN UINT64 StagedEntryBase
   )
 {
   LINUX_ENTRY_POINT LinuxEntry = NULL;
   UINT64            KernelCandidate = 0;
   UINT32            ValidatedDtbSize = 0;
-  UINT64            ValidatedDtbBase = DtbPhysBase;
+  UINT64            ValidatedDtbBase = 0;
+  UINT64            SelectedDtbSrc = 0;
   UINT64            CandidateAddresses[] = {
                       0xA2000000ULL, // 2 MiB-aligned Window F destination (KERNEL_ALIGNED_BASE)
                       0xA0561040ULL, // Container-offset compound payload (P_load 0xA0160000 + 0x401040)
@@ -292,63 +314,111 @@ CEntryPoint (
   // Status indicator: Center confirmation block (PrePi active)
   DrawColorBlock(440, 1150, 200, 100, 0x0000A86B);
 
-  // 2. Validate Device Tree Blob passed by ABL (or fall back to bundled DTB in container)
-  if (!IsValidDeviceTree(DtbPhysBase, &ValidatedDtbSize)) {
-    if (IsValidDeviceTree(BUNDLED_DTB_SOURCE_BASE, &ValidatedDtbSize)) {
-      DtbPhysBase = BUNDLED_DTB_SOURCE_BASE;
-    }
+  // 2. Select Source Device Tree Blob (Priority 1: ABL runtime DTB in x0; Fallback: Bundled/Container DTB)
+  if (IsValidDeviceTree(DtbPhysBase, &ValidatedDtbSize)) {
+    SelectedDtbSrc = DtbPhysBase; // ABL passed hardware-configured DTB
+  } else if (IsValidDeviceTree(BUNDLED_DTB_SOURCE_BASE, &ValidatedDtbSize)) {
+    SelectedDtbSrc = BUNDLED_DTB_SOURCE_BASE;
+  } else if (StagedEntryBase != 0 && IsValidDeviceTree(StagedEntryBase + 0x16D7000ULL, &ValidatedDtbSize)) {
+    SelectedDtbSrc = StagedEntryBase + 0x16D7000ULL;
+  } else if (StagedEntryBase != 0 && IsValidDeviceTree(StagedEntryBase + 0x16D8000ULL, &ValidatedDtbSize)) {
+    SelectedDtbSrc = StagedEntryBase + 0x16D8000ULL;
   }
 
-  if (IsValidDeviceTree(DtbPhysBase, &ValidatedDtbSize)) {
+  // Runtime DTB Unpacking, /chosen property injection, and preservation of hardware nodes
+  if (SelectedDtbSrc != 0) {
     // Draw small DTB confirmation badge (Cyan: 0x0000CED1)
     DrawColorBlock(100, 40, 80, 40, 0x0000CED1);
 
-    // Ensure DTB resides at safe 2 MiB-aligned buffer (0xA4000000) outside kernel execution envelope
-    if (DtbPhysBase != DTB_REALLOC_BASE) {
-      volatile UINT8 *DtbSrc = (volatile UINT8 *)(UINTN)DtbPhysBase;
+    // Unpack and expand selected DTB into dedicated 2 MiB buffer at DTB_REALLOC_BASE (0xA4000000)
+    int FdtErr = fdt_open_into((CONST VOID *)(UINTN)SelectedDtbSrc, (VOID *)(UINTN)DTB_REALLOC_BASE, 0x200000);
+    if (FdtErr == 0) {
+      VOID *Fdt = (VOID *)(UINTN)DTB_REALLOC_BASE;
+      int ChosenNode = fdt_path_offset(Fdt, "/chosen");
+      if (ChosenNode < 0) {
+        ChosenNode = fdt_add_subnode(Fdt, 0, "chosen");
+      }
+      if (ChosenNode >= 0) {
+        CONST CHAR8 RequiredBootArgs[] = "console=tty0 console=ttyMSM0,115200n8 earlycon=msm_geni_serial,0xa90000 clk_ignore_unused pd_ignore_unused initcall_debug loglevel=8 root=/dev/ram0 rw init=/init";
+        int ArgLen = 0;
+        CONST CHAR8 *ExistingArgs = (CONST CHAR8 *)fdt_getprop(Fdt, ChosenNode, "bootargs", &ArgLen);
+        CHAR8 MergedArgs[2048];
+        MergedArgs[0] = '\0';
+        if (ExistingArgs != NULL && ArgLen > 1) {
+          AsciiStrCpyS(MergedArgs, sizeof(MergedArgs), ExistingArgs);
+          AsciiStrCatS(MergedArgs, sizeof(MergedArgs), " ");
+          AsciiStrCatS(MergedArgs, sizeof(MergedArgs), RequiredBootArgs);
+        } else {
+          AsciiStrCpyS(MergedArgs, sizeof(MergedArgs), RequiredBootArgs);
+        }
+        fdt_setprop_string(Fdt, ChosenNode, "bootargs", MergedArgs);
+        fdt_setprop_u64(Fdt, ChosenNode, "linux,initrd-start", INITRD_REALLOC_BASE);
+        fdt_setprop_u64(Fdt, ChosenNode, "linux,initrd-end", INITRD_REALLOC_BASE + INITRD_PAYLOAD_SIZE);
+      }
+      fdt_pack(Fdt);
+      ValidatedDtbBase = DTB_REALLOC_BASE;
+      ValidatedDtbSize = (UINT32)fdt_totalsize(Fdt);
+    } else {
+      // Direct copy fallback if fdt_open_into encountered unexpected error
+      volatile UINT8 *DtbSrc = (volatile UINT8 *)(UINTN)SelectedDtbSrc;
       volatile UINT8 *DtbDst = (volatile UINT8 *)(UINTN)DTB_REALLOC_BASE;
       UINT32 i;
       for (i = 0; i < ValidatedDtbSize; i++) {
         DtbDst[i] = DtbSrc[i];
       }
       ValidatedDtbBase = DTB_REALLOC_BASE;
+    }
 
-      // Re-validate DTB at new destination to prove copy integrity
-      UINT32 PostRelocSize = 0;
-      if (!IsValidDeviceTree(ValidatedDtbBase, &PostRelocSize) || PostRelocSize != ValidatedDtbSize) {
-        // Post-relocation DTB verification failed!
-        DrawColorBlock(100, 40, 80, 40, 0x00FF0000);
-        ValidatedDtbBase = DtbPhysBase; // Fall back to source
-      }
+    // Re-validate DTB at new destination to prove copy integrity
+    UINT32 PostRelocSize = 0;
+    if (!IsValidDeviceTree(ValidatedDtbBase, &PostRelocSize)) {
+      // Post-relocation DTB verification failed!
+      DrawColorBlock(100, 40, 80, 40, 0x00FF0000);
     }
   } else {
     // DTB invalid or corrupted: Draw Warning badge (Red: 0x00FF0000)
     DrawColorBlock(100, 40, 80, 40, 0x00FF0000);
   }
 
-  // Relocate Rescue Initramfs from container staging (0xA1568000) to dedicated buffer (0xA4400000)
+  // 3. Dynamic Initramfs Relocation from Container Staging to Dedicated 32 MiB Buffer (0xA4400000)
   {
-    volatile UINT64 *RdSrc = (volatile UINT64 *)(UINTN)BUNDLED_INITRD_SOURCE_BASE;
-    volatile UINT64 *RdDst = (volatile UINT64 *)(UINTN)INITRD_REALLOC_BASE;
-    UINT64 RdWords = (INITRD_PAYLOAD_SIZE + 7) / 8;
-    UINT64 RdIdx;
-    for (RdIdx = 0; RdIdx < RdWords; RdIdx++) {
-      RdDst[RdIdx] = RdSrc[RdIdx];
+    UINT64 InitrdSrc = 0;
+    if (StagedEntryBase != 0 && IsValidInitrd(StagedEntryBase + 0x1407000ULL)) {
+      InitrdSrc = StagedEntryBase + 0x1407000ULL;
+    } else if (StagedEntryBase != 0 && IsValidInitrd(StagedEntryBase + 0x1408000ULL)) {
+      InitrdSrc = StagedEntryBase + 0x1408000ULL;
+    } else if (IsValidInitrd(BUNDLED_INITRD_SOURCE_BASE)) {
+      InitrdSrc = BUNDLED_INITRD_SOURCE_BASE;
+    }
+
+    if (InitrdSrc != 0) {
+      volatile UINT64 *RdSrc = (volatile UINT64 *)(UINTN)InitrdSrc;
+      volatile UINT64 *RdDst = (volatile UINT64 *)(UINTN)INITRD_REALLOC_BASE;
+      UINT64 RdWords = (INITRD_PAYLOAD_SIZE + 7) / 8;
+      UINT64 RdIdx;
+      for (RdIdx = 0; RdIdx < RdWords; RdIdx++) {
+        RdDst[RdIdx] = RdSrc[RdIdx];
+      }
     }
   }
 
-  // 3. Mathematical non-overlap verification
+  // 4. Mathematical non-overlap verification
   // Verify Firmware [0x9E400000, 0x9E800000) is outside TrustZone [0x80B00000, 0x88400000)
   if (FIRMWARE_BASE >= TRUSTZONE_END || (FIRMWARE_BASE + FIRMWARE_SIZE) <= TRUSTZONE_BASE) {
     // Memory isolation confirmed
     DrawColorBlock(200, 40, 80, 40, 0x0000A86B);
   }
 
-  // 4. Scan candidate staging ranges for Linux ARM64 kernel Image (MAJOR-01 Remediation)
-  for (Index = 0; Index < sizeof(CandidateAddresses)/sizeof(CandidateAddresses[0]); Index++) {
-    if (IsValidLinuxKernel(CandidateAddresses[Index])) {
-      KernelCandidate = CandidateAddresses[Index];
-      break;
+  // 5. Locate Embedded Mainline Linux ARM64 Kernel Image
+  // Priority 0: Exact derived offset from actual staging base (StagedEntryBase + 0x400040)
+  if (StagedEntryBase != 0 && IsValidLinuxKernel(StagedEntryBase + 0x400040ULL)) {
+    KernelCandidate = StagedEntryBase + 0x400040ULL;
+  } else {
+    for (Index = 0; Index < sizeof(CandidateAddresses)/sizeof(CandidateAddresses[0]); Index++) {
+      if (IsValidLinuxKernel(CandidateAddresses[Index])) {
+        KernelCandidate = CandidateAddresses[Index];
+        break;
+      }
     }
   }
 
@@ -369,7 +439,7 @@ CEntryPoint (
     }
   }
 
-  // 5. Transfer execution to Linux EFI Stub / ARM64 Kernel Entry
+  // 6. Transfer execution to Linux EFI Stub / ARM64 Kernel Entry
   if (KernelCandidate != 0) {
     volatile UINT64 *ImgSizePtr = (volatile UINT64 *)(UINTN)(KernelCandidate + 0x10);
     UINT64          KernelSize = *ImgSizePtr;
@@ -396,8 +466,9 @@ CEntryPoint (
         volatile UINT64 *Src = (volatile UINT64 *)(UINTN)KernelCandidate;
         volatile UINT64 *Dst = (volatile UINT64 *)(UINTN)KERNEL_ALIGNED_BASE;
         UINT64 CopyBytes = KernelSize;
-        // Hardening: Avoid copying beyond actual kernel payload into adjacent ramdisk at 0xA1568000
-        if (KernelCandidate == 0xA0561040ULL && CopyBytes > 0x01006200ULL) {
+        // Hardening: Clamp copy length to actual payload size (16,802,304 bytes = 0x01006200).
+        // Discrepancy resolution: 0x01070000 - 0x01006200 = 433,664 bytes (0x69E00) is BSS.
+        if (CopyBytes > 0x01006200ULL) {
           CopyBytes = 0x01006200ULL;
         }
         UINT64 Words = (CopyBytes + 7) / 8;
@@ -406,7 +477,7 @@ CEntryPoint (
         for (Idx = 0; Idx < Words; Idx++) {
           Dst[Idx] = Src[Idx];
         }
-        // Zero BSS remainder in destination buffer
+        // Zero BSS remainder in destination buffer (433,664 bytes)
         for (Idx = Words; Idx < TotalWords; Idx++) {
           Dst[Idx] = 0;
         }

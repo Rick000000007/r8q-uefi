@@ -33,6 +33,9 @@ real_entry_point:
     // 1. Preserve x0 (pointer to Device Tree Blob in DRAM passed by Samsung ABL)
     mov     x19, x0
 
+    // Save actual physical load address of this entry point in x27 (AAPCS64 callee-saved)
+    adr     x27, _ModuleEntryPoint
+
     // 2. Mask all interrupts (Debug, SError, IRQ, FIQ)
     msr     daifset, #0xf
 
@@ -106,11 +109,13 @@ real_entry_point:
     // Jump to the relocated code at 0x9E400000 (Exact match, delta = 0)
     ldr     x25, =.Lalready_relocated
     mov     x0, x19
+    mov     x1, x27                     // x1 = Actual physical base of compound kernel in DRAM
     br      x25
 
 .Lalready_relocated:
-    // Transition to PrePi C main with DTB pointer in x0
+    // Transition to PrePi C main with DTB pointer in x0 and Staged Entry Base in x1
     mov     x0, x19
+    mov     x1, x27
     bl      CEntryPoint
 
     // If CEntryPoint ever returns, park core in safe WFI loop
