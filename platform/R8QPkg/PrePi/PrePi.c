@@ -38,6 +38,10 @@
 #define KERNEL_MAX_OFFSET  0x02000000ULL  // 32 MiB max text_offset
 #define KERNEL_ALIGNED_BASE 0xA2000000ULL // 2 MiB-aligned destination in Window F (modulo 0x200000 == 0)
 #define DTB_REALLOC_BASE    0xA4000000ULL // 2 MiB-aligned non-overlapping DTB buffer in Window F
+#define BUNDLED_DTB_SOURCE_BASE     0xA1838000ULL // DTB offset in compound container (0xA0160000 + 0x16D8000)
+#define BUNDLED_INITRD_SOURCE_BASE  0xA1568000ULL // Initramfs offset in compound container (0xA0160000 + 0x1408000)
+#define INITRD_REALLOC_BASE         0xA4400000ULL // 2 MiB-aligned Initramfs destination buffer in Window F
+#define INITRD_PAYLOAD_SIZE         0x002CF9EAULL // 2,947,562 bytes authoritative CPIO payload size
 
 STATIC UINT64 gPassedDtbBase = 0;
 
@@ -288,18 +292,19 @@ CEntryPoint (
   // Status indicator: Center confirmation block (PrePi active)
   DrawColorBlock(440, 1150, 200, 100, 0x0000A86B);
 
-  // 2. Validate Device Tree Blob passed by ABL (Full Structural, Alignment, and Bounds Check)
+  // 2. Validate Device Tree Blob passed by ABL (or fall back to bundled DTB in container)
+  if (!IsValidDeviceTree(DtbPhysBase, &ValidatedDtbSize)) {
+    if (IsValidDeviceTree(BUNDLED_DTB_SOURCE_BASE, &ValidatedDtbSize)) {
+      DtbPhysBase = BUNDLED_DTB_SOURCE_BASE;
+    }
+  }
+
   if (IsValidDeviceTree(DtbPhysBase, &ValidatedDtbSize)) {
     // Draw small DTB confirmation badge (Cyan: 0x0000CED1)
     DrawColorBlock(100, 40, 80, 40, 0x0000CED1);
 
-    // CRITICAL (Phase 3.6A.7): Prevent Kernel / DTB Collision!
-    // The relocated kernel occupies [KERNEL_ALIGNED_BASE, KERNEL_ALIGNED_BASE + KernelSize)
-    // with execution envelope up to 0xA4000000.
-    // If incoming DTB is located in [0xA2000000, 0xA4000000), e.g. legacy 0xA3000000,
-    // the kernel copy will overwrite the DTB!
-    // Relocate the validated DTB to DTB_REALLOC_BASE (0xA4000000) BEFORE kernel relocation.
-    if (DtbPhysBase < DTB_REALLOC_BASE && (DtbPhysBase + ValidatedDtbSize) > KERNEL_ALIGNED_BASE) {
+    // Ensure DTB resides at safe 2 MiB-aligned buffer (0xA4000000) outside kernel execution envelope
+    if (DtbPhysBase != DTB_REALLOC_BASE) {
       volatile UINT8 *DtbSrc = (volatile UINT8 *)(UINTN)DtbPhysBase;
       volatile UINT8 *DtbDst = (volatile UINT8 *)(UINTN)DTB_REALLOC_BASE;
       UINT32 i;
@@ -319,6 +324,17 @@ CEntryPoint (
   } else {
     // DTB invalid or corrupted: Draw Warning badge (Red: 0x00FF0000)
     DrawColorBlock(100, 40, 80, 40, 0x00FF0000);
+  }
+
+  // Relocate Rescue Initramfs from container staging (0xA1568000) to dedicated buffer (0xA4400000)
+  {
+    volatile UINT64 *RdSrc = (volatile UINT64 *)(UINTN)BUNDLED_INITRD_SOURCE_BASE;
+    volatile UINT64 *RdDst = (volatile UINT64 *)(UINTN)INITRD_REALLOC_BASE;
+    UINT64 RdWords = (INITRD_PAYLOAD_SIZE + 7) / 8;
+    UINT64 RdIdx;
+    for (RdIdx = 0; RdIdx < RdWords; RdIdx++) {
+      RdDst[RdIdx] = RdSrc[RdIdx];
+    }
   }
 
   // 3. Mathematical non-overlap verification
@@ -409,7 +425,18 @@ CEntryPoint (
       }
     }
 
-    // 2. Perform Point-of-Coherence (PoC) cache maintenance for entire loaded Linux Image
+    // 2. Perform Point-of-Coherence (PoC) cache maintenance for relocated Rescue Initramfs
+    {
+      UINT64 RdCleanAddr = INITRD_REALLOC_BASE & ~(CacheLineSize - 1);
+      UINT64 RdCleanLimit = (INITRD_REALLOC_BASE + INITRD_PAYLOAD_SIZE + CacheLineSize - 1) & ~(CacheLineSize - 1);
+      if (RdCleanLimit <= DRAM_LIMIT_PHYS && RdCleanLimit > RdCleanAddr) {
+        for (; RdCleanAddr < RdCleanLimit; RdCleanAddr += CacheLineSize) {
+          __asm__ __volatile__ ("dc civac, %0" : : "r" (RdCleanAddr) : "memory");
+        }
+      }
+    }
+
+    // 3. Perform Point-of-Coherence (PoC) cache maintenance for entire loaded Linux Image
     // Mandated by Linux ARM64 Boot Protocol (Documentation/arm64/booting.rst)
     if (KernelSize >= KERNEL_MIN_SIZE && KernelSize <= KERNEL_MAX_SIZE) {
       UINT64 KernelCleanAddr = KernelRunBase & ~(CacheLineSize - 1);

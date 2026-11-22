@@ -3,7 +3,7 @@
   "device": "Samsung Galaxy S20 FE 5G (SM-G781B)",
   "codename": "r8q",
   "soc": "Qualcomm Snapdragon 865 (SM8250)",
-  "generated_at": "2026-11-20T22:38:35.494791+00:00",
+  "generated_at": "2026-11-22T00:43:15.633395+00:00",
   "security_policy": "Strict zero-private-key credential isolation",
   "files": [
     {
@@ -212,6 +212,46 @@
       "sha256": "26a4702d3b30af942def29239add82d34b05cbc52fdb9f37580feab2f82a7d87"
     },
     {
+      "path": "docs/R8Q_PHASE3_2_DTB_DISPLAY.md",
+      "size_bytes": 4661,
+      "sha256": "e789ae70e8eec01d6987b43fdf9e4b1eab53fbf8af835e20a8b7655ac78b5be9"
+    },
+    {
+      "path": "docs/R8Q_PHASE3_2_KERNEL_PROVENANCE.md",
+      "size_bytes": 5830,
+      "sha256": "1a5be6d9f928f0a5a32567df9c18d5b2010addd564b0a820653a9720230c7f05"
+    },
+    {
+      "path": "docs/R8Q_PHASE3_2_MASTER_REPORT.md",
+      "size_bytes": 11286,
+      "sha256": "310584083e764a240ddaaee0febd5e0df9c71b2da9481e375af29fafd9ce1349"
+    },
+    {
+      "path": "docs/R8Q_PHASE3_2_MEMORY_ARCHITECTURE.md",
+      "size_bytes": 6910,
+      "sha256": "a3bd4d095d72f9a15d52c61bab52c48e02d119e65edde10f842e1b9b259a508e"
+    },
+    {
+      "path": "docs/R8Q_PHASE3_2_PARTITION_SAFETY.md",
+      "size_bytes": 5552,
+      "sha256": "04904bac16d7670ecfb647183586a2d9845336e763a639e6c0f89fbb456a16e5"
+    },
+    {
+      "path": "docs/R8Q_PHASE3_2_PREPI_DISPATCH.md",
+      "size_bytes": 6701,
+      "sha256": "25a88bb7cbbddef4dbd72bc6cd172caac97efe09ef3bb50e7d1695aac6f56aca"
+    },
+    {
+      "path": "docs/R8Q_PHASE3_2_ROOTFS_SECURITY.md",
+      "size_bytes": 4788,
+      "sha256": "d44c3266cedc2d57b939504a6ce8d4ee2ce3de6bc72ffa645ffc63532d2fc725"
+    },
+    {
+      "path": "docs/R8Q_PHASE3_2_VERIFICATION.md",
+      "size_bytes": 8085,
+      "sha256": "8c3b1611bd91d7206030e086643c82632ed485748c6fe97329f1045ecc20b3d3"
+    },
+    {
       "path": "docs/R8Q_PHASE3_HARDWARE_INTEGRATION.md",
       "size_bytes": 14266,
       "sha256": "f813ede5cd7c1fa107b64bd701cb0132e658d57913d22d0343fb06531d93458c"
@@ -302,9 +342,169 @@
       "sha256": "bed8fb5020f6b5bcb49fd988e063cee2ae42f3977481cdc5dbd380b1e02702bb"
     },
     {
+      "path": "docs/phase3_3/PHASE3_3_ARM64_BOOTCHAIN_AUDIT.md",
+      "size_bytes": 16679,
+      "sha256": "ee3c521385e218f1de7b6a7c9cc1feae4968fac7929fa763609bf8ee7f8320f8"
+    },
+    {
+      "path": "docs/phase3_3/PHASE3_3_ARTIFACT_INTEGRITY.md",
+      "size_bytes": 5067,
+      "sha256": "1d478e25b0d7ee3c1e551952060e6b992e7bc80b34ea78481e7803010b19005c"
+    },
+    {
+      "path": "docs/phase3_3/PHASE3_3_EXECUTIVE_AUDIT.md",
+      "size_bytes": 11307,
+      "sha256": "8332d2287b52bc8d3ac17697000770d9b0bac631720b9744c4ec496a8d3fffb8"
+    },
+    {
+      "path": "docs/phase3_3/PHASE3_3_FINAL_GO_NO_GO_REPORT.md",
+      "size_bytes": 9132,
+      "sha256": "e388a5a51fb5fd5a95f4abca8bfbd420c55d94d569ab18d78ed82f250269e4e1"
+    },
+    {
+      "path": "docs/phase3_3/PHASE3_3_HARDWARE_VALIDATION.md",
+      "size_bytes": 8207,
+      "sha256": "517f5647310b83ee380db3f0222ec92a034ffaa94c06138c2c4c0bccf8586987"
+    },
+    {
+      "path": "docs/phase3_3/PHASE3_3_KERNEL_DTB_AUDIT.md",
+      "size_bytes": 8326,
+      "sha256": "efed396fc1d599ba66a11dd7bf17cc64c217f47393a060912d33138993c99b82"
+    },
+    {
+      "path": "docs/phase3_3/PHASE3_3_MEMORY_SAFETY_AUDIT.md",
+      "size_bytes": 7390,
+      "sha256": "625f5b340b39f6debb51d81d8512844e88c709a98e3e3f7908a1a22ae5fe8100"
+    },
+    {
+      "path": "docs/phase3_3/PHASE3_3_PARTITION_KNOX_AUDIT.md",
+      "size_bytes": 6123,
+      "sha256": "558c330884982324e0dcd15e7ad5db5b40b57b13156d948db086de09b06d0cab"
+    },
+    {
+      "path": "docs/phase3_3/PHASE3_3_ROOTFS_SECURITY_AUDIT.md",
+      "size_bytes": 6343,
+      "sha256": "826135093369512ee0957a22e05374ab9658005f0a9bfd3f8bc5d63b449681aa"
+    },
+    {
+      "path": "docs/phase3_3/PHASE3_3_SOURCE_PROVENANCE.md",
+      "size_bytes": 6629,
+      "sha256": "6d8a487e11afc1c6bcc8a3d1558d58d96bf6e97da9e73cad76a892980579c7a0"
+    },
+    {
+      "path": "docs/phase3_4/PHASE3_4_ARCHITECTURE_DESIGN.md",
+      "size_bytes": 22082,
+      "sha256": "c5c512ebe499a1c615165864d2576eb4233be7fa02e2d09afffce99031315200"
+    },
+    {
+      "path": "docs/phase3_4/PHASE3_4_CUSTOM_BOOTLOADER_ARCHITECTURE.md",
+      "size_bytes": 26565,
+      "sha256": "894596a5ddfb1917aa68f885616f574d8f08124412e6a69bfdb6fba7bbcb0e75"
+    },
+    {
+      "path": "docs/phase3_4/PHASE3_4_CUSTOM_BOOTLOADER_ARCHITECTURE_REVISION.md",
+      "size_bytes": 32596,
+      "sha256": "93b2231ebf156a5f01014207428c610d7e98df7b5321d14613653f3648369eb9"
+    },
+    {
+      "path": "docs/phase3_4/PHASE3_4_FINAL_BINARY_INTEGRITY_VALIDATION.md",
+      "size_bytes": 21188,
+      "sha256": "50c2a07060c33082758ede162865008e268c78ba44e4b74a0e17d5fce97f0745"
+    },
+    {
+      "path": "docs/phase3_4/PHASE3_4_FINAL_EXECUTION_ADDRESS_VALIDATION.md",
+      "size_bytes": 21951,
+      "sha256": "ee85c72c2dd486151e869bd17daf56e588e369040c0aa9b91d5ba83111e3068d"
+    },
+    {
+      "path": "docs/phase3_4/PHASE3_4_IMPLEMENTATION_GATE_VALIDATION.md",
+      "size_bytes": 23893,
+      "sha256": "d0329246afcae5633b0389e246202b27e872bbba0fd1cce4593d7f80caa29c64"
+    },
+    {
+      "path": "docs/phase3_4/PHASE3_4_MASTER_MERGE_COMPLETION_REPORT.md",
+      "size_bytes": 15014,
+      "sha256": "0260f0184eba2dc510b603685260737320ad6a91916ff21a8d3843ea949cd8bc"
+    },
+    {
+      "path": "docs/phase3_4/PHASE3_4_MASTER_MERGE_READINESS.md",
+      "size_bytes": 38968,
+      "sha256": "769790038db784da706cc36213e7d2f5df4806af49bb92facd002d12c91c6d8b"
+    },
+    {
+      "path": "docs/phase3_5/PHASE3_5_1_REMEDIATION_REPORT.md",
+      "size_bytes": 19036,
+      "sha256": "f70ea5caa8bf99c49a8a6d2d76be668c7db8be40ca07252f87f21f4150d210ab"
+    },
+    {
+      "path": "docs/phase3_5/PHASE3_5_INDEPENDENT_TECHNICAL_AUDIT.md",
+      "size_bytes": 43881,
+      "sha256": "bfc242230e3e7bf1d3f830621e2bb88b3dc87b0275a168c293e0ce6393ec0507"
+    },
+    {
+      "path": "docs/phase3_6/PHASE3_6A_10_KERNEL_AND_FIRMWARE_MEMORY_RECONCILIATION.md",
+      "size_bytes": 25080,
+      "sha256": "7f64c4bfd8a7103bf614d8c2f171023ad87586f26e82102f50a07155ce80c92d"
+    },
+    {
+      "path": "docs/phase3_6/PHASE3_6A_1_PARTITION_AND_BOOTCHAIN_VERIFICATION.md",
+      "size_bytes": 23048,
+      "sha256": "c9d48a42ca28efe12fc66ea26a4117fbc0f076d00a55f22949f31eb95a8e2d4c"
+    },
+    {
+      "path": "docs/phase3_6/PHASE3_6A_2_BOOTCHAIN_EVIDENCE_VALIDATION.md",
+      "size_bytes": 25309,
+      "sha256": "fe58b519d28f2aa23c6e0c80958b10cae2749efa04a85fb1f11d63d45b166e71"
+    },
+    {
+      "path": "docs/phase3_6/PHASE3_6A_3_FINAL_SAFETY_HANDOFF_AUDIT.md",
+      "size_bytes": 24967,
+      "sha256": "c3a5c0542b5e4913e3a57aefb2b88804732d1d52d36813756832b1e5a6d6ef78"
+    },
+    {
+      "path": "docs/phase3_6/PHASE3_6A_4_ARM64_HANDOFF_RECOVERY_AUDIT.md",
+      "size_bytes": 25899,
+      "sha256": "8ff2399dc4b9821070232828c23aa0c6526131efedea5f3716e349dc2e73fba1"
+    },
+    {
+      "path": "docs/phase3_6/PHASE3_6A_5_LINUX_ARM64_PROTOCOL_AUDIT.md",
+      "size_bytes": 22676,
+      "sha256": "9ef14f193e0ce72687b5da93aade4d958b805729c3e3f23fdeb2e75e53c85bcb"
+    },
+    {
+      "path": "docs/phase3_6/PHASE3_6A_6_KERNEL_PLACEMENT_CPU_HANDOFF.md",
+      "size_bytes": 23369,
+      "sha256": "c6a3b4d9977e640698596801d93b92df08995635825515281364597ca2111aca"
+    },
+    {
+      "path": "docs/phase3_6/PHASE3_6A_7_MEMORY_OWNERSHIP_AUDIT.md",
+      "size_bytes": 24589,
+      "sha256": "433ba5d732501548d6d1a6146a1361718e93a99c0f9c159cb43a85147d086dcc"
+    },
+    {
+      "path": "docs/phase3_6/PHASE3_6A_8_INDEPENDENT_INTEGRITY_VERIFICATION.md",
+      "size_bytes": 27484,
+      "sha256": "2bf9e46e82da07824a1a4f5d0a432851bc2106c50f6f196dc08eb2769b430f41"
+    },
+    {
+      "path": "docs/phase3_6/PHASE3_6A_9_INITRAMFS_AND_HANDOFF_AUDIT.md",
+      "size_bytes": 20301,
+      "sha256": "64cec2dd5df4acd9b834f06103ea1d9ef3df9a121e6fbb3c7cce69e614361518"
+    },
+    {
+      "path": "docs/phase3_6/PHASE3_6A_NON_DESTRUCTIVE_HARDWARE_PREPARATION.md",
+      "size_bytes": 41582,
+      "sha256": "c60df2a6bfd4977be140e7564e35d7d3cc685ecb44d5d6abd2fc5d2c4c2daaff"
+    },
+    {
+      "path": "docs/phase3_6/r8q_physical_memory_map.json",
+      "size_bytes": 25021,
+      "sha256": "944e303bbf86d3569a73f77acf62e6c493c246e6f6a5a944c5310166a4f0aaba"
+    },
+    {
       "path": "config/kernel_r8q_defconfig",
-      "size_bytes": 4487,
-      "sha256": "8c5ec44882cb3c0d430b1e5426295beade5c32534a60ec54ff185f49b84301c9"
+      "size_bytes": 4956,
+      "sha256": "6f72d1dede1df29e76a144c5e8523829893415e01333ae87b4a31ea42a3716f8"
     },
     {
       "path": "config/platform.env",
@@ -348,13 +548,13 @@
     },
     {
       "path": "scripts/build_initramfs.sh",
-      "size_bytes": 13930,
-      "sha256": "4dcc85758ac7ae2d06fbe60ab442c156191cc67f9ff5edc4cd785f4a0cd6d51d"
+      "size_bytes": 14134,
+      "sha256": "a8018d315c74ce174693a2a80c2db421862d1e264e4d577e18128cf584eaf697"
     },
     {
       "path": "scripts/build_kernel.sh",
-      "size_bytes": 2083,
-      "sha256": "a1a7c8c08b5e228a232835660c86670796c5540913dc71b2d3d3911d09d12ee2"
+      "size_bytes": 2070,
+      "sha256": "81f5099815b0c380054d2c0474ac6d6ede0bdba41a52f276c56d862852d22953"
     },
     {
       "path": "scripts/build_rootfs.sh",
@@ -373,8 +573,8 @@
     },
     {
       "path": "scripts/package_complete_boot_img.py",
-      "size_bytes": 5556,
-      "sha256": "c166a215db2f7011dda2d9928aa2e22548414aa523f72b0c31ec2ec0dc71c2eb"
+      "size_bytes": 9729,
+      "sha256": "0b8fde81207558f1d44e50d981f51e8603fa797ac5de37f194308b839e80a32e"
     },
     {
       "path": "scripts/run_qemu_test.sh",
@@ -392,11 +592,6 @@
       "sha256": "3f47361fbed340c9cfb0a2099bd9f63ebf9695dc6bcaefeed4e61cccd452bcc5"
     },
     {
-      "path": "tests/test_final_boot_readiness.py",
-      "size_bytes": 15969,
-      "sha256": "adf4d4130fc17cb3e2f8d97b91f4f817d1b1c6aaeca40036573f8eb964ef2a95"
-    },
-    {
       "path": "tests/test_initramfs_validation.py",
       "size_bytes": 6167,
       "sha256": "f02a281fa26f4e6fae48b7a1d4c545ba7929deefbbc969f9e73b1febc325c533"
@@ -412,14 +607,74 @@
       "sha256": "ba7d6abb786dde7a0ce45fecb1f73bf3bdd4c5b17820c4b0faf188477ab455cc"
     },
     {
-      "path": "tests/test_phase3_hardware_readiness.py",
-      "size_bytes": 10742,
-      "sha256": "28d7dc794bd741283213a9863b3b8a4eee3351404a995cbeee620ad4ef3141ec"
+      "path": "tests/test_phase3_4_implementation_gate.py",
+      "size_bytes": 10289,
+      "sha256": "ff46b093964a33cb6b8b41e8eda7c082ba6d0f9902334afeddf5993aa060a777"
+    },
+    {
+      "path": "tests/test_phase3_4_master_integration.py",
+      "size_bytes": 22910,
+      "sha256": "c8a31408645191c706912ec6902bd71aff5ab75dd183df59bdbd436fb7fed902"
+    },
+    {
+      "path": "tests/test_phase3_5_1_remediation.py",
+      "size_bytes": 12437,
+      "sha256": "aae0eac425cfa5a44734a042e23012e5820ddad8723edb8c9bd238c4b439696a"
+    },
+    {
+      "path": "tests/test_phase3_6a_10_audit.py",
+      "size_bytes": 19901,
+      "sha256": "f52abc157784fa1c8e85d4c5a6e64853db09956c1b126ba136fd5a64e0fcb21b"
+    },
+    {
+      "path": "tests/test_phase3_6a_1_verification.py",
+      "size_bytes": 8103,
+      "sha256": "0aceb91c7adea28075746ada8ab6228186add6028bf3d8cc3fb8eb9bc1b59892"
+    },
+    {
+      "path": "tests/test_phase3_6a_2_validation.py",
+      "size_bytes": 3768,
+      "sha256": "3a45c4c12b6c8f473cc5418796a8d59c5a7d5dd552348da88fe18ac75736ae34"
+    },
+    {
+      "path": "tests/test_phase3_6a_3_audit.py",
+      "size_bytes": 6760,
+      "sha256": "9e3abcdd3c4059ca4736bd37a0e2fb335a0633975e0a18d4bb640b802de89566"
+    },
+    {
+      "path": "tests/test_phase3_6a_4_audit.py",
+      "size_bytes": 11753,
+      "sha256": "afb4b289a181408cf50233c2c368e5612216d5e502c8b06f7794921baea88b71"
+    },
+    {
+      "path": "tests/test_phase3_6a_5_audit.py",
+      "size_bytes": 8535,
+      "sha256": "2c28df5a7309648a95ccc75161ca918a8e7b133da8f965f3cf26143ba7396c96"
+    },
+    {
+      "path": "tests/test_phase3_6a_6_audit.py",
+      "size_bytes": 9304,
+      "sha256": "c2598b07c8790ecdd2b6a529cfe0f44b26be15dbfc3b7d328adf75d4eab3277f"
+    },
+    {
+      "path": "tests/test_phase3_6a_7_audit.py",
+      "size_bytes": 10354,
+      "sha256": "8b60f3316f6e2a0ba1af543e46faa08dc9fa1f0f4fd047d5ab394758c50a8bfa"
+    },
+    {
+      "path": "tests/test_phase3_6a_8_audit.py",
+      "size_bytes": 13679,
+      "sha256": "71e1afc36348b9a78156384e3482a700191e8c8c1620b73d755080e0d788a20a"
+    },
+    {
+      "path": "tests/test_phase3_6a_9_audit.py",
+      "size_bytes": 14960,
+      "sha256": "bd1768cb69a506a15fd25331e2b9bd9c11656f8d0a6f1904598d2cd24ba16453"
     },
     {
       "path": "tests/test_qemu_phase2_validation.py",
-      "size_bytes": 8169,
-      "sha256": "3948ac5434d3fb25f06feab83dff57d2c82597194ba185c562d21342b7490dea"
+      "size_bytes": 8568,
+      "sha256": "45087ff269822ad53c111a64e32f52ab63479d10cab506e780407e1530eda94b"
     },
     {
       "path": "tests/test_real_device_boot_evidence.py",
@@ -428,8 +683,8 @@
     },
     {
       "path": "tests/test_rootfs_validation.py",
-      "size_bytes": 8608,
-      "sha256": "3184ef09a289cc4b8b8051543c82f899b247cb0efa2cf3a10ba9aaf0c10d5ab1"
+      "size_bytes": 8981,
+      "sha256": "2b77e54a793e5beacba1cca66c014dc8c24e78bb2dd0b999a93dc18e2addfcec"
     },
     {
       "path": "tests/test_three_track_strategy.py",
@@ -457,14 +712,84 @@
       "sha256": "e4d9c81bc38ff07b7589d8cdf46a38bd088f4e97bd51417921b66ec32d160bbe"
     },
     {
+      "path": "tests/__pycache__/test_phase3_3_independent_audit.cpython-314.pyc",
+      "size_bytes": 11350,
+      "sha256": "2941d03c2d535a7312ede2a592355612b21d46861798bb99fee3efa4cbb71a73"
+    },
+    {
+      "path": "tests/__pycache__/test_phase3_4_implementation_gate.cpython-314.pyc",
+      "size_bytes": 11732,
+      "sha256": "868fdfd0a677f8f1067f771b92e82dac8f8786476594d70af6688f51be3bc161"
+    },
+    {
+      "path": "tests/__pycache__/test_phase3_4_master_integration.cpython-314.pyc",
+      "size_bytes": 25311,
+      "sha256": "f2a5eac6c6f2ab8be69081937bc0767f17410ac03ca4304b8b16bee6e4179da6"
+    },
+    {
+      "path": "tests/__pycache__/test_phase3_5_1_remediation.cpython-314.pyc",
+      "size_bytes": 15440,
+      "sha256": "23bc2b967b1f3bebdd8e37c3b4ff5d12ff62c53b08dfd7aaf069ac907c18d9e1"
+    },
+    {
+      "path": "tests/__pycache__/test_phase3_6a_10_audit.cpython-314.pyc",
+      "size_bytes": 24852,
+      "sha256": "5bb96c7704644f0b34d0751e145cd6148c3a16f3114e7be5680fcfb507a99033"
+    },
+    {
+      "path": "tests/__pycache__/test_phase3_6a_1_verification.cpython-314.pyc",
+      "size_bytes": 10002,
+      "sha256": "6e3609e5b3daa57abf9d0313d99250d38288431f895bb15c13cbd139d2e89852"
+    },
+    {
+      "path": "tests/__pycache__/test_phase3_6a_2_validation.cpython-314.pyc",
+      "size_bytes": 5038,
+      "sha256": "4b33c734e8dc118e211c62cc069ce42669abbd4205e150a1d15323333611201c"
+    },
+    {
+      "path": "tests/__pycache__/test_phase3_6a_3_audit.cpython-314.pyc",
+      "size_bytes": 8490,
+      "sha256": "ca477657095bfa2d12a08f6d3f9cb3cb0657d0a94e05fa054a934fa540dac2bd"
+    },
+    {
+      "path": "tests/__pycache__/test_phase3_6a_4_audit.cpython-314.pyc",
+      "size_bytes": 12426,
+      "sha256": "0d7cef81971871bc5f25dbaaf06ab5a5d239bcac9f79c7086dded7f36a6b54b3"
+    },
+    {
+      "path": "tests/__pycache__/test_phase3_6a_5_audit.cpython-314.pyc",
+      "size_bytes": 10216,
+      "sha256": "48cdb0854921bf7af01352a5c977a16dedd1edbea3b5466e823d51510f02970e"
+    },
+    {
+      "path": "tests/__pycache__/test_phase3_6a_6_audit.cpython-314.pyc",
+      "size_bytes": 11850,
+      "sha256": "5761686c1956570ce57a16f4cb7e59c96eed87489291c105672cef2f7996dec4"
+    },
+    {
+      "path": "tests/__pycache__/test_phase3_6a_7_audit.cpython-314.pyc",
+      "size_bytes": 12938,
+      "sha256": "06b12a19cc51b935e8f4ceb5666d33f4c8f18dc905ecd1dee4d3a9d93bc436f5"
+    },
+    {
+      "path": "tests/__pycache__/test_phase3_6a_8_audit.cpython-314.pyc",
+      "size_bytes": 19697,
+      "sha256": "39c3fcd6c971994b762b238860f927b6aff2b5b7b3429ce81de9f1d68efc8acf"
+    },
+    {
+      "path": "tests/__pycache__/test_phase3_6a_9_audit.cpython-314.pyc",
+      "size_bytes": 21049,
+      "sha256": "ebb1522cb0aa3a2d9828464fca944d441c6920a153ba15d294d83c89093bbf65"
+    },
+    {
       "path": "tests/__pycache__/test_phase3_hardware_readiness.cpython-314.pyc",
-      "size_bytes": 16155,
-      "sha256": "88d40eba1db2a33f150cb1b8ece95b6e1f06c9e2c473b6663d87c07d172169cf"
+      "size_bytes": 20337,
+      "sha256": "e1eb0989c6525302a6c0a714c8a5dc7826ff70569ef6a3bc4daf4c28c9debbc2"
     },
     {
       "path": "tests/__pycache__/test_qemu_phase2_validation.cpython-314.pyc",
-      "size_bytes": 12682,
-      "sha256": "12d3bada674e41bbf42673309d7dcd80473b5a640089e4ffefa5c65a80e431f2"
+      "size_bytes": 13015,
+      "sha256": "76f7e4aa203123e147a25b94b4323356c9368795689ea67de042b94050d35416"
     },
     {
       "path": "tests/__pycache__/test_real_device_boot_evidence.cpython-314.pyc",
@@ -473,13 +798,33 @@
     },
     {
       "path": "tests/__pycache__/test_rootfs_validation.cpython-314.pyc",
-      "size_bytes": 13013,
-      "sha256": "6abcea6cda489a9f92e2ef12e564310d3f9812248ebc4bf1bd5c56d203908491"
+      "size_bytes": 13629,
+      "sha256": "36666f34662d5934b320a05bb2f20e078eeb7fa19637d1f736c99c4dce7ad267"
     },
     {
       "path": "tests/__pycache__/test_three_track_strategy.cpython-314.pyc",
       "size_bytes": 11614,
       "sha256": "851a7d790ce543c9d38faaaf5c59a4cdf5e545f87c1409000f875bbf00e64e58"
+    },
+    {
+      "path": "tests/legacy/README.md",
+      "size_bytes": 2501,
+      "sha256": "7a055cf4fce676e22ce0a34c342e08b2bdb7dc13bc705f91c4aaefd093a62065"
+    },
+    {
+      "path": "tests/legacy/test_final_boot_readiness.py",
+      "size_bytes": 15969,
+      "sha256": "adf4d4130fc17cb3e2f8d97b91f4f817d1b1c6aaeca40036573f8eb964ef2a95"
+    },
+    {
+      "path": "tests/legacy/test_phase3_3_independent_audit.py",
+      "size_bytes": 7206,
+      "sha256": "6b93b2f4c942ec50261be6f7cc72a02b0ac9b5a175749ecef6d01b16566d4f2e"
+    },
+    {
+      "path": "tests/legacy/test_phase3_hardware_readiness.py",
+      "size_bytes": 13920,
+      "sha256": "d415759a9a009712c344722afe37f541f4c407989e3867e3760bcc4f1c12e7b4"
     },
     {
       "path": "platform/R8QPkg/R8QPkg.dec",
@@ -498,13 +843,13 @@
     },
     {
       "path": "platform/R8QPkg/PrePi/ModuleEntryPoint.S",
-      "size_bytes": 2003,
-      "sha256": "13320115cf0a95e1f44b8aaa753bc1b0474952edb95007e450035ee5b739754f"
+      "size_bytes": 4209,
+      "sha256": "e1ba631aa7f2c0235d39e5f2604c5fd4dabb5310fc38f8e95f2c84182189f2ae"
     },
     {
       "path": "platform/R8QPkg/PrePi/PrePi.c",
-      "size_bytes": 1679,
-      "sha256": "66315f58fa4da5b44c890c2cdab3e363457d103e9d625d1d9c0aaa9ac37561a8"
+      "size_bytes": 17417,
+      "sha256": "33ccde2728057637079abd7e04774878584bc370aaa3dab4ab2fed82bf17a398"
     },
     {
       "path": "platform/R8QPkg/PrePi/PrePi.inf",
@@ -708,53 +1053,58 @@
     },
     {
       "path": "devicetree/r8q-live.dts",
-      "size_bytes": 1234551,
-      "sha256": "9b71666f5ccf53b9c70d587b9befa002c0aa2f1db3420a79084d9b6857ed91c8"
+      "size_bytes": 1234841,
+      "sha256": "c3ac098c96813a0125ee6f66805aca53cc095981015fa846af9a30f8dd6e6b78"
     },
     {
       "path": "build/Image",
-      "size_bytes": 48269824,
-      "sha256": "a02004e609206bd34ecf496c7a52c92c11400a19733f42d9e2b063b122e7c05a"
+      "size_bytes": 16802304,
+      "sha256": "411f9062ff29324e57c4afd08c6c228c777c2d6eae60d5b075c988b29c19c3c1"
     },
     {
       "path": "build/R8Q_EFI.fd",
       "size_bytes": 4194304,
-      "sha256": "fd1b640cf0cf18e3f6cf16f5fb3aa87cbdc2b43c49d3934be2408988ab8bd344"
+      "sha256": "e5c5bd3bd5e1316329848edd3c72356434753a944cb874ef9219f7cb2629924f"
     },
     {
       "path": "build/esp.img",
       "size_bytes": 268435456,
-      "sha256": "6d2462f7af23f3721d81a45315386823e87afa7ff6462421502d67687ae37147"
+      "sha256": "3f7485e5ad33ef2f8f3c03b2ef96f5f18f145c5a4c72361728f7029d8df05600"
     },
     {
       "path": "build/initramfs.img",
-      "size_bytes": 2947587,
-      "sha256": "35f7a667f3952b8f8baf3de534c6d81b7dd984ca92c902f683767d5ebc638c59"
+      "size_bytes": 2947562,
+      "sha256": "edee6b70686df49ac85b021af18c1eb1d26387e98f7dcfccd1ea05e2508df2da"
     },
     {
       "path": "build/r8q-rootfs.ext4",
       "size_bytes": 2147483648,
-      "sha256": "24004bf3776d8314387b52aec980bc135193fff63b3bc46ede56827bb8248243"
+      "sha256": "3c8f5c67cb1f7bf21d2802e317a91b678ad1f06a4958cbcc0cde77fb2998abf6"
     },
     {
       "path": "build/r8q-rootfs.tar.gz",
-      "size_bytes": 158113523,
-      "sha256": "731854c04923e02b9411eded95d48feaf5cfb04aa27eac4706794fd920a18c84"
+      "size_bytes": 158123670,
+      "sha256": "f732533c71d4c6dcbd67de246f8610f7aecdd31781149d9692dceeeba351aa15"
     },
     {
       "path": "build/r8q-uefi-boot-complete.img",
-      "size_bytes": 55554048,
-      "sha256": "dbc59dc0c3447c53a68ea7669e0c4446ef5fd9812ccb73d192d593549836f206"
+      "size_bytes": 24068096,
+      "sha256": "72ce47eb788620375d4d953e109e23133ba059dda5384ded52bda4651edccb1e"
     },
     {
       "path": "build/r8q-uefi-boot-poc.img",
       "size_bytes": 4202496,
-      "sha256": "9beb0253d6816cecbbd509ac701d26e5f8ce881fd3caed94ad517304f49e0a5c"
+      "sha256": "eac71a5aa559c91c7a60ceca2d75c24fa9376f9c31b77a3ebb663d06e0c968cd"
     },
     {
       "path": "build/r8q.dtb",
-      "size_bytes": 821231,
-      "sha256": "75244696944e1fac692366de6898b880480b0c8fde74f28d8cf44e108923e7e3"
+      "size_bytes": 821466,
+      "sha256": "d626045ee1bc8f47ded23598d59fd1f527ea4a0398e02ccd8a4b690bf2e755d9"
+    },
+    {
+      "path": "build/sm8250-samsung-r8q.dtb",
+      "size_bytes": 112421,
+      "sha256": "d6c57c08f641dce38cbbd4a0e377c4b4cd23851ec8588a89c5400b1204f136ef"
     }
   ]
 }

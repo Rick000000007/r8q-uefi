@@ -10,6 +10,7 @@ import os
 import sys
 import struct
 import hashlib
+import subprocess
 
 BOOT_MAGIC = b"ANDROID!"
 BOOT_PAGE_SIZE = 4096
@@ -42,6 +43,17 @@ def build_complete_boot_image():
         kernel_data = f.read()
     with open(initrd_path, "rb") as f:
         initrd_data = f.read()
+
+    # Pre-patch DTB /chosen node with authoritative Linux ARM64 boot parameters
+    # Sets console, earlycon, initramfs destination buffer (0xA4400000 - 0xA46CF9EA), and rootfs mount
+    initrd_start = 0xA4400000
+    initrd_end = initrd_start + len(initrd_data)
+    bootargs_str = "console=tty0 console=ttyMSM0,115200n8 earlycon=msm_geni_serial,0xa90000 clk_ignore_unused pd_ignore_unused initcall_debug loglevel=8 root=/dev/ram0 rw init=/init"
+
+    subprocess.run(["fdtput", "-t", "s", dtb_path, "/chosen", "bootargs", bootargs_str], check=True)
+    subprocess.run(["fdtput", "-p", "-t", "x", dtb_path, "/chosen", "linux,initrd-start", "0x0", f"0x{initrd_start:x}"], check=True)
+    subprocess.run(["fdtput", "-p", "-t", "x", dtb_path, "/chosen", "linux,initrd-end", "0x0", f"0x{initrd_end:x}"], check=True)
+
     with open(dtb_path, "rb") as f:
         dtb_data = f.read()
 

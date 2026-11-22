@@ -264,15 +264,12 @@ class Phase36A10AuditTests(unittest.TestCase):
         self.assertEqual(rd_pad_len, 1558)
         self.assertEqual(set(self.boot_img_data[rd_raw_end:dtb_offset]), {0}, "Ramdisk pad must be all zeroes")
 
-        # Section 8: DTB Payload
-        dtb_size = 112160
+        # Section 8: DTB Payload (with authoritative /chosen boot parameters)
         self.assertEqual(self.boot_img_data[dtb_offset : dtb_offset + 4], bytes.fromhex("d00dfeed"), "FDT magic at 0x16D8000")
+        dtb_size = struct.unpack(">I", self.boot_img_data[dtb_offset + 4 : dtb_offset + 8])[0]
 
         # Section 9: DTB-to-EOF zero padding
         dtb_raw_end = dtb_offset + dtb_size
-        self.assertEqual(dtb_raw_end, 0x016F3620)
-        dtb_pad_len = total_size - dtb_raw_end
-        self.assertEqual(dtb_pad_len, 2528)
         self.assertEqual(set(self.boot_img_data[dtb_raw_end:total_size]), {0}, "DTB pad must be all zeroes")
 
     def test_07_negative_incorrect_boot_header_sizes(self):
