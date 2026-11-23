@@ -1,8 +1,10 @@
 # R8Q Release Binary Artifacts
-# Large binary images are distributed via GitHub Releases assets:
+# Large binary images and archives are distributed via GitHub Releases assets:
 # https://github.com/Rick000000007/r8q-uefi/releases/tag/r8q-debian12-alpha1
 *.img
 *.ext4
 *.fd
 *.dtb
+*.gz
+*.tar.gz
 Image
