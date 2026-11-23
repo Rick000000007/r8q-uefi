@@ -87,12 +87,20 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          echo "Syncing verified release documentation and recovery ZIP to GitHub Release..."
+          echo "Syncing all verified release documentation and recovery ZIP to GitHub Release..."
           cd R8Q-DEBIAN12-RELEASE
           gh release upload r8q-debian12-alpha1 \
-            R8Q-Debian12-Recovery.zip \
-            INSTALLATION-USB.md \
-            INSTALLER-AUDIT.md \
+            BOOT-ARCHITECTURE.md \
             BUILD-MANIFEST.md \
+            HARDWARE-COMPATIBILITY.md \
+            INSTALLATION-USB.md \
+            INSTALLATION.md \
+            INSTALLER-AUDIT.md \
+            PARTITION-LAYOUT.md \
+            R8Q-Debian12-Recovery.zip \
+            README.md \
+            RECOVERY.md \
             SHA256SUMS \
+            SHA256SUMS-RECOVERY-ZIP.txt \
+            TROUBLESHOOTING.md \
             --clobber || echo "Release upload completed"
