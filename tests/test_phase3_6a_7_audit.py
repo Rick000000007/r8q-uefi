@@ -163,8 +163,8 @@ class Phase36A7AuditTests(unittest.TestCase):
     def test_05_initramfs_dtb_handoff_contract(self):
         """Workstream 5: Verify DTB in x0, 1 GiB window, and absence of automatic XPU recovery claims."""
         # DTB passed in x0 via ValidatedDtbBase
-        self.assertIn("LinuxEntry(ValidatedDtbBase, 0, 0, 0);", self.prepi_c,
-                      "LinuxEntry must pass ValidatedDtbBase in x0 and 0 in x1-x3")
+        self.assertTrue("ArmLaunchLinuxKernel(KernelCandidate, ValidatedDtbBase);" in self.prepi_c or "LinuxEntry(ValidatedDtbBase, 0, 0, 0);" in self.prepi_c,
+                        "ArmLaunchLinuxKernel or LinuxEntry must pass ValidatedDtbBase in x0 and 0 in x1-x3")
 
         # 1 GiB window [0x80000000, 0xC0000000) verification
         win_start = 0x80000000

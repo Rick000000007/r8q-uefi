@@ -46,6 +46,13 @@
 
 STATIC UINT64 gPassedDtbBase = 0;
 
+VOID
+EFIAPI
+ArmLaunchLinuxKernel (
+  IN UINT64 KernelEntry,
+  IN UINT64 DtbBase
+  );
+
 typedef VOID (*LINUX_ENTRY_POINT)(
   IN UINT64 DtbPhys,
   IN UINT64 Res1,
@@ -257,41 +264,230 @@ IsValidDeviceTree (
   return TRUE;
 }
 
+/**
+  Validate that a candidate memory address hosts the authentic R8Q EDK II Firmware Volume.
+  Verifies:
+  1. Base pointer non-null and 8-byte aligned.
+  2. Complete 4 MiB span resides in valid physical DRAM without arithmetic overflow.
+  3. No collision with TrustZone, Framebuffer, or Stack reservations.
+  4. Firmware Volume signature matches '_FVH' (0x4856465F).
+  5. FvLength matches FIRMWARE_SIZE (4,194,304 bytes / 0x00400000).
+  6. HeaderLength matches 72 bytes (0x0048).
+  7. 16-bit header checksum sums to 0x0000 over HeaderLength.
+  8. FileSystemGuid matches EFI_FIRMWARE_FILE_SYSTEM2_GUID.
+  9. ZeroVector reset instruction branches to expected entry point (+0x2CB0).
+  10. Entry point at +0x2CB0 hosts valid ARM64 wrapper header ('ARM\x64' at +0x38).
+**/
+STATIC
+BOOLEAN
+IsValidFirmwareVolume (
+  IN UINT64 FvBase
+  )
+{
+  volatile UINT32 *SigPtr;
+  volatile UINT64 *FvLenPtr;
+  volatile UINT16 *HdrLenPtr;
+  volatile UINT16 *Words;
+  volatile UINT64 *GuidPtr;
+  volatile UINT32 *ResetVec;
+  volatile UINT32 *EntryInstr;
+  volatile UINT64 *EntryImgSize;
+  volatile UINT32 *EntryMagic;
+  UINT32          Sum = 0;
+  UINT32          i;
+  UINT32          Instr;
+  INT32           Imm26;
+  INT64           BranchOffset;
+  UINT64          TargetEntry;
+
+  // 1. Non-null and 8-byte alignment check
+  if (FvBase == 0 || (FvBase & 0x7ULL) != 0) {
+    return FALSE;
+  }
+
+  // 2. DRAM boundary and arithmetic overflow check
+  if (FvBase < DRAM_BASE_PHYS || (FvBase + FIRMWARE_SIZE) > DRAM_LIMIT_PHYS || (FvBase + FIRMWARE_SIZE) <= FvBase) {
+    return FALSE;
+  }
+
+  // 3. Memory collision checks
+  if (FvBase < TRUSTZONE_END && (FvBase + FIRMWARE_SIZE) > TRUSTZONE_BASE) {
+    return FALSE;
+  }
+  if (FvBase < FB_BASE_LIMIT && (FvBase + FIRMWARE_SIZE) > FB_BASE_PHYS) {
+    return FALSE;
+  }
+
+  // 4. Signature check: '_FVH' at offset +0x28
+  SigPtr = (volatile UINT32 *)(UINTN)(FvBase + 0x28);
+  if (*SigPtr != 0x4856465F) {
+    return FALSE;
+  }
+
+  // 5. FvLength check: 4 MiB (0x00400000) at offset +0x20
+  FvLenPtr = (volatile UINT64 *)(UINTN)(FvBase + 0x20);
+  if (*FvLenPtr != FIRMWARE_SIZE) {
+    return FALSE;
+  }
+
+  // 6. HeaderLength check: 72 bytes (0x0048) at offset +0x30
+  HdrLenPtr = (volatile UINT16 *)(UINTN)(FvBase + 0x30);
+  if (*HdrLenPtr != 0x0048) {
+    return FALSE;
+  }
+
+  // 7. 16-bit header checksum check: sum of all 36 halfwords must be 0x0000
+  Words = (volatile UINT16 *)(UINTN)FvBase;
+  for (i = 0; i < (*HdrLenPtr / 2); i++) {
+    Sum += Words[i];
+  }
+  if ((Sum & 0xFFFF) != 0) {
+    return FALSE;
+  }
+
+  // 8. FileSystemGuid check at offset +0x10: EFI_FIRMWARE_FILE_SYSTEM2_GUID
+  // { 0x8c8ce578, 0x8a3d, 0x4f1c, { 0x99, 0x35, 0x89, 0x61, 0x85, 0xc3, 0x2d, 0xd3 } }
+  // Little-endian QWORD 0: 0x4F1C8A3D8C8CE578ULL, QWORD 1: 0xD32DC38561893599ULL
+  GuidPtr = (volatile UINT64 *)(UINTN)(FvBase + 0x10);
+  if (GuidPtr[0] != 0x4F1C8A3D8C8CE578ULL || GuidPtr[1] != 0xD32DC38561893599ULL) {
+    return FALSE;
+  }
+
+  // 9. Reset vector branch instruction at offset +0x00:
+  // Must be an unconditional B instruction (opcode bits [31:26] == 000101b, i.e. 0x14000000).
+  // Dynamically decodes signed imm26 displacement to determine entry point.
+  ResetVec = (volatile UINT32 *)(UINTN)FvBase;
+  Instr = *ResetVec;
+  if ((Instr & 0xFC000000) != 0x14000000) {
+    return FALSE;
+  }
+  Imm26 = (INT32)(Instr & 0x03FFFFFF);
+  if ((Imm26 & 0x02000000) != 0) {
+    Imm26 |= (INT32)0xFC000000;
+  }
+  BranchOffset = ((INT64)Imm26) * 4;
+  if (BranchOffset < 72 || BranchOffset >= (INT64)FIRMWARE_SIZE) {
+    return FALSE;
+  }
+
+  TargetEntry = FvBase + (UINT64)BranchOffset;
+
+  // 10. Validate entry point target:
+  // First instruction of ModuleEntryPoint must branch forward past 64-byte wrapper (0x14000010)
+  EntryInstr = (volatile UINT32 *)(UINTN)TargetEntry;
+  if (*EntryInstr != 0x14000010 && (*EntryInstr & 0xFC000000) != 0x14000000) {
+    return FALSE;
+  }
+
+  // Wrapper image_size field at TargetEntry + 0x10 must match FIRMWARE_SIZE (4 MiB)
+  EntryImgSize = (volatile UINT64 *)(UINTN)(TargetEntry + 0x10);
+  if (*EntryImgSize != FIRMWARE_SIZE) {
+    return FALSE;
+  }
+
+  // Expected entry point ARM64 header check: 'ARM\x64' (0x644D5241) at TargetEntry + 0x38
+  EntryMagic = (volatile UINT32 *)(UINTN)(TargetEntry + 0x38);
+  if (*EntryMagic != LINUX_ARM64_MAGIC) {
+    return FALSE;
+  }
+
+  return TRUE;
+}
+
+#define EXPECTED_INITRD_CRC32       0x032DDBEDULL // CRC-32 of uncompressed CPIO data per RFC 1952
+#define EXPECTED_INITRD_ISIZE       7280640ULL    // 0x006F1800 uncompressed CPIO size (ISIZE)
+
 STATIC
 BOOLEAN
 IsValidInitrd (
-  IN UINT64 Addr
+  IN UINT64 Addr,
+  IN UINT64 StagedFvBase OPTIONAL
   )
 {
-  volatile UINT8 *Bytes;
-  if (Addr < DRAM_BASE_PHYS || (Addr + INITRD_PAYLOAD_SIZE) > DRAM_LIMIT_PHYS) {
+  volatile UINT8  *Bytes;
+  volatile UINT32 *CrcPtr;
+  volatile UINT32 *IsizePtr;
+
+  // 1. 8-byte alignment check
+  if ((Addr & 0x7ULL) != 0) {
     return FALSE;
   }
-  Bytes = (volatile UINT8 *)(UINTN)Addr;
-  // Verify Gzip compressed CPIO magic: 0x1F, 0x8B, 0x08
-  if (Bytes[0] == 0x1F && Bytes[1] == 0x8B && Bytes[2] == 0x08) {
-    return TRUE;
+
+  // 2. DRAM physical boundary and arithmetic overflow check
+  if (Addr < DRAM_BASE_PHYS || (Addr + INITRD_PAYLOAD_SIZE) > DRAM_LIMIT_PHYS || (Addr + INITRD_PAYLOAD_SIZE) <= Addr) {
+    return FALSE;
   }
-  return FALSE;
+
+  // 3. Staging container envelope bounds check (if StagedFvBase is provided)
+  if (StagedFvBase != 0) {
+    UINT64 ContainerBase = (StagedFvBase >= 0x1040ULL) ? (StagedFvBase - 0x1040ULL) : StagedFvBase;
+    UINT64 ContainerEnd = ContainerBase + 0x02000000ULL; // 32 MiB max container envelope
+    if (Addr != INITRD_REALLOC_BASE) {
+      if (Addr < ContainerBase || (Addr + INITRD_PAYLOAD_SIZE) > ContainerEnd) {
+        return FALSE;
+      }
+    }
+  }
+
+  // 4. Memory carveout exclusion checks:
+  // Must not intersect TrustZone reservation [0x80B00000, 0x88400000)
+  if (Addr < TRUSTZONE_END && (Addr + INITRD_PAYLOAD_SIZE) > TRUSTZONE_BASE) {
+    return FALSE;
+  }
+
+  // Must not intersect Framebuffer carveout [0x9C000000, 0x9E300000)
+  if (Addr < FB_BASE_LIMIT && (Addr + INITRD_PAYLOAD_SIZE) > FB_BASE_PHYS) {
+    return FALSE;
+  }
+
+  // Must not intersect Firmware & Stack envelope [0x9E400000, 0x9E890000)
+  if (Addr < FIRMWARE_STACK_TOP && (Addr + INITRD_PAYLOAD_SIZE) > FIRMWARE_BASE) {
+    return FALSE;
+  }
+
+  // 5. Gzip magic header & Deflate compression method verification (0x1F, 0x8B, 0x08)
+  Bytes = (volatile UINT8 *)(UINTN)Addr;
+  if (Bytes[0] != 0x1F || Bytes[1] != 0x8B || Bytes[2] != 0x08) {
+    return FALSE;
+  }
+
+  // 6. Gzip header flags validation (RFC 1952: reserved bits 5-7 must be 0)
+  if ((Bytes[3] & 0xE0) != 0) {
+    return FALSE;
+  }
+
+  // 7. Expected uncompressed CRC-32 trailer verification (RFC 1952: offset PayloadSize - 8)
+  CrcPtr = (volatile UINT32 *)(UINTN)(Addr + INITRD_PAYLOAD_SIZE - 8);
+  if ((UINT64)(*CrcPtr) != EXPECTED_INITRD_CRC32) {
+    return FALSE;
+  }
+
+  // 8. Expected uncompressed ISIZE footer verification (RFC 1952: offset PayloadSize - 4)
+  IsizePtr = (volatile UINT32 *)(UINTN)(Addr + INITRD_PAYLOAD_SIZE - 4);
+  if ((UINT64)(*IsizePtr) != EXPECTED_INITRD_ISIZE) {
+    return FALSE;
+  }
+
+  return TRUE;
 }
 
 /**
   C Entry point invoked from ModuleEntryPoint.S after self-relocation to 0x9E400000.
   x0 contains the DTB physical base address passed by Samsung ABL.
-  x1 contains the actual physical staging base address of the compound kernel payload.
+  x1 contains the authoritative physical base address of R8Q_EFI.fd in DRAM (StagedFvBase).
 **/
 VOID
 EFIAPI
 CEntryPoint (
   IN UINT64 DtbPhysBase,
-  IN UINT64 StagedEntryBase
+  IN UINT64 StagedFvBase
   )
 {
-  LINUX_ENTRY_POINT LinuxEntry = NULL;
   UINT64            KernelCandidate = 0;
   UINT32            ValidatedDtbSize = 0;
   UINT64            ValidatedDtbBase = 0;
   UINT64            SelectedDtbSrc = 0;
+  UINT64            CurrentElVal = 0;
   UINT64            CandidateAddresses[] = {
                       0xA2000000ULL, // 2 MiB-aligned Window F destination (KERNEL_ALIGNED_BASE)
                       0xA0561040ULL, // Container-offset compound payload (P_load 0xA0160000 + 0x401040)
@@ -305,6 +501,17 @@ CEntryPoint (
 
   gPassedDtbBase = DtbPhysBase;
 
+  // 0. Comprehensive Firmware Volume Validation
+  if (StagedFvBase == 0 || !IsValidFirmwareVolume(StagedFvBase)) {
+    // Corrupted or spoofed FV: Alert indicator (Red: 0x00FF0000)
+    DrawColorBlock(440, 1150, 200, 100, 0x00FF0000);
+    for (;;) { __asm__ __volatile__ ("wfi"); }
+  }
+
+  // Read Current Exception Level (bits [3:2]: 0=EL0, 1=EL1, 2=EL2, 3=EL3)
+  __asm__ __volatile__ ("mrs %0, CurrentEL" : "=r" (CurrentElVal));
+  CurrentElVal = (CurrentElVal >> 2) & 0x3;
+
   // 1. Draw visual confirmation bar across top of AMOLED panel
   // Color: Royal Blue Header bar (0x001B365D)
   DrawColorBlock(0, 0, FB_WIDTH, 120, 0x001B365D);
@@ -314,15 +521,44 @@ CEntryPoint (
   // Status indicator: Center confirmation block (PrePi active)
   DrawColorBlock(440, 1150, 200, 100, 0x0000A86B);
 
+  // Exception Level status badge:
+  // EL2: Gold (0x00FFD700) indicating hypervisor execution
+  // EL1: Emerald Green (0x0000A86B) indicating supervisor execution
+  // EL0 / EL3: Unsupported execution level, alert indicator (Red: 0x00FF0000) and halt
+  if (CurrentElVal == 2) {
+    DrawColorBlock(20, 40, 60, 40, 0x00FFD700);
+  } else if (CurrentElVal == 1) {
+    DrawColorBlock(20, 40, 60, 40, 0x0000A86B);
+  } else {
+    DrawColorBlock(20, 40, 60, 40, 0x00FF0000);
+    for (;;) { __asm__ __volatile__ ("wfi"); }
+  }
+
   // 2. Select Source Device Tree Blob (Priority 1: ABL runtime DTB in x0; Fallback: Bundled/Container DTB)
   if (IsValidDeviceTree(DtbPhysBase, &ValidatedDtbSize)) {
     SelectedDtbSrc = DtbPhysBase; // ABL passed hardware-configured DTB
+  } else if (StagedFvBase != 0 && IsValidDeviceTree(StagedFvBase + 0x16D6FC0ULL, &ValidatedDtbSize)) {
+    SelectedDtbSrc = StagedFvBase + 0x16D6FC0ULL;
+  } else if (StagedFvBase != 0 && IsValidDeviceTree(StagedFvBase + 0x16D7FC0ULL, &ValidatedDtbSize)) {
+    SelectedDtbSrc = StagedFvBase + 0x16D7FC0ULL;
   } else if (IsValidDeviceTree(BUNDLED_DTB_SOURCE_BASE, &ValidatedDtbSize)) {
     SelectedDtbSrc = BUNDLED_DTB_SOURCE_BASE;
-  } else if (StagedEntryBase != 0 && IsValidDeviceTree(StagedEntryBase + 0x16D7000ULL, &ValidatedDtbSize)) {
-    SelectedDtbSrc = StagedEntryBase + 0x16D7000ULL;
-  } else if (StagedEntryBase != 0 && IsValidDeviceTree(StagedEntryBase + 0x16D8000ULL, &ValidatedDtbSize)) {
-    SelectedDtbSrc = StagedEntryBase + 0x16D8000ULL;
+  } else if (StagedFvBase != 0 && IsValidDeviceTree(StagedFvBase + 0x16D7000ULL, &ValidatedDtbSize)) {
+    SelectedDtbSrc = StagedFvBase + 0x16D7000ULL;
+  } else if (StagedFvBase != 0 && IsValidDeviceTree(StagedFvBase + 0x16D8000ULL, &ValidatedDtbSize)) {
+    SelectedDtbSrc = StagedFvBase + 0x16D8000ULL;
+  }
+
+  // Dynamic Scan: If DTB not found at primary offsets, probe 4K boundaries across container envelope
+  if (SelectedDtbSrc == 0 && StagedFvBase != 0) {
+    UINT64 ContainerBase = (StagedFvBase >= 0x1040ULL) ? (StagedFvBase - 0x1040ULL) : StagedFvBase;
+    UINT64 DtbProbe;
+    for (DtbProbe = ContainerBase + 0x00400000ULL; DtbProbe < ContainerBase + 0x02000000ULL; DtbProbe += 0x1000) {
+      if (IsValidDeviceTree(DtbProbe, &ValidatedDtbSize)) {
+        SelectedDtbSrc = DtbProbe;
+        break;
+      }
+    }
   }
 
   // Runtime DTB Unpacking, /chosen property injection, and preservation of hardware nodes
@@ -383,12 +619,28 @@ CEntryPoint (
   // 3. Dynamic Initramfs Relocation from Container Staging to Dedicated 32 MiB Buffer (0xA4400000)
   {
     UINT64 InitrdSrc = 0;
-    if (StagedEntryBase != 0 && IsValidInitrd(StagedEntryBase + 0x1407000ULL)) {
-      InitrdSrc = StagedEntryBase + 0x1407000ULL;
-    } else if (StagedEntryBase != 0 && IsValidInitrd(StagedEntryBase + 0x1408000ULL)) {
-      InitrdSrc = StagedEntryBase + 0x1408000ULL;
-    } else if (IsValidInitrd(BUNDLED_INITRD_SOURCE_BASE)) {
+    if (StagedFvBase != 0 && IsValidInitrd(StagedFvBase + 0x1406FC0ULL, StagedFvBase)) {
+      InitrdSrc = StagedFvBase + 0x1406FC0ULL;
+    } else if (StagedFvBase != 0 && IsValidInitrd(StagedFvBase + 0x1407FC0ULL, StagedFvBase)) {
+      InitrdSrc = StagedFvBase + 0x1407FC0ULL;
+    } else if (StagedFvBase != 0 && IsValidInitrd(StagedFvBase + 0x1407000ULL, StagedFvBase)) {
+      InitrdSrc = StagedFvBase + 0x1407000ULL;
+    } else if (StagedFvBase != 0 && IsValidInitrd(StagedFvBase + 0x1408000ULL, StagedFvBase)) {
+      InitrdSrc = StagedFvBase + 0x1408000ULL;
+    } else if (IsValidInitrd(BUNDLED_INITRD_SOURCE_BASE, 0)) {
       InitrdSrc = BUNDLED_INITRD_SOURCE_BASE;
+    }
+
+    // Dynamic Scan: If Initrd not found at primary offsets, probe 4K boundaries across container envelope
+    if (InitrdSrc == 0 && StagedFvBase != 0) {
+      UINT64 ContainerBase = (StagedFvBase >= 0x1040ULL) ? (StagedFvBase - 0x1040ULL) : StagedFvBase;
+      UINT64 RdProbe;
+      for (RdProbe = ContainerBase + 0x00400000ULL; RdProbe < ContainerBase + 0x02000000ULL; RdProbe += 0x1000) {
+        if (IsValidInitrd(RdProbe, StagedFvBase)) {
+          InitrdSrc = RdProbe;
+          break;
+        }
+      }
     }
 
     if (InitrdSrc != 0) {
@@ -410,9 +662,11 @@ CEntryPoint (
   }
 
   // 5. Locate Embedded Mainline Linux ARM64 Kernel Image
-  // Priority 0: Exact derived offset from actual staging base (StagedEntryBase + 0x400040)
-  if (StagedEntryBase != 0 && IsValidLinuxKernel(StagedEntryBase + 0x400040ULL)) {
-    KernelCandidate = StagedEntryBase + 0x400040ULL;
+  // Priority 0: Exact derived offset from authoritative StagedFvBase (StagedFvBase + 0x00400000ULL)
+  if (StagedFvBase != 0 && IsValidLinuxKernel(StagedFvBase + 0x00400000ULL)) {
+    KernelCandidate = StagedFvBase + 0x00400000ULL;
+  } else if (StagedFvBase != 0 && IsValidLinuxKernel(StagedFvBase + 0x400040ULL)) {
+    KernelCandidate = StagedFvBase + 0x400040ULL;
   } else {
     for (Index = 0; Index < sizeof(CandidateAddresses)/sizeof(CandidateAddresses[0]); Index++) {
       if (IsValidLinuxKernel(CandidateAddresses[Index])) {
@@ -522,14 +776,38 @@ CEntryPoint (
     // Full system data barrier and instruction pipeline barrier before kernel branch
     __asm__ __volatile__ ("dsb sy\n\tisb" : : : "memory");
 
+    // 4. Ensure all interrupts are masked per Linux ARM64 Boot Protocol (DAIF = 0xF)
+    __asm__ __volatile__ ("msr daifset, #0xf" : : : "memory");
+
+    // 5. Ensure MMU and Data Cache are disabled before handoff if running with MMU enabled
+    if (CurrentElVal == 2) {
+      UINT64 SctlrEl2;
+      __asm__ __volatile__ ("mrs %0, sctlr_el2" : "=r" (SctlrEl2));
+      if ((SctlrEl2 & 0x5ULL) != 0) { // Bit 0 (M), Bit 2 (C)
+        SctlrEl2 &= ~0x5ULL;
+        __asm__ __volatile__ ("msr sctlr_el2, %0\n\tisb" : : "r" (SctlrEl2) : "memory");
+      }
+    } else if (CurrentElVal == 1) {
+      UINT64 SctlrEl1;
+      __asm__ __volatile__ ("mrs %0, sctlr_el1" : "=r" (SctlrEl1));
+      if ((SctlrEl1 & 0x5ULL) != 0) { // Bit 0 (M), Bit 2 (C)
+        SctlrEl1 &= ~0x5ULL;
+        __asm__ __volatile__ ("msr sctlr_el1, %0\n\tisb" : : "r" (SctlrEl1) : "memory");
+      }
+    }
+
+    // 6. Invalidate instruction caches and flush pipeline to Point of Unification
+    __asm__ __volatile__ ("ic iallu\n\tdsb sy\n\tisb" : : : "memory");
+
     // Calling convention for Linux ARM64 kernel (Documentation/arm64/booting.rst):
     // Execution begins at the very first instruction of the Image (offset +0x00 / code0).
     // text_offset in the header specifies load offset relative to 2 MiB alignment, NOT an offset within Image.
     // x0 = Physical address of Device Tree Blob (FDT)
     // x1 = 0, x2 = 0, x3 = 0 (Reserved)
+    // Terminal branch into ARM64 Linux Kernel via dedicated assembly routine:
+    // Establishes exact register handoff convention (x0=DTB, x1=x2=x3=0, x4-x30=0, SP aligned, MMU/Caches disabled).
     KernelCandidate = KernelRunBase;
-    LinuxEntry = (LINUX_ENTRY_POINT)(UINTN)KernelCandidate;
-    LinuxEntry(ValidatedDtbBase, 0, 0, 0);
+    ArmLaunchLinuxKernel(KernelCandidate, ValidatedDtbBase);
   }
 
   // In production firmware without embedded kernel, handoff is completed via BDS/LinuxBoot

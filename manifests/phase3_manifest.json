@@ -3,7 +3,7 @@
   "device": "Samsung Galaxy S20 FE 5G (SM-G781B)",
   "codename": "r8q",
   "soc": "Qualcomm Snapdragon 865 (SM8250)",
-  "generated_at": "2026-11-22T13:52:46.084186+00:00",
+  "generated_at": "2026-11-23T19:33:26.101719+00:00",
   "security_policy": "Strict zero-private-key credential isolation",
   "files": [
     {
@@ -503,8 +503,8 @@
     },
     {
       "path": "config/kernel_r8q_defconfig",
-      "size_bytes": 4956,
-      "sha256": "6f72d1dede1df29e76a144c5e8523829893415e01333ae87b4a31ea42a3716f8"
+      "size_bytes": 5227,
+      "sha256": "0b24361212a1c7958915fe31390d55ea99a98894c7a6c1869c5e24a24fb446ed"
     },
     {
       "path": "config/platform.env",
@@ -548,8 +548,8 @@
     },
     {
       "path": "scripts/build_initramfs.sh",
-      "size_bytes": 14134,
-      "sha256": "a8018d315c74ce174693a2a80c2db421862d1e264e4d577e18128cf584eaf697"
+      "size_bytes": 14246,
+      "sha256": "8285ead2474547ebb1c1023c8330459adca1ab0248df5d9ec9a9c49a1b975e83"
     },
     {
       "path": "scripts/build_kernel.sh",
@@ -573,8 +573,8 @@
     },
     {
       "path": "scripts/package_complete_boot_img.py",
-      "size_bytes": 9729,
-      "sha256": "0b8fde81207558f1d44e50d981f51e8603fa797ac5de37f194308b839e80a32e"
+      "size_bytes": 9602,
+      "sha256": "93412b802893a4dce4678772e7a81efb5245a8b76339c21dd1e41393aaad1bac"
     },
     {
       "path": "scripts/run_qemu_test.sh",
@@ -613,23 +613,23 @@
     },
     {
       "path": "tests/test_phase3_4_master_integration.py",
-      "size_bytes": 22910,
-      "sha256": "c8a31408645191c706912ec6902bd71aff5ab75dd183df59bdbd436fb7fed902"
+      "size_bytes": 22594,
+      "sha256": "a991c47c67c6d87eba5f303ef5c35d119df94bbc031a3459e9d942de78955c2b"
     },
     {
       "path": "tests/test_phase3_5_1_remediation.py",
-      "size_bytes": 12437,
-      "sha256": "aae0eac425cfa5a44734a042e23012e5820ddad8723edb8c9bd238c4b439696a"
+      "size_bytes": 12283,
+      "sha256": "b89cf0d57176b46080c7f66ffbd573d5f3d6e4d9e665646ceeac66852a2bcb0f"
     },
     {
       "path": "tests/test_phase3_6a_10_audit.py",
-      "size_bytes": 19901,
-      "sha256": "f52abc157784fa1c8e85d4c5a6e64853db09956c1b126ba136fd5a64e0fcb21b"
+      "size_bytes": 19533,
+      "sha256": "ebf5165a53179a25da17c605e3302dbcd95b4a803bb75e128d317d56d1c9b07f"
     },
     {
       "path": "tests/test_phase3_6a_1_verification.py",
-      "size_bytes": 8103,
-      "sha256": "0aceb91c7adea28075746ada8ab6228186add6028bf3d8cc3fb8eb9bc1b59892"
+      "size_bytes": 8095,
+      "sha256": "11e9c8328588b1629062fe9ec6ac54a03ac49f76be07ae7259b0697a224ec66f"
     },
     {
       "path": "tests/test_phase3_6a_2_validation.py",
@@ -643,33 +643,33 @@
     },
     {
       "path": "tests/test_phase3_6a_4_audit.py",
-      "size_bytes": 11753,
-      "sha256": "afb4b289a181408cf50233c2c368e5612216d5e502c8b06f7794921baea88b71"
+      "size_bytes": 11824,
+      "sha256": "255c464bd4f9311835a5959a2fb36cd388d7c48b2ae55172a0b4c1a2036151b8"
     },
     {
       "path": "tests/test_phase3_6a_5_audit.py",
-      "size_bytes": 8535,
-      "sha256": "2c28df5a7309648a95ccc75161ca918a8e7b133da8f965f3cf26143ba7396c96"
+      "size_bytes": 8621,
+      "sha256": "35a9db7eb43452491469db9c037d44e5a656b5d77ccf8cbe0e845097930a28dd"
     },
     {
       "path": "tests/test_phase3_6a_6_audit.py",
-      "size_bytes": 9304,
-      "sha256": "c2598b07c8790ecdd2b6a529cfe0f44b26be15dbfc3b7d328adf75d4eab3277f"
+      "size_bytes": 9380,
+      "sha256": "a5e92fdbfd4bbc0e0ee22dda4a25c7f1230084ac60f1b793ad75d93460200f7f"
     },
     {
       "path": "tests/test_phase3_6a_7_audit.py",
-      "size_bytes": 10354,
-      "sha256": "8b60f3316f6e2a0ba1af543e46faa08dc9fa1f0f4fd047d5ab394758c50a8bfa"
+      "size_bytes": 10462,
+      "sha256": "7946ffcca19f7b03f8606042271b49843df08263484a57d7e35cb96af6831e14"
     },
     {
       "path": "tests/test_phase3_6a_8_audit.py",
-      "size_bytes": 13679,
-      "sha256": "71e1afc36348b9a78156384e3482a700191e8c8c1620b73d755080e0d788a20a"
+      "size_bytes": 13761,
+      "sha256": "3915f36c36fb7e3a2be6586cd61aa146eb02b919361ff3409f4e78e71b080b34"
     },
     {
       "path": "tests/test_phase3_6a_9_audit.py",
-      "size_bytes": 14960,
-      "sha256": "bd1768cb69a506a15fd25331e2b9bd9c11656f8d0a6f1904598d2cd24ba16453"
+      "size_bytes": 15010,
+      "sha256": "6f1d93dfa72c2e8998f63a85effabb9635896b948055b71e29832dc56678b4ac"
     },
     {
       "path": "tests/test_qemu_phase2_validation.py",
@@ -723,23 +723,23 @@
     },
     {
       "path": "tests/__pycache__/test_phase3_4_master_integration.cpython-314.pyc",
-      "size_bytes": 25311,
-      "sha256": "f2a5eac6c6f2ab8be69081937bc0767f17410ac03ca4304b8b16bee6e4179da6"
+      "size_bytes": 24980,
+      "sha256": "63d6eb90a69a21a8a07eb791328d43bd5542aec6a90e32e2dc11e654c388220c"
     },
     {
       "path": "tests/__pycache__/test_phase3_5_1_remediation.cpython-314.pyc",
-      "size_bytes": 15440,
-      "sha256": "23bc2b967b1f3bebdd8e37c3b4ff5d12ff62c53b08dfd7aaf069ac907c18d9e1"
+      "size_bytes": 15270,
+      "sha256": "7ca55dd1f9e3bda0524877406aa6f8235026a6221865f3fc45188ee66c6050e9"
     },
     {
       "path": "tests/__pycache__/test_phase3_6a_10_audit.cpython-314.pyc",
-      "size_bytes": 24852,
-      "sha256": "5bb96c7704644f0b34d0751e145cd6148c3a16f3114e7be5680fcfb507a99033"
+      "size_bytes": 24531,
+      "sha256": "8847a95e206947519b987e10cbd9a999184ae4d06f9ca94a0d849025247525d3"
     },
     {
       "path": "tests/__pycache__/test_phase3_6a_1_verification.cpython-314.pyc",
-      "size_bytes": 10002,
-      "sha256": "6e3609e5b3daa57abf9d0313d99250d38288431f895bb15c13cbd139d2e89852"
+      "size_bytes": 10000,
+      "sha256": "2fb8e198f5b750f23b0cd065c94ad0cb4de0eeb8c5bc24d57a54cf418690df84"
     },
     {
       "path": "tests/__pycache__/test_phase3_6a_2_validation.cpython-314.pyc",
@@ -753,33 +753,33 @@
     },
     {
       "path": "tests/__pycache__/test_phase3_6a_4_audit.cpython-314.pyc",
-      "size_bytes": 12426,
-      "sha256": "0d7cef81971871bc5f25dbaaf06ab5a5d239bcac9f79c7086dded7f36a6b54b3"
+      "size_bytes": 12561,
+      "sha256": "fb2422bc2c394fb8e16880b103465aa3f8e3357d2e4da136f6672c5aaed3da4b"
     },
     {
       "path": "tests/__pycache__/test_phase3_6a_5_audit.cpython-314.pyc",
-      "size_bytes": 10216,
-      "sha256": "48cdb0854921bf7af01352a5c977a16dedd1edbea3b5466e823d51510f02970e"
+      "size_bytes": 10372,
+      "sha256": "62023a662dccb2d7e43b2da32369163329f21a6d341351f5417bd71a28fad273"
     },
     {
       "path": "tests/__pycache__/test_phase3_6a_6_audit.cpython-314.pyc",
-      "size_bytes": 11850,
-      "sha256": "5761686c1956570ce57a16f4cb7e59c96eed87489291c105672cef2f7996dec4"
+      "size_bytes": 12003,
+      "sha256": "4221ab82bec7a101cb44b04ded38d325f34f85b49470cf76246aa915ae75110f"
     },
     {
       "path": "tests/__pycache__/test_phase3_6a_7_audit.cpython-314.pyc",
-      "size_bytes": 12938,
-      "sha256": "06b12a19cc51b935e8f4ceb5666d33f4c8f18dc905ecd1dee4d3a9d93bc436f5"
+      "size_bytes": 13118,
+      "sha256": "3a4867b82e4c3b09670d20c05ad6bfbca35ce222a18d6f8222e2152379ad6b58"
     },
     {
       "path": "tests/__pycache__/test_phase3_6a_8_audit.cpython-314.pyc",
-      "size_bytes": 19697,
-      "sha256": "39c3fcd6c971994b762b238860f927b6aff2b5b7b3429ce81de9f1d68efc8acf"
+      "size_bytes": 19866,
+      "sha256": "f24d2e39b7ce7f27c6aed8e2873e24ff9789aaa6baf134838c60949ce0905d2b"
     },
     {
       "path": "tests/__pycache__/test_phase3_6a_9_audit.cpython-314.pyc",
-      "size_bytes": 21049,
-      "sha256": "ebb1522cb0aa3a2d9828464fca944d441c6920a153ba15d294d83c89093bbf65"
+      "size_bytes": 21163,
+      "sha256": "964aa9a3e56ef379b4e58070e01070e3bf0bcf41897021a4830ce123e21bf58a"
     },
     {
       "path": "tests/__pycache__/test_phase3_hardware_readiness.cpython-314.pyc",
@@ -843,13 +843,13 @@
     },
     {
       "path": "platform/R8QPkg/PrePi/ModuleEntryPoint.S",
-      "size_bytes": 4480,
-      "sha256": "e1aa47333d7ed59b5c117147021aeeea9417ecacf2e77a208792f795c502c26e"
+      "size_bytes": 12029,
+      "sha256": "3dff9a877f66265690d5a9560be19bc65f08d8170c26353c1c6498ad854f5ce0"
     },
     {
       "path": "platform/R8QPkg/PrePi/PrePi.c",
-      "size_bytes": 20599,
-      "sha256": "692e694f5cca5aa5699c3dca46d05d3f4bc04fc8835226b3cb8ef5a45970e7ab"
+      "size_bytes": 31097,
+      "sha256": "09f528aef370603cf81e1ecba5aff75ac3e6002ef32f797e694131bc8a347e79"
     },
     {
       "path": "platform/R8QPkg/PrePi/PrePi.inf",
@@ -1058,13 +1058,13 @@
     },
     {
       "path": "build/Image",
-      "size_bytes": 16802304,
-      "sha256": "411f9062ff29324e57c4afd08c6c228c777c2d6eae60d5b075c988b29c19c3c1"
+      "size_bytes": 17197568,
+      "sha256": "d8e4401e1b3bc16b86e7063f339a42ca1f44076e496d66a172421dc673f3a661"
     },
     {
       "path": "build/R8Q_EFI.fd",
       "size_bytes": 4194304,
-      "sha256": "b1d5cf8aac58fdd81e90a33b5a980e2d485618e47e2d734a9d7a12775e6b04f1"
+      "sha256": "b539a600d09162f55000b460349294ef310cb340e234252cb2b3828ca3df4dd6"
     },
     {
       "path": "build/esp.img",
@@ -1079,7 +1079,7 @@
     {
       "path": "build/r8q-rootfs.ext4",
       "size_bytes": 2147483648,
-      "sha256": "45058f0b94d5dbe52156c6c560ee61fac85d3d3fea977a65e7d8d3345160dba6"
+      "sha256": "d1cec20f4a71b96ed415e215b470d73b7998d88e3a9540e1114c200d864844a4"
     },
     {
       "path": "build/r8q-rootfs.tar.gz",
@@ -1088,13 +1088,13 @@
     },
     {
       "path": "build/r8q-uefi-boot-complete.img",
-      "size_bytes": 24068096,
-      "sha256": "029b83f6036909ae55eeb3975ff33dba70ae943827cacdcd2ec29099a49f06db"
+      "size_bytes": 24461312,
+      "sha256": "b2d6f721fe52633e4bee4e1a626514fc5cbe166102803d8b6f0a5c581c5cb100"
     },
     {
       "path": "build/r8q-uefi-boot-poc.img",
       "size_bytes": 4202496,
-      "sha256": "930b206466033272877ef5c939083992492c2ae31ab4eb6b832cb8f876957d5d"
+      "sha256": "d6867ae77d0cac46fff3f12832878d797908e7d7561b1cb3c4644f3cf2f9b188"
     },
     {
       "path": "build/r8q.dtb",

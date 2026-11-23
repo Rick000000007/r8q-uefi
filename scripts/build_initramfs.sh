@@ -9,7 +9,10 @@ PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BUILD_DIR="$PROJECT_ROOT/build"
 INITRAMFS_ROOT="/tmp/r8q_initramfs_root"
 OUTPUT_IMG="$BUILD_DIR/initramfs.img"
-MODULES_SRC="/tmp/extracted_modules/usr/lib/modules/7.2.15+kali-arm64"
+MODULES_SRC="/tmp/r8q_rootfs_staging/usr/lib/modules/7.2.15+kali-arm64"
+if [ ! -d "$MODULES_SRC" ]; then
+    MODULES_SRC="/tmp/extracted_modules/usr/lib/modules/7.2.15+kali-arm64"
+fi
 
 echo "=========================================================="
 echo "   PROJECT R8Q: NATIVE LINUX INITRAMFS GENERATOR"

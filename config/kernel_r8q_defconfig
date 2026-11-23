@@ -215,3 +215,12 @@ CONFIG_PRINTK_TIME=y
 CONFIG_EARLY_PRINTK=y
 CONFIG_DEBUG_FS=y
 CONFIG_MAGIC_SYSRQ=y
+
+# Generic and Qualcomm QMP UFS PHY (Mandatory for SM8250 UFS Link Startup)
+CONFIG_GENERIC_PHY=y
+CONFIG_PHY_QCOM_QMP=y
+CONFIG_PHY_QCOM_QMP_UFS=y
+
+# Kernel Release and Module Vermagic Synchronization
+CONFIG_LOCALVERSION="+kali-arm64"
+# CONFIG_LOCALVERSION_AUTO is not set

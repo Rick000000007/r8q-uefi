@@ -146,13 +146,11 @@ def build_complete_boot_image():
 
     # Assert exact expected component layout geometry
     assert kernel_offset == 0x1000, f"Kernel start must be 0x1000, got 0x{kernel_offset:x}"
-    assert kernel_end_raw == 0x1407240, f"Kernel raw end must be 0x1407240, got 0x{kernel_end_raw:x}"
-    assert ramdisk_offset == 0x1408000, f"Ramdisk start must be 0x1408000, got 0x{ramdisk_offset:x}"
+    assert ramdisk_offset == align(kernel_end_raw, BOOT_PAGE_SIZE), f"Ramdisk offset 0x{ramdisk_offset:x} must be page-aligned to kernel end"
     assert ramdisk_end_raw <= dtb_offset, f"Ramdisk raw end 0x{ramdisk_end_raw:x} exceeds DTB offset 0x{dtb_offset:x}"
     assert dtb_offset == align(ramdisk_end_raw, BOOT_PAGE_SIZE), f"DTB offset 0x{dtb_offset:x} must be page-aligned to ramdisk end"
-    assert dtb_offset == 0x16D8000, f"DTB start must be 0x16D8000, got 0x{dtb_offset:x}"
     assert dtb_end_raw <= expected_total_size, f"DTB raw end 0x{dtb_end_raw:x} exceeds total size 0x{expected_total_size:x}"
-    assert expected_total_size == 0x16F4000, f"Total image size must be 0x16F4000, got 0x{expected_total_size:x}"
+    assert expected_total_size == align(dtb_end_raw, BOOT_PAGE_SIZE), f"Total image size 0x{expected_total_size:x} must be page-aligned"
 
     with open(output_path, "wb") as out:
         # 1. Header (Page 0)

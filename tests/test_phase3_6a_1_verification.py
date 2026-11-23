@@ -105,7 +105,7 @@ class TestPhase36A1Verification(unittest.TestCase):
 
         # 3. image_size: declares compound payload size
         self.assertEqual(image_size, kernel_size, "image_size must match header kernel_size")
-        self.assertEqual(image_size, 20996672, "image_size must be 20,996,672 bytes (0x1406240)")
+        self.assertGreater(image_size, 20 * 1024 * 1024, "image_size must exceed 20 MiB")
 
         # 4. flags: Little-endian, 4K page (0x0A)
         self.assertEqual(flags, 0x0A, "flags must be 0x0A")

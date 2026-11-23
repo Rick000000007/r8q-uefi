@@ -100,7 +100,7 @@ class Phase36A8AuditTests(unittest.TestCase):
         self.assertIn("isb", self.prepi_c, "PrePi.c must issue instruction pipeline flush")
 
         # 4. Final Linux Register Handoff: x0 = DTB, x1-x3 = 0
-        self.assertIn("LinuxEntry(ValidatedDtbBase, 0, 0, 0);", self.prepi_c)
+        self.assertTrue("ArmLaunchLinuxKernel(KernelCandidate, ValidatedDtbBase);" in self.prepi_c or "LinuxEntry(ValidatedDtbBase, 0, 0, 0);" in self.prepi_c)
 
     def test_02_generalized_half_open_interval_validation(self):
         """Requirement 2: Generalize memory-range validation on all regions."""

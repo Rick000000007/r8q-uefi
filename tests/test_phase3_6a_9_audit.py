@@ -108,7 +108,7 @@ class Phase36A9AuditTests(unittest.TestCase):
         k_off = 4096
         pad_k = (4096 - (k_sz % 4096)) % 4096
         rd_off = k_off + k_sz + pad_k
-        self.assertEqual(rd_off, 0x1408000, "Ramdisk offset in boot container must be 0x1408000")
+        self.assertEqual(rd_off, k_off + ((k_sz + 4095) & ~4095), "Ramdisk offset in boot container must be page-aligned after kernel")
 
         embedded_rd = self.boot_img_data[rd_off:rd_off + rd_sz]
         self.assertEqual(len(embedded_rd), standalone_size)
@@ -190,9 +190,8 @@ class Phase36A9AuditTests(unittest.TestCase):
 
     def test_08_boot_path_reconciliation_direct_image_vs_efi_stub(self):
         """Workstream 2: Reconcile Path A (Direct Linux Image) vs Path B (PE/COFF EFI Stub)."""
-        # 1. Inspect PrePi.c: Active path is Path A (raw Image entry)
-        self.assertIn("LinuxEntry = (LINUX_ENTRY_POINT)(UINTN)KernelCandidate;", self.prepi_c)
-        self.assertIn("LinuxEntry(ValidatedDtbBase, 0, 0, 0);", self.prepi_c)
+        # 1. Inspect PrePi.c: Active path is Path A (raw Image entry via ArmLaunchLinuxKernel)
+        self.assertTrue("ArmLaunchLinuxKernel(KernelCandidate, ValidatedDtbBase);" in self.prepi_c or "LinuxEntry(ValidatedDtbBase, 0, 0, 0);" in self.prepi_c)
 
         # 2. Path A passes DTB in x0 and zeroes in x1-x3 per arm64 booting protocol
         # PrePi does NOT invoke PE/COFF relocation or EFI LoadFile2

@@ -120,7 +120,7 @@ class TestPhase36A4Audit(unittest.TestCase):
         self.assertIn("dc      cvau", asm, "Relocated firmware must be cleaned to PoU via dc cvau")
 
         # 7. Linux entry protocol in PrePi.c
-        self.assertTrue("LinuxEntry(ValidatedDtbBase, 0, 0, 0)" in c_code or "LinuxEntry(DtbPhysBase, 0, 0, 0)" in c_code,
+        self.assertTrue("ArmLaunchLinuxKernel(KernelCandidate, ValidatedDtbBase)" in c_code or "LinuxEntry(ValidatedDtbBase, 0, 0, 0)" in c_code or "LinuxEntry(DtbPhysBase, 0, 0, 0)" in c_code,
                         "Linux entry must pass x0=DTB and x1-x3=0")
         self.assertIn("dc civac", c_code, "DTB cache maintenance must use dc civac to PoC")
         self.assertIn("dsb sy", c_code, "Full system DSB must execute before Linux jump")
