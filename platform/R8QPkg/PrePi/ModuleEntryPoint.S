@@ -238,21 +238,21 @@ real_entry_point:
 .align 4
 
 ArmLaunchLinuxKernel:
-    // 1. Move arguments to callee-saved registers
-    mov     x19, x0                     // x19 = Kernel entry point
-    mov     x20, x1                     // x20 = DTB physical base
+    // Arguments:
+    //   x0 = Kernel entry point (physical address of Linux Image, offset +0x00 / code0)
+    //   x1 = Validated Device Tree Blob physical base address
 
-    // 2. Mask all interrupts (Debug, SError, IRQ, FIQ)
+    // 1. Mask all interrupts (Debug, SError, IRQ, FIQ)
     msr     daifset, #0xf
 
-    // 3. Ensure 16-byte stack alignment per AAPCS64
+    // 2. Ensure 16-byte stack alignment per AAPCS64
     mov     x2, sp
     bic     x2, x2, #0xf
     mov     sp, x2
 
-    // 4. Check Current Exception Level (CurrentEL[3:2])
+    // 3. Inspect Current Exception Level (CurrentEL[3:2])
     mrs     x2, CurrentEL
-    lsr     x2, x2, #2
+    lsr     x2, x2, #2                  // 1=EL1, 2=EL2
     cmp     x2, #2
     b.eq    .Lhandoff_el2
     cmp     x2, #1
@@ -266,6 +266,11 @@ ArmLaunchLinuxKernel:
     bic     x3, x3, #(1 << 0)           // Clear M (MMU disabled)
     bic     x3, x3, #(1 << 2)           // Clear C (Data cache disabled)
     msr     sctlr_el2, x3
+    isb
+
+    // Invalidate EL2 TLB
+    tlbi    alle2
+    dsb     sy
     isb
 
     // Configure HCR_EL2: Set RW (Bit 31) = 1 to mandate AArch64 state for EL1
@@ -283,6 +288,18 @@ ArmLaunchLinuxKernel:
     // Disable coprocessor/FP/SIMD traps in CPTR_EL2
     msr     cptr_el2, xzr
     isb
+
+    // Program Exception Link Register (ELR_EL2) with Kernel Entry Address
+    msr     elr_el2, x0
+
+    // Program Saved Program Status Register (SPSR_EL2):
+    //   M[3:0] = 0b1001 (EL2h: Exception Level 2 with SP_EL2)
+    //   M[4]   = 0 (AArch64 execution state)
+    //   DAIF   = 0b1111 (Debug, SError, IRQ, FIQ masked: bits [9:6] = 0x3C0)
+    //   Value  = 0x3C9
+    mov     x3, #0x3C9
+    msr     spsr_el2, x3
+    isb
     b       .Ldo_kernel_jump
 
 .Lhandoff_el1:
@@ -294,29 +311,48 @@ ArmLaunchLinuxKernel:
     msr     sctlr_el1, x3
     isb
 
+    // Invalidate EL1 TLB
+    tlbi    vmalle1
+    dsb     sy
+    isb
+
     // Enable FP/SIMD coprocessor access in CPACR_EL1 (Bits [21:20] = 0b11)
     mrs     x3, cpacr_el1
     orr     x3, x3, #(0x3 << 20)
     msr     cpacr_el1, x3
     isb
 
+    // Program Exception Link Register (ELR_EL1) with Kernel Entry Address
+    msr     elr_el1, x0
+
+    // Program Saved Program Status Register (SPSR_EL1):
+    //   M[3:0] = 0b0101 (EL1h: Exception Level 1 with SP_EL1)
+    //   M[4]   = 0 (AArch64 execution state)
+    //   DAIF   = 0b1111 (Debug, SError, IRQ, FIQ masked: bits [9:6] = 0x3C0)
+    //   Value  = 0x3C5
+    mov     x3, #0x3C5
+    msr     spsr_el1, x3
+    isb
+
 .Ldo_kernel_jump:
-    // 5. Invalidate all instruction caches to Point of Unification (PoU)
+    // Invalidate all instruction caches to Point of Unification (PoU)
     ic      iallu
-    dsb     sy                          // Ensure I-cache invalidation completes
+    dsb     sy                          // Ensure I-cache and TLB operations complete
     isb                                 // Flush CPU instruction pipeline
 
-    // 6. Establish authoritative ARM64 Linux Register Handoff Convention:
+    // Establish authoritative ARM64 Linux Register Handoff Convention:
+    // Documentation/arch/arm64/booting.rst:
     //   x0 = Physical address of Device Tree Blob (must be 8-byte aligned)
     //   x1 = 0 (Reserved for future use)
     //   x2 = 0 (Reserved for future use)
     //   x3 = 0 (Reserved for future use)
-    mov     x0, x20                     // x0 = DTB physical base
+    //   x4..x30 = 0 (All general-purpose registers zeroed)
+    mov     x0, x1                      // x0 = DTB physical base (from incoming x1)
     mov     x1, xzr                     // x1 = 0
     mov     x2, xzr                     // x2 = 0
     mov     x3, xzr                     // x3 = 0
 
-    // Clear remaining scratch registers
+    // Clear remaining general-purpose registers
     mov     x4, xzr
     mov     x5, xzr
     mov     x6, xzr
@@ -332,7 +368,8 @@ ArmLaunchLinuxKernel:
     mov     x16, xzr
     mov     x17, xzr
     mov     x18, xzr
-    mov     x20, xzr
+    mov     x19, xzr                    // x19 = 0 (100% compliant, entry address in ELR_ELx)
+    mov     x20, xzr                    // x20 = 0
     mov     x21, xzr
     mov     x22, xzr
     mov     x23, xzr
@@ -344,5 +381,7 @@ ArmLaunchLinuxKernel:
     mov     x29, xzr                    // Frame pointer = 0 (top-of-stack)
     mov     x30, xzr                    // Link register = 0 (no return)
 
-    // 7. Terminal Branch directly to Linux Image (offset 0x00 / code0)
-    br      x19                         // Never returns
+    // Terminal Exception Return directly to Linux Image:
+    // Transitions atomically to Target PC from ELR_ELx and PSTATE from SPSR_ELx.
+    // ZERO general-purpose registers retain the kernel entry address!
+    eret

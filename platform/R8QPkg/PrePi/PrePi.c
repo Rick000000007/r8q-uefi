@@ -773,13 +773,24 @@ CEntryPoint (
       }
     }
 
+    // 4. Perform Point-of-Coherence (PoC) cache maintenance for early stack envelope [0x9E880000, 0x9E890000)
+    {
+      UINT64 StackCleanAddr = FIRMWARE_STACK_BASE & ~(CacheLineSize - 1);
+      UINT64 StackCleanLimit = (FIRMWARE_STACK_TOP + CacheLineSize - 1) & ~(CacheLineSize - 1);
+      if (StackCleanLimit <= DRAM_LIMIT_PHYS && StackCleanLimit > StackCleanAddr) {
+        for (; StackCleanAddr < StackCleanLimit; StackCleanAddr += CacheLineSize) {
+          __asm__ __volatile__ ("dc civac, %0" : : "r" (StackCleanAddr) : "memory");
+        }
+      }
+    }
+
     // Full system data barrier and instruction pipeline barrier before kernel branch
     __asm__ __volatile__ ("dsb sy\n\tisb" : : : "memory");
 
-    // 4. Ensure all interrupts are masked per Linux ARM64 Boot Protocol (DAIF = 0xF)
+    // 5. Ensure all interrupts are masked per Linux ARM64 Boot Protocol (DAIF = 0xF)
     __asm__ __volatile__ ("msr daifset, #0xf" : : : "memory");
 
-    // 5. Ensure MMU and Data Cache are disabled before handoff if running with MMU enabled
+    // 6. Ensure MMU and Data Cache are disabled before handoff if running with MMU enabled
     if (CurrentElVal == 2) {
       UINT64 SctlrEl2;
       __asm__ __volatile__ ("mrs %0, sctlr_el2" : "=r" (SctlrEl2));
@@ -787,6 +798,8 @@ CEntryPoint (
         SctlrEl2 &= ~0x5ULL;
         __asm__ __volatile__ ("msr sctlr_el2, %0\n\tisb" : : "r" (SctlrEl2) : "memory");
       }
+      // Invalidate EL2 TLB to prevent stale address translations
+      __asm__ __volatile__ ("tlbi alle2\n\tdsb sy\n\tisb" : : : "memory");
     } else if (CurrentElVal == 1) {
       UINT64 SctlrEl1;
       __asm__ __volatile__ ("mrs %0, sctlr_el1" : "=r" (SctlrEl1));
@@ -794,9 +807,11 @@ CEntryPoint (
         SctlrEl1 &= ~0x5ULL;
         __asm__ __volatile__ ("msr sctlr_el1, %0\n\tisb" : : "r" (SctlrEl1) : "memory");
       }
+      // Invalidate EL1 TLB to prevent stale address translations
+      __asm__ __volatile__ ("tlbi vmalle1\n\tdsb sy\n\tisb" : : : "memory");
     }
 
-    // 6. Invalidate instruction caches and flush pipeline to Point of Unification
+    // 7. Invalidate instruction caches and flush pipeline to Point of Unification
     __asm__ __volatile__ ("ic iallu\n\tdsb sy\n\tisb" : : : "memory");
 
     // Calling convention for Linux ARM64 kernel (Documentation/arm64/booting.rst):

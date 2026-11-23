@@ -271,7 +271,9 @@ class Phase36A9AuditTests(unittest.TestCase):
         # 1. Verify EL1 system registers used in early assembly
         self.assertIn("cpacr_el1", self.asm, "ModuleEntryPoint.S must configure CPACR_EL1")
         self.assertIn("daifset", self.asm, "ModuleEntryPoint.S must mask DAIF interrupts")
-        self.assertNotIn("eret", self.asm, "ModuleEntryPoint.S must not execute eret (no EL2 transition in firmware)")
+        early_asm = self.asm.split("ArmLaunchLinuxKernel:")[0]
+        self.assertNotIn("eret", early_asm, "ModuleEntryPoint.S must not execute eret during early firmware entry")
+        self.assertIn("eret", self.asm, "ArmLaunchLinuxKernel must execute eret for zero-register Linux handoff")
 
         # 2. Verify audit deliverable exists and contains all required classifications
         self.assertTrue(os.path.isfile(AUDIT_DOC))

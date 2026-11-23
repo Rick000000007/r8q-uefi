@@ -3,7 +3,7 @@
   "device": "Samsung Galaxy S20 FE 5G (SM-G781B)",
   "codename": "r8q",
   "soc": "Qualcomm Snapdragon 865 (SM8250)",
-  "generated_at": "2026-11-23T19:33:26.101719+00:00",
+  "generated_at": "2026-11-23T19:52:41.979846+00:00",
   "security_policy": "Strict zero-private-key credential isolation",
   "files": [
     {
@@ -668,8 +668,8 @@
     },
     {
       "path": "tests/test_phase3_6a_9_audit.py",
-      "size_bytes": 15010,
-      "sha256": "6f1d93dfa72c2e8998f63a85effabb9635896b948055b71e29832dc56678b4ac"
+      "size_bytes": 15184,
+      "sha256": "15cbd11d59012b2dfa3a33cb221b0ad68132abe36ce978b35a3226eb423c7d3d"
     },
     {
       "path": "tests/test_qemu_phase2_validation.py",
@@ -778,8 +778,8 @@
     },
     {
       "path": "tests/__pycache__/test_phase3_6a_9_audit.cpython-314.pyc",
-      "size_bytes": 21163,
-      "sha256": "964aa9a3e56ef379b4e58070e01070e3bf0bcf41897021a4830ce123e21bf58a"
+      "size_bytes": 21420,
+      "sha256": "141ddcac1802f720f083f294c02fc7551f479c39272f39907e1edfb2662413c3"
     },
     {
       "path": "tests/__pycache__/test_phase3_hardware_readiness.cpython-314.pyc",
@@ -843,13 +843,13 @@
     },
     {
       "path": "platform/R8QPkg/PrePi/ModuleEntryPoint.S",
-      "size_bytes": 12029,
-      "sha256": "3dff9a877f66265690d5a9560be19bc65f08d8170c26353c1c6498ad854f5ce0"
+      "size_bytes": 13382,
+      "sha256": "72c8939200fac525d83f80d8d10dc8ccdb76650b20e666b4b7bfcacf1a52cde0"
     },
     {
       "path": "platform/R8QPkg/PrePi/PrePi.c",
-      "size_bytes": 31097,
-      "sha256": "09f528aef370603cf81e1ecba5aff75ac3e6002ef32f797e694131bc8a347e79"
+      "size_bytes": 31946,
+      "sha256": "bf105403f73c76466e8ca177d85ef3eb543e5d6c00c60f4d5b9b9adfa017f1e4"
     },
     {
       "path": "platform/R8QPkg/PrePi/PrePi.inf",
