@@ -1,0 +1,3 @@
+# Project R8Q LineageOS Recovery Updater Script
+# Execution is handled by update-binary shell script.
+ui_print("Project R8Q Native Debian 12 ARM64 Recovery Installer");

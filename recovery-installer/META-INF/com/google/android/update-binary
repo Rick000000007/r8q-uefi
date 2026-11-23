@@ -1,0 +1,211 @@
+#!/system/bin/sh
+# ==============================================================================
+# PROJECT R8Q: LINEAGEOS RECOVERY USB OTG INSTALLER
+# Target Device: Samsung Galaxy S20 FE 5G (SM-G781B / r8q)
+# Target Slot:   /dev/block/by-name/recovery (sda24)
+# Artifact:      r8q-uefi-boot-complete.img (24,461,312 Bytes)
+# ==============================================================================
+
+OUTFD=$2
+ZIP_PATH="$3"
+
+ui_print() {
+    if [ -n "$OUTFD" ] && [ -e "/proc/self/fd/$OUTFD" ]; then
+        echo -e "ui_print $1
+ui_print" > "/proc/self/fd/$OUTFD"
+    else
+        echo "$1"
+    fi
+}
+
+set_progress() {
+    if [ -n "$OUTFD" ] && [ -e "/proc/self/fd/$OUTFD" ]; then
+        echo -e "set_progress $1" > "/proc/self/fd/$OUTFD"
+    fi
+}
+
+ui_print "=================================================="
+ui_print "  PROJECT R8Q: NATIVE DEBIAN 12 ARM64 INSTALLER   "
+ui_print "  Target: Samsung Galaxy S20 FE 5G (SM-G781B)     "
+ui_print "  Environment: LineageOS Recovery (Android)       "
+ui_print "=================================================="
+
+set_progress 0.1
+
+# 1. Device Verification
+ui_print "[STEP 1/6] Verifying target device hardware..."
+DEV="$(getprop ro.product.device)"
+[ -z "$DEV" ] && DEV="$(getprop ro.product.system.device)"
+[ -z "$DEV" ] && DEV="$(getprop ro.build.product)"
+
+MODEL="$(getprop ro.product.model)"
+[ -z "$MODEL" ] && MODEL="$(getprop ro.product.system.model)"
+
+ui_print "  Detected Device: $DEV ($MODEL)"
+
+MATCH=0
+case "$DEV" in
+    r8q|r8qxx|SM-G781B|SM-G780G) MATCH=1 ;;
+esac
+
+case "$MODEL" in
+    *G781*|*G780*) MATCH=1 ;;
+esac
+
+if [ "$MATCH" -ne 1 ]; then
+    ui_print "ERROR: Device verification failed!"
+    ui_print "Expected 'r8q' (SM-G781B / SM-G780G), but found: $DEV ($MODEL)"
+    ui_print "Aborting installation to prevent hardware damage."
+    exit 1
+fi
+ui_print "  Device verification PASSED."
+set_progress 0.25
+
+# 2. Destination Partition Resolution & Bounds Verification
+ui_print "[STEP 2/6] Auditing destination partition metadata..."
+TARGET_PART="/dev/block/bootdevice/by-name/recovery"
+if [ ! -e "$TARGET_PART" ]; then
+    TARGET_PART="/dev/block/by-name/recovery"
+fi
+
+if [ ! -e "$TARGET_PART" ]; then
+    ui_print "ERROR: Destination partition '$TARGET_PART' does not exist!"
+    exit 2
+fi
+
+REAL_DEV="$(readlink -f "$TARGET_PART" 2>/dev/null || echo "$TARGET_PART")"
+ui_print "  Target block node: $TARGET_PART -> $REAL_DEV"
+
+# Strict Zero-Gap sda25 keyrefuge Safety Guard
+case "$REAL_DEV" in
+    *sda25*|*keyrefuge*|*/dev/block/sda)
+        ui_print "CRITICAL SECURITY HAZARD: Target points to keystore or whole-disk!"
+        ui_print "Refusing to write to protected cryptographic partition: $REAL_DEV"
+        exit 3
+        ;;
+    *sda24*)
+        ui_print "  Confirmed destination node: sda24 (recovery slot)."
+        ;;
+    *)
+        ui_print "  Target node: $REAL_DEV (checking capacity bounds)."
+        ;;
+esac
+
+# Query block capacity
+EXPECTED_CAPACITY=82694144
+ACTUAL_CAPACITY="$(blockdev --getsize64 "$REAL_DEV" 2>/dev/null)"
+if [ -z "$ACTUAL_CAPACITY" ] || [ "$ACTUAL_CAPACITY" -eq 0 ]; then
+    if [ -f "/sys/block/sda/sda24/size" ]; then
+        SYSFS_SECTORS="$(cat /sys/block/sda/sda24/size)"
+        ACTUAL_CAPACITY=$((SYSFS_SECTORS * 512))
+    fi
+fi
+
+ui_print "  Partition Capacity: $ACTUAL_CAPACITY bytes (expected: $EXPECTED_CAPACITY bytes)"
+if [ "$ACTUAL_CAPACITY" -ne "$EXPECTED_CAPACITY" ]; then
+    ui_print "ERROR: Partition capacity mismatch!"
+    ui_print "Target partition size ($ACTUAL_CAPACITY B) does not match sda24 ($EXPECTED_CAPACITY B)."
+    ui_print "Aborting to protect adjacent partitions."
+    exit 4
+fi
+ui_print "  Partition geometry verification PASSED."
+set_progress 0.45
+
+# 3. Payload Extraction & Scratch Buffer Allocation
+ui_print "[STEP 3/6] Extracting boot container to scratch buffer..."
+WORK_DIR="/tmp/r8q_staging"
+rm -rf "$WORK_DIR"
+mkdir -p "$WORK_DIR"
+
+IMAGE_FILE="$WORK_DIR/r8q-uefi-boot-complete.img"
+if [ -f "$ZIP_PATH" ]; then
+    unzip -p "$ZIP_PATH" r8q-uefi-boot-complete.img > "$IMAGE_FILE"
+elif [ -f "/sideload/package.zip" ]; then
+    unzip -p "/sideload/package.zip" r8q-uefi-boot-complete.img > "$IMAGE_FILE"
+else
+    # Search for image in current directory or /tmp
+    find / -name "r8q-uefi-boot-complete.img" -maxdepth 4 2>/dev/null | head -n 1 | while read p; do
+        cp "$p" "$IMAGE_FILE"
+    done
+fi
+
+if [ ! -s "$IMAGE_FILE" ]; then
+    ui_print "ERROR: Failed to extract payload from $ZIP_PATH!"
+    rm -rf "$WORK_DIR"
+    exit 5
+fi
+
+EXPECTED_SIZE=24461312
+ACTUAL_SIZE="$(stat -c "%s" "$IMAGE_FILE" 2>/dev/null || ls -l "$IMAGE_FILE" | awk '{print $5}')"
+ui_print "  Extracted Payload Size: $ACTUAL_SIZE bytes (expected: $EXPECTED_SIZE bytes)"
+if [ "$ACTUAL_SIZE" -ne "$EXPECTED_SIZE" ]; then
+    ui_print "ERROR: Extracted image size mismatch! Aborting."
+    rm -rf "$WORK_DIR"
+    exit 6
+fi
+set_progress 0.60
+
+# 4. Cryptographic Hash Verification
+ui_print "[STEP 4/6] Verifying payload SHA-256 integrity..."
+EXPECTED_SHA="b2d6f721fe52633e4bee4e1a626514fc5cbe166102803d8b6f0a5c581c5cb100"
+ACTUAL_SHA="$(sha256sum "$IMAGE_FILE" | awk '{print $1}')"
+
+ui_print "  Calculated SHA-256: $ACTUAL_SHA"
+if [ "$ACTUAL_SHA" != "$EXPECTED_SHA" ]; then
+    ui_print "ERROR: Cryptographic hash verification FAILED!"
+    ui_print "Expected: $EXPECTED_SHA"
+    ui_print "Got:      $ACTUAL_SHA"
+    ui_print "Image may be corrupted or tampered. Aborting."
+    rm -rf "$WORK_DIR"
+    exit 7
+fi
+ui_print "  Cryptographic verification PASSED."
+set_progress 0.75
+
+# 5. Partition Headroom Calculation
+ui_print "[STEP 5/6] Calculating safety headroom margin..."
+HEADROOM=$((EXPECTED_CAPACITY - ACTUAL_SIZE))
+ui_print "  Headroom remaining: $HEADROOM bytes ($((HEADROOM / 1024 / 1024)) MiB)"
+if [ "$HEADROOM" -lt 52428800 ]; then
+    ui_print "ERROR: Safety margin too low (< 50 MiB). Aborting."
+    rm -rf "$WORK_DIR"
+    exit 8
+fi
+ui_print "  Safety margin verification PASSED (55.53 MiB clearance)."
+
+# 6. Physical Staging & Readback Audit
+ui_print "[STEP 6/6] Staging compound boot image to $REAL_DEV..."
+PAGE_COUNT=$((ACTUAL_SIZE / 4096))
+ui_print "  Writing $PAGE_COUNT pages (4096 B/page) via dd..."
+
+dd if="$IMAGE_FILE" of="$REAL_DEV" bs=4096 count="$PAGE_COUNT" conv=fsync
+DD_STATUS=$?
+if [ "$DD_STATUS" -ne 0 ]; then
+    ui_print "CRITICAL ERROR: dd write failed with exit code $DD_STATUS!"
+    rm -rf "$WORK_DIR"
+    exit 9
+fi
+
+ui_print "  Performing readback verification from $REAL_DEV..."
+READBACK_SHA="$(dd if="$REAL_DEV" bs=4096 count="$PAGE_COUNT" 2>/dev/null | sha256sum | awk '{print $1}')"
+
+if [ "$READBACK_SHA" != "$EXPECTED_SHA" ]; then
+    ui_print "CRITICAL INTEGRITY FAILURE: Written block hash does not match payload!"
+    ui_print "Readback: $READBACK_SHA"
+    ui_print "Expected: $EXPECTED_SHA"
+    rm -rf "$WORK_DIR"
+    exit 10
+fi
+
+ui_print "  Readback verification PASSED bit-for-bit."
+ui_print "=================================================="
+ui_print "[SUCCESS] Project R8Q UEFI successfully staged!  "
+ui_print "  Target: $REAL_DEV (recovery)                   "
+ui_print "  Bytes written: $ACTUAL_SIZE                    "
+ui_print "  Primary OS (sda23 boot) preserved 100% intact. "
+ui_print "=================================================="
+ui_print "Reboot to Recovery (Power + Vol Up with USB) to boot R8Q."
+
+rm -rf "$WORK_DIR"
+set_progress 1.0
+exit 0

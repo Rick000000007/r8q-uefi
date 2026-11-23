@@ -28,8 +28,11 @@ Every artifact has undergone deep structural validation (magic number inspection
 | **`sm8250-samsung-r8q.dtb`** | `kernel/sm8250-samsung-r8q.dtb` | 112,421 | 109.79 KiB | `d6c57c08f641dce38cbbd4a0e377c4b4cd23851ec8588a89c5400b1204f136ef` | Flattened Device Tree Blob (FDT v17) | Device Tree (`SM8250`/`r8q`) | **YES** (`4312b18`) | **VALIDATED**: Magic `0xD00DFEED`; size 112,421 B; `/chosen` configured with GENI earlycon (`0xa90000`), initrd range (`0xA4400000`–`0xA46CF9EA`). |
 | **`initramfs.img`** | `kernel/initramfs.img` / `initramfs/initramfs.img` | 2,947,562 | 2.81 MiB | `edee6b70686df49ac85b021af18c1eb1d26387e98f7dcfccd1ea05e2508df2da` | Gzip CPIO Archive (`newc`) | AArch64 / ARM64 Userspace | **YES** (`4312b18`) | **VALIDATED**: Gzip magic `0x1F8B`; uncompressed size 7,280,640 B; CPIO `070701`; pure ARM64 `/bin/busybox`; `/init` zero-UFS-write policy audited. |
 | **`r8q-rootfs.ext4`** | `rootfs/r8q-rootfs.ext4` | 2,147,483,648 | 2.00 GiB | `04ce698f9930e4854a84a1cdc625f34bf1408340be156d4d0a126c457e2e3cfc` | Standalone ext4 Raw Disk Image | AArch64 (Debian 12 Bookworm) | **YES** (`4312b18`) | **VALIDATED**: Superblock magic `0xEF53`; label `r8q-rootfs`; 524,288 blocks (4KB); `e2fsck -f -n` clean (0 errors); FHS 3.0; systemd 252; OpenSSH. |
+| **`r8q-rootfs.ext4.gz`** | `rootfs/r8q-rootfs.ext4.gz` | 172,047,353 | 164.07 MiB | `72ed1deb873639bc0c36b5da60ca9faa4815e91599774e882e0b981b47445058` | Gzip-Compressed ext4 Rootfs Image | AArch64 (Debian 12 Bookworm) | **YES** (`4312b18`) | **VALIDATED**: Decompresses bit-for-bit to verified `r8q-rootfs.ext4` (`04ce698f...`). Distributed via GitHub Releases. |
+| **`r8q-rootfs.tar.gz`** | `rootfs/r8q-rootfs.tar.gz` | 158,123,670 | 150.79 MiB | `f732533c71d4c6dcbd67de246f8610f7aecdd31781149d9692dceeeba351aa15` | Gzip Tarball Root Filesystem Archive | AArch64 (Debian 12 Bookworm) | **YES** (`4312b18`) | **VALIDATED**: Standard tarball distribution containing complete FHS 3.0 userspace for direct MicroSD extraction. |
 | **`esp.img`** | `boot/esp.img` | 268,435,456 | 256.00 MiB | `3f7485e5ad33ef2f8f3c03b2ef96f5f18f145c5a4c72361728f7029d8df05600` | GPT Disk Image (FAT32 EFI System Partition) | AArch64 / UEFI AA64 | **YES** (`4312b18`) | **VALIDATED**: Protective MBR (`0x55AA`); GPT `EFI PART`; 254 MiB FAT32 partition `R8Q_BOOT`; contains `EFI/BOOT/BOOTAA64.EFI`, R8Q diagnostic EFI tools, `startup.nsh`. |
 | **`r8q-uefi-boot-complete.img`** | `boot/r8q-uefi-boot-complete.img` | 24,461,312 | 23.33 MiB | `b2d6f721fe52633e4bee4e1a626514fc5cbe166102803d8b6f0a5c581c5cb100` | Android Boot Image v2 Compound Container | AArch64 / ARM64 (ABL Stageable) | **YES** (`4312b18`) | **VALIDATED**: Magic `ANDROID!`; header v2 (1660 B); compound kernel 21,391,936 B with 64B wrapper (`code0 = 0x14000010`, `ARM\x64`), `R8Q_EFI.fd`, `Image`, `initramfs.img`, `dtb`. |
+| **`R8Q-Debian12-Recovery.zip`** | `R8Q-Debian12-Recovery.zip` | 10,234,189 | 9.76 MiB | `d969430b84cc69f40cdf3325add813dcbdf0c9704f0e9e226af6b59ad3ec1fe6` | LineageOS Recovery Flashable ZIP Package | AArch64 / ARM64 (LineageOS OTA) | **YES** (`4312b18`) | **VALIDATED**: Verified AOSP OTA archive with POSIX shell `update-binary`, device model verification, metadata assertions, 55.53 MiB safety margin, bit-exact payload. |
 
 ---
 
@@ -117,6 +120,18 @@ Every artifact has undergone deep structural validation (magic number inspection
   - **Total File Size:** `24,461,312` bytes (`0x01754000` / 23.33 MiB).
 - **Physical Staging Compatibility:** Staged by Samsung ABL into physical DRAM at `0xA0160000` (or `0xA0161000`), perfectly fitting inside the 78.86 MiB `sda24` (`recovery`) partition with 55.53 MiB safety margin.
 
+### 3.8 LineageOS Recovery Flashable ZIP: `R8Q-Debian12-Recovery.zip`
+- **Original Path:** `/root/r8q-uefi/R8Q-DEBIAN12-RELEASE/R8Q-Debian12-Recovery.zip`
+- **Release Path:** `R8Q-DEBIAN12-RELEASE/R8Q-Debian12-Recovery.zip`
+- **Format:** Standard Android AOSP / LineageOS Recovery Update ZIP (`META-INF/com/google/android/update-binary`).
+- **Archive Contents:**
+  - `update-binary`: Hardened POSIX shell installer with device model assertion, partition symlink resolution, capacity check (`82,694,144` bytes), boundary verification, and SHA-256 pre-write validation.
+  - `updater-script`: LineageOS recovery notification hook.
+  - `metadata`: AOSP OTA property definitions (`pre-device=r8q,r8qxx,SM-G781B,SM-G780G`).
+  - `r8q-uefi-boot-complete.img`: Embedded 24,461,312-byte boot container (exact match with release artifact).
+  - `r8q-uefi-boot-complete.img.sha256`: Cryptographic digest.
+- **Safety Margin:** Confirmed 55.53 MiB unwritten headroom on `sda24`, terminating safely 113,736 sectors before `sda25` (`keyrefuge`).
+
 ---
 
 ## 4. Cryptographic Proof & Reproduction Commands
@@ -128,4 +143,4 @@ cd R8Q-DEBIAN12-RELEASE
 sha256sum -c SHA256SUMS
 ```
 
-All 7 checks must report `OK`.
+All 11 checks must report `OK`.
