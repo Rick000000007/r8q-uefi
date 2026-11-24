@@ -36,7 +36,7 @@ jobs:
       - name: Set up Dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y gcc-aarch64-linux-gnu build-essential python3 git
+          sudo apt-get install -y gcc-aarch64-linux-gnu build-essential mtools python3 git
 
       - name: Verify POSIX Shared Memory
         run: |
@@ -61,16 +61,19 @@ jobs:
           export GCC5_AARCH64_PREFIX=aarch64-linux-gnu-
 
           # Build BaseTools C utilities and Python modules
-          make -C edk2/BaseTools/Source/C GenFv GenFw GenSec GenCrc32 LzmaCompress TianoCompress BUILD_OPTFLAGS="-std=gnu89 -Wno-error" -j$(nproc) || true
-          make -C edk2/BaseTools/Source/Python -j$(nproc) || true
+          make -C edk2/BaseTools/Source/C GenFv GenFw GenSec GenCrc32 LzmaCompress TianoCompress BUILD_OPTFLAGS="-std=gnu89 -Wno-error" -j$(nproc)
+          make -C edk2/BaseTools/Source/Python -j$(nproc)
           HOST_ARCH="$(uname -m)"
-          mkdir -p edk2/BaseTools/Bin/Linux-$HOST_ARCH
+          mkdir -p edk2/BaseTools/Bin/Linux-$HOST_ARCH edk2/Conf
           cp edk2/BaseTools/Source/C/bin/* edk2/BaseTools/Bin/Linux-$HOST_ARCH/ 2>/dev/null || true
+          for tmpl in build_rule tools_def target; do
+            [ -f "edk2/BaseTools/Conf/${tmpl}.template" ] && cp -n "edk2/BaseTools/Conf/${tmpl}.template" "edk2/Conf/${tmpl}.txt"
+          done
 
           TARGET="${{ inputs.build_config || 'DEBUG' }}"
           cd edk2
-          build -p R8QPkg/R8QPkg.dsc -m R8QPkg/Applications/Setup/Setup.inf -a AARCH64 -t GCC5 -b "$TARGET" || echo "Setup build evaluated"
-          build -p R8QPkg/R8QPkg.dsc -m R8QPkg/Applications/BootManager/BootManager.inf -a AARCH64 -t GCC5 -b "$TARGET" || echo "BootManager build evaluated"
+          build -p R8QPkg/R8QPkg.dsc -m R8QPkg/Applications/Setup/Setup.inf -a AARCH64 -t GCC5 -b "$TARGET"
+          build -p R8QPkg/R8QPkg.dsc -m R8QPkg/Applications/BootManager/BootManager.inf -a AARCH64 -t GCC5 -b "$TARGET"
 
       - name: Verify Applications & PE32+ Signatures
         env:

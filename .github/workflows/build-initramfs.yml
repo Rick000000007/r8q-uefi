@@ -45,7 +45,7 @@ jobs:
           fi
 
           chmod +x scripts/build_initramfs.sh
-          ./scripts/build_initramfs.sh || echo "Notice: Verified initramfs preserved"
+          ./scripts/build_initramfs.sh
 
           if [ -f "build/initramfs.img" ]; then
             sha256sum build/initramfs.img > initramfs.img.sha256

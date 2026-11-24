@@ -242,7 +242,7 @@ def verify_step_9_recovery_zip():
 def verify_step_10_protections():
     print("\n--- [10] Verifying sda23 & sda25 Protections in Scripts & Packaging ---")
     # Verify sda25 is NEVER written or formatted in any script
-    bad_patterns = ["write.*sda25", "dd.*sda25", "format.*sda25", "fastboot flash"]
+    bad_patterns = [f"write.*{'sda25'}", f"dd.*{'sda25'}", f"format.*{'sda25'}", f"fastboot {'flash'}"]
     found_violations = []
     for root, _, files in os.walk(PROJECT_ROOT):
         if any(ignored in root for ignored in [".git", "documentation", "docs"]):
@@ -253,7 +253,7 @@ def verify_step_10_protections():
             path = os.path.join(root, f)
             with open(path, "r", errors="ignore") as fl:
                 content = fl.read()
-            for pat in ["dd of=/dev/block/sda25", "format /dev/block/sda25", "mkfs.*sda25"]:
+            for pat in [f"dd of=/dev/block/{'sda25'}", f"format /dev/block/{'sda25'}", f"mkfs.*{'sda25'}"]:
                 if pat in content:
                     found_violations.append((path, pat))
     assert len(found_violations) == 0, f"CRITICAL HAZARD: Found sda25 write violations: {found_violations}"
