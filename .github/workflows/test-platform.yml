@@ -43,29 +43,30 @@ jobs:
           [ -f R8Q-DEBIAN12-RELEASE/R8Q_EFI.fd ] && cp R8Q-DEBIAN12-RELEASE/R8Q_EFI.fd build/R8Q_EFI.fd
           [ -f R8Q-DEBIAN12-RELEASE/Image ] && cp R8Q-DEBIAN12-RELEASE/Image build/Image
           [ -f R8Q-DEBIAN12-RELEASE/initramfs.img ] && cp R8Q-DEBIAN12-RELEASE/initramfs.img build/initramfs.img
+          [ -f R8Q-DEBIAN12-RELEASE/initramfs.img ] && cp R8Q-DEBIAN12-RELEASE/initramfs.img R8Q-DEBIAN12-RELEASE/kernel/initramfs.img
           [ -f R8Q-DEBIAN12-RELEASE/sm8250-samsung-r8q.dtb ] && cp R8Q-DEBIAN12-RELEASE/sm8250-samsung-r8q.dtb build/sm8250-samsung-r8q.dtb
           [ -f R8Q-DEBIAN12-RELEASE/sm8250-samsung-r8q.dtb ] && cp R8Q-DEBIAN12-RELEASE/sm8250-samsung-r8q.dtb build/r8q.dtb
           [ -f R8Q-DEBIAN12-RELEASE/esp.img ] && cp R8Q-DEBIAN12-RELEASE/esp.img build/esp.img
           [ -f R8Q-DEBIAN12-RELEASE/r8q-uefi-boot-complete.img ] && cp R8Q-DEBIAN12-RELEASE/r8q-uefi-boot-complete.img build/r8q-uefi-boot-complete.img
           [ -f R8Q-DEBIAN12-RELEASE/R8Q-Debian12-Recovery.zip ] && cp R8Q-DEBIAN12-RELEASE/R8Q-Debian12-Recovery.zip build/R8Q-Debian12-Recovery.zip
 
-          # Extract EFI apps from esp.img if available
-          if [ -f "build/esp.img" ]; then
-            mcopy -i "build/esp.img@@1M" ::EFI/R8Q/Setup.efi edk2/Build/R8Q/DEBUG_GCC5/AARCH64/Setup.efi 2>/dev/null || true
-            mcopy -i "build/esp.img@@1M" ::EFI/R8Q/BootManager.efi edk2/Build/R8Q/DEBUG_GCC5/AARCH64/BootManager.efi 2>/dev/null || true
-            [ -f "edk2/Build/R8Q/DEBUG_GCC5/AARCH64/Setup.efi" ] && cp edk2/Build/R8Q/DEBUG_GCC5/AARCH64/Setup.efi build/Setup.efi
-            [ -f "edk2/Build/R8Q/DEBUG_GCC5/AARCH64/BootManager.efi" ] && cp edk2/Build/R8Q/DEBUG_GCC5/AARCH64/BootManager.efi build/BootManager.efi
-          fi
+          # Populate EFI applications
+          [ -f R8Q-DEBIAN12-RELEASE/Setup.efi ] && cp R8Q-DEBIAN12-RELEASE/Setup.efi edk2/Build/R8Q/DEBUG_GCC5/AARCH64/Setup.efi
+          [ -f R8Q-DEBIAN12-RELEASE/BootManager.efi ] && cp R8Q-DEBIAN12-RELEASE/BootManager.efi edk2/Build/R8Q/DEBUG_GCC5/AARCH64/BootManager.efi
+          [ -f "edk2/Build/R8Q/DEBUG_GCC5/AARCH64/Setup.efi" ] && cp edk2/Build/R8Q/DEBUG_GCC5/AARCH64/Setup.efi build/Setup.efi
+          [ -f "edk2/Build/R8Q/DEBUG_GCC5/AARCH64/BootManager.efi" ] && cp edk2/Build/R8Q/DEBUG_GCC5/AARCH64/BootManager.efi build/BootManager.efi
 
           # Extract rootfs userspace into /tmp/r8q_rootfs_staging
           if [ -f "R8Q-DEBIAN12-RELEASE/r8q-rootfs.tar.gz" ]; then
             cp R8Q-DEBIAN12-RELEASE/r8q-rootfs.tar.gz build/r8q-rootfs.tar.gz
             sudo tar -xzf build/r8q-rootfs.tar.gz -C /tmp/r8q_rootfs_staging
             sudo chmod -R a+rX /tmp/r8q_rootfs_staging
+            sudo chmod 0440 /tmp/r8q_rootfs_staging/etc/sudoers.d/r8q
           elif [ -f "R8Q-DEBIAN12-RELEASE/rootfs/r8q-rootfs.tar.gz" ]; then
             cp R8Q-DEBIAN12-RELEASE/rootfs/r8q-rootfs.tar.gz build/r8q-rootfs.tar.gz
             sudo tar -xzf build/r8q-rootfs.tar.gz -C /tmp/r8q_rootfs_staging
             sudo chmod -R a+rX /tmp/r8q_rootfs_staging
+            sudo chmod 0440 /tmp/r8q_rootfs_staging/etc/sudoers.d/r8q
           fi
           if [ -f "R8Q-DEBIAN12-RELEASE/r8q-rootfs.ext4.gz" ]; then
             gzip -dc R8Q-DEBIAN12-RELEASE/r8q-rootfs.ext4.gz > build/r8q-rootfs.ext4

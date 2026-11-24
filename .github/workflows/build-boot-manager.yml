@@ -50,6 +50,8 @@ jobs:
             echo "Cloning EDK II shallow tree (edk2-stable202411)..."
             git clone --depth 1 --branch edk2-stable202411 https://github.com/tianocore/edk2.git edk2
           fi
+          mkdir -p edk2/MdePkg/Library/MipiSysTLib/mipisyst/library/include
+          mkdir -p edk2/MdeModulePkg/Library/BrotliCustomDecompressLib/brotli/c/include
 
       - name: Build Setup.efi & BootManager.efi
         run: |

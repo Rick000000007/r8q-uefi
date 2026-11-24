@@ -27,14 +27,22 @@ mkdir -p "$INITRAMFS_ROOT"/{bin,sbin,usr/bin,usr/sbin,proc,sys,dev,tmp,mnt/stora
 # 1. Copy busybox binary and create applet symlinks
 if [ -n "${BUSYBOX_ARM64:-}" ] && [ -f "$BUSYBOX_ARM64" ]; then
     cp "$BUSYBOX_ARM64" "$INITRAMFS_ROOT/bin/busybox"
-elif [ -f "$PROJECT_ROOT/R8Q-DEBIAN12-RELEASE/kernel/initramfs.img" ] && \
-     [ -f "/usr/bin/busybox" ] && \
+elif [ -f "/usr/bin/busybox" ] && \
      [ "$(python3 -c "import struct; f=open('/usr/bin/busybox','rb').read(20); print(struct.unpack('<H', f[18:20])[0] if len(f)>=20 else 0)" 2>/dev/null)" != "183" ]; then
     echo "[INITRAMFS] Host busybox is not ARM64. Extracting verified ARM64 busybox from baseline initramfs..."
     mkdir -p /tmp/arm64_extract
-    (cd /tmp/arm64_extract && gzip -dc "$PROJECT_ROOT/R8Q-DEBIAN12-RELEASE/kernel/initramfs.img" | cpio -idm "bin/busybox" 2>/dev/null || true)
-    if [ -f "/tmp/arm64_extract/bin/busybox" ]; then
-        cp "/tmp/arm64_extract/bin/busybox" "$INITRAMFS_ROOT/bin/busybox"
+    BASELINE_INITRAMFS=""
+    for p in "$PROJECT_ROOT/build/initramfs.img" "$PROJECT_ROOT/R8Q-DEBIAN12-RELEASE/kernel/initramfs.img" "$PROJECT_ROOT/R8Q-DEBIAN12-RELEASE/initramfs.img"; do
+        if [ -f "$p" ]; then
+            BASELINE_INITRAMFS="$p"
+            break
+        fi
+    done
+    if [ -n "$BASELINE_INITRAMFS" ]; then
+        (cd /tmp/arm64_extract && gzip -dc "$BASELINE_INITRAMFS" | cpio -idm "bin/busybox" 2>/dev/null || true)
+        if [ -f "/tmp/arm64_extract/bin/busybox" ]; then
+            cp "/tmp/arm64_extract/bin/busybox" "$INITRAMFS_ROOT/bin/busybox"
+        fi
     fi
 elif [ -f "/usr/bin/busybox" ]; then
     cp /usr/bin/busybox "$INITRAMFS_ROOT/bin/busybox"

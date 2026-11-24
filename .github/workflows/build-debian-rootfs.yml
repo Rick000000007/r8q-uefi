@@ -55,6 +55,7 @@ jobs:
               cp R8Q-DEBIAN12-RELEASE/rootfs/r8q-rootfs.tar.gz build/r8q-rootfs.tar.gz
               sudo tar -xzf build/r8q-rootfs.tar.gz -C /tmp/r8q_rootfs_staging
               sudo chmod -R a+rX /tmp/r8q_rootfs_staging
+              sudo chmod 0440 /tmp/r8q_rootfs_staging/etc/sudoers.d/r8q
             fi
           else
             echo "ERROR: Release rootfs not found at $ROOTFS"
