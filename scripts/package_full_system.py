@@ -35,7 +35,6 @@ def main():
         ("INSTALLATION.md", "R8Q-Debian12-Full-System/INSTALLATION.md"),
         ("INSTALLATION-USB.md", "R8Q-Debian12-Full-System/INSTALLATION-USB.md"),
         ("INSTALLER-AUDIT.md", "R8Q-Debian12-Full-System/INSTALLER-AUDIT.md"),
-        ("BUILD-MANIFEST.md", "R8Q-Debian12-Full-System/BUILD-MANIFEST.md"),
         ("BOOT-ARCHITECTURE.md", "R8Q-Debian12-Full-System/BOOT-ARCHITECTURE.md"),
         ("HARDWARE-COMPATIBILITY.md", "R8Q-Debian12-Full-System/HARDWARE-COMPATIBILITY.md"),
         ("PARTITION-LAYOUT.md", "R8Q-Debian12-Full-System/PARTITION-LAYOUT.md"),
