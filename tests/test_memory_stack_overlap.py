@@ -114,7 +114,8 @@ def test_memory_layout():
     print("  [PASS] Linux kernel physical placement complies with ARM64 booting specification.")
 
     print("\n[TEST 4/5] Disassembling Boot Image Binary to Verify Encoded SP...")
-    boot_img_path = "/root/r8q-uefi/build/r8q-uefi-boot-poc.img"
+    project_root = os.environ.get("PROJECT_ROOT", os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+    boot_img_path = os.path.join(project_root, "build", "r8q-uefi-boot-poc.img")
     assert os.path.exists(boot_img_path), "Boot image missing"
     with open(boot_img_path, "rb") as f:
         # Seek past 4096B header + 64B wrapper + PrePi offset

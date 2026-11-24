@@ -24,7 +24,7 @@ import struct
 import gzip
 import unittest
 
-PROJECT_ROOT = "/root/r8q-uefi"
+PROJECT_ROOT = os.environ.get("PROJECT_ROOT", os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 BUILD_DIR = os.path.join(PROJECT_ROOT, "build")
 PREPI_SRC = os.path.join(PROJECT_ROOT, "platform/R8QPkg/PrePi/PrePi.c")
 INITRD_SCRIPT = os.path.join(PROJECT_ROOT, "scripts/build_initramfs.sh")

@@ -15,7 +15,7 @@ import struct
 import subprocess
 import unittest
 
-PROJECT_ROOT = "/root/r8q-uefi"
+PROJECT_ROOT = os.environ.get("PROJECT_ROOT", os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 ENTRY_POINT_ASM = os.path.join(PROJECT_ROOT, "platform/R8QPkg/PrePi/ModuleEntryPoint.S")
 GOLDEN_RECOVERY_IMG = os.path.join(PROJECT_ROOT, "artifacts/sda24_lineageos_recovery.img")
 

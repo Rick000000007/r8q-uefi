@@ -33,26 +33,42 @@ echo "[ESP] Creating EFI directory structure..."
 mmd -i "$TARGET_PART" ::EFI
 mmd -i "$TARGET_PART" ::EFI/BOOT
 mmd -i "$TARGET_PART" ::EFI/R8Q
+mmd -i "$TARGET_PART" ::EFI/R8Q/Config
+mmd -i "$TARGET_PART" ::EFI/R8Q/Config/entries
+mmd -i "$TARGET_PART" ::EFI/R8Q/Kernels
 mmd -i "$TARGET_PART" ::EFI/tools
 
-# 4. Install UEFI Shell as default fallback bootloader (BOOTAA64.EFI)
-if [ -f "$EDK2_BIN_DIR/Shell.efi" ]; then
+# 4. Install R8Q Boot Manager & Fallback Shell (BOOTAA64.EFI)
+if [ -f "$EDK2_BIN_DIR/BootManager.efi" ]; then
+    echo "[ESP] Installing R8Q Boot Manager to ::EFI/BOOT/BOOTAA64.EFI and ::EFI/R8Q/BootManager.efi..."
+    mcopy -i "$TARGET_PART" "$EDK2_BIN_DIR/BootManager.efi" ::EFI/BOOT/BOOTAA64.EFI
+    mcopy -i "$TARGET_PART" "$EDK2_BIN_DIR/BootManager.efi" ::EFI/R8Q/BootManager.efi
+elif [ -f "$EDK2_BIN_DIR/Shell.efi" ]; then
     echo "[ESP] Installing UEFI Shell to ::EFI/BOOT/BOOTAA64.EFI..."
     mcopy -i "$TARGET_PART" "$EDK2_BIN_DIR/Shell.efi" ::EFI/BOOT/BOOTAA64.EFI
-    mcopy -i "$TARGET_PART" "$EDK2_BIN_DIR/Shell.efi" ::EFI/R8Q/Shell.efi
-elif [ -f "/usr/share/qemu-efi-aarch64/Shell.efi" ]; then
-    echo "[ESP] Installing system UEFI Shell to ::EFI/BOOT/BOOTAA64.EFI..."
-    mcopy -i "$TARGET_PART" "/usr/share/qemu-efi-aarch64/Shell.efi" ::EFI/BOOT/BOOTAA64.EFI
 fi
 
-# 5. Copy custom R8Q EFI applications
+if [ -f "$EDK2_BIN_DIR/Shell.efi" ]; then
+    mcopy -i "$TARGET_PART" "$EDK2_BIN_DIR/Shell.efi" ::EFI/R8Q/Shell.efi
+fi
+
+# 5. Copy custom R8Q EFI applications and Setup Utility
 echo "[ESP] Installing custom R8Q EFI applications..."
-for app in sysinfo cpuinfo memmap diagnostics LinuxBoot storage display battery thermal fdtinfo firmware CoreTest StorageTest; do
+for app in Setup BootManager sysinfo cpuinfo memmap diagnostics LinuxBoot storage display battery thermal fdtinfo firmware CoreTest StorageTest; do
     if [ -f "$EDK2_BIN_DIR/${app}.efi" ]; then
         mcopy -i "$TARGET_PART" "$EDK2_BIN_DIR/${app}.efi" "::EFI/R8Q/${app}.efi"
         mcopy -i "$TARGET_PART" "$EDK2_BIN_DIR/${app}.efi" "::EFI/tools/${app}.efi"
     fi
 done
+
+# Copy Boot Manager Configurations
+if [ -d "$PROJECT_ROOT/boot-manager/Config" ]; then
+    echo "[ESP] Installing R8Q Boot Manager configuration files..."
+    mcopy -i "$TARGET_PART" "$PROJECT_ROOT/boot-manager/Config/boot.cfg" ::EFI/R8Q/Config/boot.cfg || true
+    for conf in "$PROJECT_ROOT/boot-manager/Config/entries"/*.conf; do
+        [ -f "$conf" ] && mcopy -i "$TARGET_PART" "$conf" "::EFI/R8Q/Config/entries/$(basename "$conf")" || true
+    done
+fi
 
 # 6. Copy Kernel, Initramfs, and Device Tree
 echo "[ESP] Installing Linux Kernel, Initramfs, and DTB..."

@@ -13,7 +13,7 @@ import unittest
 import hashlib
 import json
 
-PROJECT_ROOT = "/root/r8q-uefi"
+PROJECT_ROOT = os.environ.get("PROJECT_ROOT", os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 BUILD_DIR = os.path.join(PROJECT_ROOT, "build")
 CONFIG_DIR = os.path.join(PROJECT_ROOT, "config")
 DT_DIR = os.path.join(PROJECT_ROOT, "devicetree")

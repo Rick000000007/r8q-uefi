@@ -20,7 +20,7 @@ def align(size, page_size):
     return (size + page_size - 1) & ~(page_size - 1)
 
 def build_complete_boot_image():
-    project_root = "/root/r8q-uefi"
+    project_root = os.environ.get("PROJECT_ROOT", os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
     fd_path = os.path.join(project_root, "build/R8Q_EFI.fd")
     kernel_path = os.path.join(project_root, "build/Image")
     initrd_path = os.path.join(project_root, "build/initramfs.img")

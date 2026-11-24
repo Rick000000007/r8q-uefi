@@ -25,7 +25,9 @@ rm -rf "$INITRAMFS_ROOT"
 mkdir -p "$INITRAMFS_ROOT"/{bin,sbin,usr/bin,usr/sbin,proc,sys,dev,tmp,mnt/storage,root,newroot,etc,lib/modules}
 
 # 1. Copy busybox binary and create applet symlinks
-if [ -f "/usr/bin/busybox" ]; then
+if [ -n "${BUSYBOX_ARM64:-}" ] && [ -f "$BUSYBOX_ARM64" ]; then
+    cp "$BUSYBOX_ARM64" "$INITRAMFS_ROOT/bin/busybox"
+elif [ -f "/usr/bin/busybox" ]; then
     cp /usr/bin/busybox "$INITRAMFS_ROOT/bin/busybox"
 elif [ -f "/bin/busybox" ]; then
     cp /bin/busybox "$INITRAMFS_ROOT/bin/busybox"

@@ -1,0 +1,106 @@
+name: Build Complete Platform Package
+
+on:
+  push:
+    paths:
+      - 'scripts/package_full_system.py'
+      - 'scripts/package_complete_boot_img.py'
+      - 'R8Q-DEBIAN12-RELEASE/**'
+      - '.github/workflows/build-complete-platform.yml'
+  workflow_dispatch:
+  workflow_call:
+
+jobs:
+  build-complete-platform:
+    name: Package Reproducible Compound Boot Image & Full System Distribution
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python & Tools
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install System Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y device-tree-compiler gzip tar
+
+      - name: Stage Artifacts & Ensure Build Directory
+        run: |
+          mkdir -p build
+          mkdir -p R8Q-DEBIAN12-RELEASE/boot
+          mkdir -p R8Q-DEBIAN12-RELEASE/firmware
+          mkdir -p R8Q-DEBIAN12-RELEASE/kernel
+          mkdir -p R8Q-DEBIAN12-RELEASE/rootfs
+
+          # Populate build/ from R8Q-DEBIAN12-RELEASE if files not present
+          if [ ! -f "build/R8Q_EFI.fd" ] && [ -f "R8Q-DEBIAN12-RELEASE/firmware/R8Q_EFI.fd" ]; then
+            cp R8Q-DEBIAN12-RELEASE/firmware/R8Q_EFI.fd build/R8Q_EFI.fd
+          fi
+          if [ ! -f "build/Image" ] && [ -f "R8Q-DEBIAN12-RELEASE/kernel/Image" ]; then
+            cp R8Q-DEBIAN12-RELEASE/kernel/Image build/Image
+          fi
+          if [ ! -f "build/sm8250-samsung-r8q.dtb" ] && [ -f "R8Q-DEBIAN12-RELEASE/kernel/sm8250-samsung-r8q.dtb" ]; then
+            cp R8Q-DEBIAN12-RELEASE/kernel/sm8250-samsung-r8q.dtb build/sm8250-samsung-r8q.dtb
+            cp R8Q-DEBIAN12-RELEASE/kernel/sm8250-samsung-r8q.dtb build/r8q.dtb
+          fi
+          if [ ! -f "build/initramfs.img" ] && [ -f "R8Q-DEBIAN12-RELEASE/kernel/initramfs.img" ]; then
+            cp R8Q-DEBIAN12-RELEASE/kernel/initramfs.img build/initramfs.img
+          fi
+          if [ ! -f "build/esp.img" ] && [ -f "R8Q-DEBIAN12-RELEASE/boot/esp.img" ]; then
+            cp R8Q-DEBIAN12-RELEASE/boot/esp.img build/esp.img
+          fi
+
+      - name: Build Compound Boot Image v2
+        run: |
+          python3 scripts/package_complete_boot_img.py
+          cp build/r8q-uefi-boot-complete.img R8Q-DEBIAN12-RELEASE/boot/r8q-uefi-boot-complete.img
+          if [ -f "build/esp.img" ]; then
+            cp build/esp.img R8Q-DEBIAN12-RELEASE/boot/esp.img
+          fi
+
+      - name: Validate Compound Boot Image Invariants & sda24 Ceiling
+        run: |
+          BOOT_IMG="build/r8q-uefi-boot-complete.img"
+          python3 -c "
+          import os, struct
+          size = os.path.getsize('$BOOT_IMG')
+          print(f'Compound boot image size: {size} bytes ({size/(1024*1024):.2f} MiB)')
+          MAX_SDA24 = 82694144
+          assert size <= MAX_SDA24, f'Exceeds sda24 partition limit ({size} > {MAX_SDA24})'
+          with open('$BOOT_IMG', 'rb') as f:
+              magic = f.read(8)
+              assert magic == b'ANDROID!', f'Invalid Android magic: {magic}'
+              f.seek(40)
+              header_version = struct.unpack('<I', f.read(4))[0]
+              assert header_version == 2, f'Expected header version 2, got {header_version}'
+          headroom = (MAX_SDA24 - size) / (1024 * 1024)
+          print(f'Safety validation PASSED: +{headroom:.2f} MiB headroom in sda24 before sda25 boundary')
+          "
+
+      - name: Build Full System Tarball
+        run: |
+          python3 scripts/package_full_system.py
+
+      - name: Verify Release Checksums
+        run: |
+          cd R8Q-DEBIAN12-RELEASE
+          sha256sum --ignore-missing -c SHA256SUMS
+
+      - name: Upload Compound Boot Image Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: r8q-complete-boot-img
+          path: build/r8q-uefi-boot-complete.img
+          retention-days: 30
+
+      - name: Upload Full System Package Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: r8q-full-system-distribution
+          path: R8Q-DEBIAN12-RELEASE/R8Q-Debian12-Full-System.tar.gz
+          retention-days: 90

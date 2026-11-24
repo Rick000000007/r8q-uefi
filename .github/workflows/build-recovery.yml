@@ -1,0 +1,58 @@
+name: Build Recovery Installer ZIP (Layer 1 & Installer)
+
+on:
+  push:
+    paths:
+      - 'recovery-installer/**'
+      - 'scripts/package_recovery_zip.py'
+      - '.github/workflows/build-recovery.yml'
+  pull_request:
+    paths:
+      - 'recovery-installer/**'
+  workflow_dispatch:
+  workflow_call:
+
+jobs:
+  build-recovery-zip:
+    name: Package LineageOS Recovery Flashable ZIP
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Run Recovery Packaging
+        run: |
+          mkdir -p build
+          BOOT_IMG="build/r8q-uefi-boot-complete.img"
+          if [ ! -f "$BOOT_IMG" ]; then
+            BOOT_IMG="R8Q-DEBIAN12-RELEASE/boot/r8q-uefi-boot-complete.img"
+          fi
+          python3 scripts/package_recovery_zip.py \
+            "$BOOT_IMG" \
+            build/R8Q-Debian12-Recovery.zip
+          cp build/R8Q-Debian12-Recovery.zip R8Q-DEBIAN12-RELEASE/R8Q-Debian12-Recovery.zip
+
+      - name: Validate Recovery ZIP & Strict sda25 Safety
+        run: |
+          python3 -c "
+          import zipfile
+          with zipfile.ZipFile('build/R8Q-Debian12-Recovery.zip', 'r') as z:
+              assert 'META-INF/com/google/android/update-binary' in z.namelist()
+              updater = z.read('META-INF/com/google/android/update-binary').decode('utf-8', errors='ignore')
+              assert 'sda25' in updater and 'CRITICAL SECURITY HAZARD' in updater, 'sda25 protection missing!'
+              assert 'r8q-uefi-boot-complete.img' in z.namelist()
+          print('LineageOS Recovery ZIP validation: PASSED')
+          "
+
+      - name: Upload Recovery ZIP
+        uses: actions/upload-artifact@v4
+        with:
+          name: r8q-recovery-installer-zip
+          path: build/R8Q-Debian12-Recovery.zip
+          retention-days: 30

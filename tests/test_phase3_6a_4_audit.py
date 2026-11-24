@@ -17,7 +17,7 @@ import os
 import struct
 import unittest
 
-PROJECT_ROOT = "/root/r8q-uefi"
+PROJECT_ROOT = os.environ.get("PROJECT_ROOT", os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 ENTRY_POINT_ASM = os.path.join(PROJECT_ROOT, "platform/R8QPkg/PrePi/ModuleEntryPoint.S")
 PREPI_C = os.path.join(PROJECT_ROOT, "platform/R8QPkg/PrePi/PrePi.c")
 DOC_P36A4 = os.path.join(PROJECT_ROOT, "docs/phase3_6/PHASE3_6A_4_ARM64_HANDOFF_RECOVERY_AUDIT.md")

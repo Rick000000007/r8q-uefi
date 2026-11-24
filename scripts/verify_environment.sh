@@ -22,7 +22,11 @@ check_tool gcc "Native GCC Compiler"
 check_tool clang "Clang Compiler"
 check_tool make "GNU Make"
 check_tool dtc "Device Tree Compiler"
-check_tool iasl "ACPI iASL Compiler"
+if which iasl > /dev/null 2>&1; then
+    echo "[PASS] ACPI iASL Compiler found: $(which iasl)"
+else
+    echo "[WARN] ACPI iASL Compiler not found (optional for Device Tree / FDT target)"
+fi
 check_tool git "Git SCM"
 check_tool python3 "Python 3 Engine"
 
@@ -31,7 +35,9 @@ echo "=== TOOL VERSIONS ==="
 gcc --version | head -n 1
 clang --version | head -n 1
 dtc --version
-iasl -v | head -n 1
+if which iasl > /dev/null 2>&1; then
+    iasl -v | head -n 1
+fi
 
 echo ""
 echo "=== TARGET HARDWARE VERIFICATION ==="

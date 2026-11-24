@@ -1,0 +1,89 @@
+name: Build EFI System Partition (Layer 4 & 5)
+
+on:
+  push:
+    paths:
+      - 'scripts/build_esp.sh'
+      - 'boot-manager/**'
+      - '.github/workflows/build-esp.yml'
+  pull_request:
+    paths:
+      - 'scripts/build_esp.sh'
+      - 'boot-manager/**'
+  workflow_dispatch:
+  workflow_call:
+    inputs:
+      build_config:
+        type: string
+        default: 'DEBUG'
+
+jobs:
+  build-esp:
+    name: Generate 256 MiB FAT32 ESP Disk Image
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Install Filesystem Tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y parted dosfstools mtools python3
+
+      - name: Prepare Staged Binaries & Build Directory
+        run: |
+          mkdir -p build
+          mkdir -p edk2/Build/R8Q/DEBUG_GCC5/AARCH64
+
+          # Populate kernel and initramfs from release cache if not present in build
+          if [ ! -f "build/Image" ] && [ -f "R8Q-DEBIAN12-RELEASE/kernel/Image" ]; then
+            cp R8Q-DEBIAN12-RELEASE/kernel/Image build/Image
+          fi
+          if [ ! -f "build/initramfs.img" ] && [ -f "R8Q-DEBIAN12-RELEASE/kernel/initramfs.img" ]; then
+            cp R8Q-DEBIAN12-RELEASE/kernel/initramfs.img build/initramfs.img
+          fi
+          if [ ! -f "build/sm8250-samsung-r8q.dtb" ] && [ -f "R8Q-DEBIAN12-RELEASE/kernel/sm8250-samsung-r8q.dtb" ]; then
+            cp R8Q-DEBIAN12-RELEASE/kernel/sm8250-samsung-r8q.dtb build/sm8250-samsung-r8q.dtb
+            cp R8Q-DEBIAN12-RELEASE/kernel/sm8250-samsung-r8q.dtb build/r8q.dtb
+          fi
+
+      - name: Execute ESP Disk Builder
+        run: |
+          chmod +x scripts/build_esp.sh
+          ./scripts/build_esp.sh
+
+      - name: Validate ESP Disk Image Geometry & Filesystem
+        run: |
+          ESP_PATH="build/esp.img"
+          if [ ! -f "$ESP_PATH" ]; then
+            echo "ERROR: ESP image not found at $ESP_PATH"
+            exit 1
+          fi
+
+          # Exact size check: 256 MiB = 268,435,456 bytes
+          ACTUAL_SIZE=$(stat -c "%s" "$ESP_PATH" 2>/dev/null || ls -l "$ESP_PATH" | awk '{print $5}')
+          EXPECTED_SIZE=268435456
+          if [ "$ACTUAL_SIZE" -ne "$EXPECTED_SIZE" ]; then
+            echo "ERROR: ESP size ($ACTUAL_SIZE) does not match expected ($EXPECTED_SIZE)"
+            exit 1
+          fi
+          echo "ESP geometry verification PASSED: exactly 256 MiB (268,435,456 bytes)"
+
+          # Validate FAT32 partition structure via mtools
+          TARGET_PART="$ESP_PATH@@1M"
+          mdir -i "$TARGET_PART" ::EFI
+          mdir -i "$TARGET_PART" ::EFI/BOOT
+          mdir -i "$TARGET_PART" ::EFI/R8Q
+
+          sha256sum "$ESP_PATH" > esp.img.sha256
+          cat esp.img.sha256
+
+      - name: Upload ESP Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: r8q-esp
+          path: |
+            build/esp.img
+            esp.img.sha256
+          retention-days: 30

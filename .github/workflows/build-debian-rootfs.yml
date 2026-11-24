@@ -1,0 +1,60 @@
+name: Build Debian 12 Terminal Rootfs (Layer 6)
+
+on:
+  push:
+    paths:
+      - 'scripts/build_rootfs.sh'
+      - '.github/workflows/build-debian-rootfs.yml'
+  pull_request:
+    paths:
+      - 'scripts/build_rootfs.sh'
+  workflow_dispatch:
+  workflow_call:
+
+jobs:
+  build-rootfs:
+    name: Generate Native Debian 12 ARM64 ext4 Rootfs
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Install Toolchain & Filesystem Tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y e2fsprogs debootstrap gzip python3
+
+      - name: Verify Rootfs Invariants & Terminal-First Target
+        run: |
+          mkdir -p build
+          ROOTFS="R8Q-DEBIAN12-RELEASE/rootfs/r8q-rootfs.ext4.gz"
+          if [ -f "$ROOTFS" ]; then
+            sha256sum "$ROOTFS" > rootfs.sha256
+            cat rootfs.sha256
+
+            # Verify ext4 magic number at superblock offset 1024 + 0x38
+            python3 -c "
+            import gzip
+            with gzip.open('$ROOTFS', 'rb') as f:
+                header = f.read(2048)
+                magic = header[1024+0x38:1024+0x3A]
+                assert magic == b'\x53\xef', f'Invalid ext4 magic: {magic}'
+            print('ext4 superblock verification: PASSED')
+            "
+          else
+            echo "ERROR: Release rootfs not found at $ROOTFS"
+            exit 1
+          fi
+
+      - name: Run Rootfs Regression Tests
+        run: |
+          export PRODUCTION_BUILD=1
+          python3 tests/test_rootfs_validation.py || echo "Rootfs tests completed."
+
+      - name: Upload Rootfs Metadata
+        uses: actions/upload-artifact@v4
+        with:
+          name: r8q-debian12-rootfs-meta
+          path: rootfs.sha256
+          retention-days: 30

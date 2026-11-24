@@ -63,6 +63,8 @@ INF R8QPkg/Applications/Firmware/Firmware.inf
 INF R8QPkg/Applications/Diagnostics/Diagnostics.inf
 INF R8QPkg/Applications/ShellTest/ShellTest.inf
 INF R8QPkg/Applications/LinuxBoot/LinuxBoot.inf
+INF R8QPkg/Applications/Setup/Setup.inf
+INF R8QPkg/Applications/BootManager/BootManager.inf
 
 [Rule.Common.SEC]
   FILE SEC = $(NAMED_GUID) RELOCS_STRIPPED {

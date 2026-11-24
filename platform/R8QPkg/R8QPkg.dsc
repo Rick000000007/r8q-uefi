@@ -109,6 +109,8 @@
   R8QPkg/Applications/Diagnostics/Diagnostics.inf
   R8QPkg/Applications/ShellTest/ShellTest.inf
   R8QPkg/Applications/LinuxBoot/LinuxBoot.inf
+  R8QPkg/Applications/Setup/Setup.inf
+  R8QPkg/Applications/BootManager/BootManager.inf
 
   ShellPkg/Application/Shell/Shell.inf {
     <PcdsFixedAtBuild>

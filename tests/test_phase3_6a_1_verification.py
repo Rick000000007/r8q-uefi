@@ -18,7 +18,7 @@ import sys
 import struct
 import unittest
 
-PROJECT_ROOT = "/root/r8q-uefi"
+PROJECT_ROOT = os.environ.get("PROJECT_ROOT", os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 COMPLETE_IMG = os.path.join(PROJECT_ROOT, "build/r8q-uefi-boot-complete.img")
 DOC_36A = os.path.join(PROJECT_ROOT, "docs/phase3_6/PHASE3_6A_NON_DESTRUCTIVE_HARDWARE_PREPARATION.md")
 DOC_36A_1 = os.path.join(PROJECT_ROOT, "docs/phase3_6/PHASE3_6A_1_PARTITION_AND_BOOTCHAIN_VERIFICATION.md")

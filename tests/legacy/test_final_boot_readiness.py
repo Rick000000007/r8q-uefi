@@ -18,7 +18,7 @@ import struct
 import hashlib
 import gzip
 
-PROJECT_ROOT = "/root/r8q-uefi"
+PROJECT_ROOT = os.environ.get("PROJECT_ROOT", os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 BUILD_DIR = os.path.join(PROJECT_ROOT, "build")
 FD_PATH = os.path.join(BUILD_DIR, "R8Q_EFI.fd")
 KERNEL_PATH = os.path.join(BUILD_DIR, "Image")

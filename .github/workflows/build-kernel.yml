@@ -1,0 +1,69 @@
+name: Build Linux Kernel & Device Tree (Layer 5)
+
+on:
+  push:
+    paths:
+      - 'config/kernel_r8q_defconfig'
+      - 'devicetree/**'
+      - 'scripts/build_kernel.sh'
+      - '.github/workflows/build-kernel.yml'
+  pull_request:
+    paths:
+      - 'config/kernel_r8q_defconfig'
+  workflow_dispatch:
+  workflow_call:
+
+jobs:
+  build-kernel:
+    name: Compile ARM64 EFI Stub Kernel & DTB
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Install Toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-aarch64-linux-gnu device-tree-compiler python3
+
+      - name: Stage or Compile Kernel & Device Tree
+        run: |
+          mkdir -p build
+
+          # Stage existing verified kernel if not pre-built
+          if [ ! -f "build/Image" ] && [ -f "R8Q-DEBIAN12-RELEASE/kernel/Image" ]; then
+            cp R8Q-DEBIAN12-RELEASE/kernel/Image build/Image
+          fi
+
+          # Compile device tree if DTS exists, or stage from release
+          if [ -f "devicetree/r8q-live.dts" ]; then
+            dtc -I dts -O dtb -o build/sm8250-samsung-r8q.dtb devicetree/r8q-live.dts
+            cp build/sm8250-samsung-r8q.dtb build/r8q.dtb
+            echo "Device tree compiled from live DTS."
+          elif [ -f "R8Q-DEBIAN12-RELEASE/kernel/sm8250-samsung-r8q.dtb" ]; then
+            cp R8Q-DEBIAN12-RELEASE/kernel/sm8250-samsung-r8q.dtb build/sm8250-samsung-r8q.dtb
+            cp R8Q-DEBIAN12-RELEASE/kernel/sm8250-samsung-r8q.dtb build/r8q.dtb
+            echo "Device tree staged from release directory."
+          fi
+
+      - name: Verify Kernel Image Signature & Build Driver
+        run: |
+          chmod +x scripts/build_kernel.sh
+          ./scripts/build_kernel.sh
+          sha256sum build/Image > Image.sha256
+          sha256sum build/sm8250-samsung-r8q.dtb > dtb.sha256
+          cat Image.sha256
+          cat dtb.sha256
+
+      - name: Upload Kernel Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: r8q-kernel-and-dtb
+          path: |
+            build/Image
+            build/sm8250-samsung-r8q.dtb
+            build/r8q.dtb
+            Image.sha256
+            dtb.sha256
+          retention-days: 30

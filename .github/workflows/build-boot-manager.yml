@@ -1,0 +1,86 @@
+name: Build R8Q Boot Manager & Setup (Layer 3 & 4)
+
+on:
+  push:
+    paths:
+      - 'platform/R8QPkg/Applications/**'
+      - 'boot-manager/**'
+      - '.github/workflows/build-boot-manager.yml'
+  pull_request:
+    paths:
+      - 'platform/R8QPkg/Applications/**'
+  workflow_dispatch:
+    inputs:
+      build_config:
+        description: 'Build target (DEBUG or RELEASE)'
+        type: choice
+        options:
+          - DEBUG
+          - RELEASE
+        default: 'DEBUG'
+  workflow_call:
+    inputs:
+      build_config:
+        type: string
+        default: 'DEBUG'
+
+jobs:
+  build-boot-manager:
+    name: Compile Standalone BootManager.efi & Setup.efi
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-aarch64-linux-gnu build-essential python3
+
+      - name: Verify POSIX Shared Memory
+        run: |
+          sudo mkdir -p /dev/shm
+          sudo chmod 1777 /dev/shm
+          sudo mount -t tmpfs tmpfs /dev/shm || true
+
+      - name: Build Setup.efi & BootManager.efi
+        run: |
+          export WORKSPACE="$PWD/edk2"
+          export PACKAGES_PATH="$PWD/platform:$PWD/edk2"
+          export EDK_TOOLS_PATH="$PWD/edk2/BaseTools"
+          export PATH="$EDK_TOOLS_PATH/BinWrappers/PosixLike:$PATH"
+          export PYTHON_COMMAND=python3
+          export GCC5_AARCH64_PREFIX=aarch64-linux-gnu-
+
+          make -C edk2/BaseTools -j$(nproc)
+          TARGET="${{ inputs.build_config || 'DEBUG' }}"
+          cd edk2
+          build -p R8QPkg/R8QPkg.dsc -m R8QPkg/Applications/Setup/Setup.inf -a AARCH64 -t GCC5 -b "$TARGET"
+          build -p R8QPkg/R8QPkg.dsc -m R8QPkg/Applications/BootManager/BootManager.inf -a AARCH64 -t GCC5 -b "$TARGET"
+
+      - name: Verify Applications & PE32+ Signatures
+        run: |
+          mkdir -p output_bins build
+          TARGET="${{ inputs.build_config || 'DEBUG' }}"
+          BIN_DIR="edk2/Build/R8Q/${TARGET}_GCC5/AARCH64"
+          if [ -f "$BIN_DIR/Setup.efi" ] && [ -f "$BIN_DIR/BootManager.efi" ]; then
+            cp "$BIN_DIR/Setup.efi" output_bins/
+            cp "$BIN_DIR/BootManager.efi" output_bins/
+            cp "$BIN_DIR/Setup.efi" build/
+            cp "$BIN_DIR/BootManager.efi" build/
+          elif [ -f "build/Setup.efi" ] && [ -f "build/BootManager.efi" ]; then
+            cp build/Setup.efi output_bins/
+            cp build/BootManager.efi output_bins/
+          fi
+
+          cd output_bins
+          sha256sum Setup.efi BootManager.efi > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+
+      - name: Upload Boot Manager Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: r8q-boot-manager-and-setup
+          path: output_bins/
+          retention-days: 30

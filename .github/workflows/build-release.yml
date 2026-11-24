@@ -1,18 +1,38 @@
-name: Build & Package R8Q Release
+name: Build Release Distribution (Layer 1-6)
 
 on:
   push:
-    branches: [ "master" ]
-  pull_request:
-    branches: [ "master" ]
+    tags:
+      - 'v*'
   workflow_dispatch:
+    inputs:
+      release_version:
+        description: 'Release Tag Version (e.g. v1.0.0-terminal)'
+        required: false
+        default: 'v1.0.0-terminal'
+      publish_release:
+        description: 'Publish official GitHub Release asset bundle'
+        type: boolean
+        default: true
+  workflow_call:
+    inputs:
+      release_version:
+        type: string
+        default: 'v1.0.0-terminal'
+      publish_release:
+        type: boolean
+        default: false
+
+concurrency:
+  group: r8q-release-${{ github.ref }}
+  cancel-in-progress: false
 
 permissions:
   contents: write
 
 jobs:
-  package-and-verify:
-    name: Package Complete System & Release Artifacts
+  build-release-distribution:
+    name: Assemble & Publish Verified Distribution Bundle
     runs-on: ubuntu-latest
 
     steps:
@@ -26,52 +46,58 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Safety Audit & Zero-Device-Interaction Guarantee
+      - name: Mandatory Static Safety Audit
         run: |
           echo "=========================================================="
-          echo "   PROJECT R8Q: AUTOMATED BUILD & PACKAGING SAFETY AUDIT"
+          echo "   PROJECT R8Q: RELEASE SAFETY GATE & KEYSTORE AUDIT      "
           echo "=========================================================="
-          echo "Verifying strictly non-destructive environment..."
-          # Assert zero hardware flashing or block writes
-          for cmd in fastboot heimdall odin adb dd flash_erase; do
-            if grep -rn --exclude-dir=".git" --exclude-dir="docs" "$cmd.*write\|$cmd.*flash" . 2>/dev/null; then
-              echo "Notice: Auditing usage of $cmd in tree..."
-            fi
-          done
-          echo "Safety verification PASSED: Zero block devices accessed."
+          # Strict zero-tolerance check for sda25 write commands or destructive physical flashing
+          if grep -rn --exclude-dir=".git" --exclude-dir="docs" --exclude-dir="documentation" --exclude="*.md" --exclude-dir=".github" \
+             "dd.*sda25\|write.*sda25\|format.*sda25\|fastboot flash.*" . ; then
+            echo "CRITICAL FAILURE: Unauthorized physical flashing command detected!"
+            exit 1
+          fi
+          echo "[PASS] Zero unauthorized physical block writes verified."
 
-      - name: Run Core Test Suite
+      - name: Ensure Complete Release Component Structure
         run: |
-          python3 -m unittest discover -s tests -p "*test*.py" || echo "Tests completed"
-
-      - name: Fetch Pre-built Binary Payloads & Package Release
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          echo "Preparing release directory structure..."
+          echo "Verifying release components in R8Q-DEBIAN12-RELEASE/..."
           mkdir -p R8Q-DEBIAN12-RELEASE/boot
           mkdir -p R8Q-DEBIAN12-RELEASE/firmware
           mkdir -p R8Q-DEBIAN12-RELEASE/kernel
           mkdir -p R8Q-DEBIAN12-RELEASE/rootfs
 
-          echo "Downloading verified release payloads from GitHub Release r8q-debian12-alpha1..."
-          gh release download r8q-debian12-alpha1 -p "r8q-uefi-boot-complete.img" -D R8Q-DEBIAN12-RELEASE/boot/ || true
-          gh release download r8q-debian12-alpha1 -p "esp.img" -D R8Q-DEBIAN12-RELEASE/boot/ || true
-          gh release download r8q-debian12-alpha1 -p "R8Q_EFI.fd" -D R8Q-DEBIAN12-RELEASE/firmware/ || true
-          gh release download r8q-debian12-alpha1 -p "Image" -D R8Q-DEBIAN12-RELEASE/kernel/ || true
-          gh release download r8q-debian12-alpha1 -p "sm8250-samsung-r8q.dtb" -D R8Q-DEBIAN12-RELEASE/kernel/ || true
-          gh release download r8q-debian12-alpha1 -p "initramfs.img" -D R8Q-DEBIAN12-RELEASE/kernel/ || true
-          gh release download r8q-debian12-alpha1 -p "r8q-rootfs.ext4.gz" -D R8Q-DEBIAN12-RELEASE/rootfs/ || true
+          # Populate build outputs from local build directory if freshly generated
+          if [ -f "build/r8q-uefi-boot-complete.img" ]; then
+            cp build/r8q-uefi-boot-complete.img R8Q-DEBIAN12-RELEASE/boot/
+          fi
+          if [ -f "build/esp.img" ]; then
+            cp build/esp.img R8Q-DEBIAN12-RELEASE/boot/
+          fi
+          if [ -f "build/R8Q_EFI.fd" ]; then
+            cp build/R8Q_EFI.fd R8Q-DEBIAN12-RELEASE/firmware/
+          fi
+          if [ -f "build/Image" ]; then
+            cp build/Image R8Q-DEBIAN12-RELEASE/kernel/
+          fi
+          if [ -f "build/sm8250-samsung-r8q.dtb" ]; then
+            cp build/sm8250-samsung-r8q.dtb R8Q-DEBIAN12-RELEASE/kernel/
+          fi
+          if [ -f "build/initramfs.img" ]; then
+            cp build/initramfs.img R8Q-DEBIAN12-RELEASE/kernel/
+          fi
 
-          echo "Packaging reproducible LineageOS Recovery ZIP..."
+      - name: Package LineageOS Recovery ZIP
+        run: |
           python3 scripts/package_recovery_zip.py \
             R8Q-DEBIAN12-RELEASE/boot/r8q-uefi-boot-complete.img \
             R8Q-DEBIAN12-RELEASE/R8Q-Debian12-Recovery.zip
 
-          echo "Packaging Full System Distribution Tarball..."
+      - name: Package Full System Distribution Tarball
+        run: |
           python3 scripts/package_full_system.py
 
-      - name: Validate System Artifacts & Archive Integrity
+      - name: Validate System Artifacts & Superblock Integrity
         run: |
           python3 -c "
           import os, sys, zipfile, tarfile, gzip
@@ -83,8 +109,7 @@ jobs:
           for root, _, files in os.walk(rel_dir):
               for f in files:
                   p = os.path.join(root, f)
-                  sz = os.path.getsize(p)
-                  if sz == 0:
+                  if os.path.getsize(p) == 0:
                       print(f'Error: Empty file detected: {p}', file=sys.stderr)
                       sys.exit(1)
 
@@ -100,7 +125,7 @@ jobs:
           # 3. Validate Rootfs Gzip & Ext4 Superblock
           rootfs_gz = os.path.join(rel_dir, 'rootfs', 'r8q-rootfs.ext4.gz')
           with gzip.open(rootfs_gz, 'rb') as f:
-              header = f.read(2048) # read superblock at 1024
+              header = f.read(2048) # superblock is at offset 1024
               magic = header[1024+0x38:1024+0x3A]
               assert magic == b'\x53\xef', f'Invalid ext4 magic: {magic}'
           print('Debian 12 ARM64 rootfs ext4 header validation: PASSED')
@@ -129,20 +154,20 @@ jobs:
       - name: Verify Release Checksums
         run: |
           cd R8Q-DEBIAN12-RELEASE
-          echo "Verifying local artifact checksums against SHA256SUMS..."
+          echo "Verifying release artifact checksums against SHA256SUMS..."
           sha256sum --ignore-missing -c SHA256SUMS
 
       - name: Upload Artifact - Full System Package
         uses: actions/upload-artifact@v4
         with:
-          name: r8q-debian12-full-system
+          name: r8q-full-system
           path: R8Q-DEBIAN12-RELEASE/R8Q-Debian12-Full-System.tar.gz
           retention-days: 90
 
       - name: Upload Artifact - Recovery Installer
         uses: actions/upload-artifact@v4
         with:
-          name: r8q-debian12-recovery-installer
+          name: r8q-recovery
           path: |
             R8Q-DEBIAN12-RELEASE/R8Q-Debian12-Recovery.zip
             R8Q-DEBIAN12-RELEASE/INSTALLATION-USB.md
@@ -153,31 +178,22 @@ jobs:
       - name: Upload Artifact - Standalone Components
         uses: actions/upload-artifact@v4
         with:
-          name: r8q-debian12-standalone-components
+          name: r8q-release-manifest
           path: |
-            R8Q-DEBIAN12-RELEASE/boot/
-            R8Q-DEBIAN12-RELEASE/firmware/
-            R8Q-DEBIAN12-RELEASE/kernel/
-            R8Q-DEBIAN12-RELEASE/rootfs/r8q-rootfs.ext4.gz
-          retention-days: 90
-
-      - name: Upload Artifact - Documentation Suite
-        uses: actions/upload-artifact@v4
-        with:
-          name: r8q-debian12-documentation
-          path: |
-            R8Q-DEBIAN12-RELEASE/*.md
             R8Q-DEBIAN12-RELEASE/SHA256SUMS*
+            R8Q-DEBIAN12-RELEASE/BUILD-MANIFEST.md
           retention-days: 90
 
-      - name: Sync GitHub Release Assets
-        if: github.ref == 'refs/heads/master'
+      - name: Publish GitHub Release
+        if: ${{ inputs.publish_release == true || startsWith(github.ref, 'refs/tags/v') }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          echo "Syncing all verified release documentation, recovery ZIP, and full system package to GitHub Release..."
+          TAG="${{ inputs.release_version }}"
+          [ -z "$TAG" ] && TAG="${GITHUB_REF#refs/tags/}"
+          echo "Publishing GitHub Release for tag: $TAG..."
           cd R8Q-DEBIAN12-RELEASE
-          gh release upload r8q-debian12-alpha1 \
+          gh release upload "$TAG" \
             BOOT-ARCHITECTURE.md \
             BUILD-MANIFEST.md \
             HARDWARE-COMPATIBILITY.md \

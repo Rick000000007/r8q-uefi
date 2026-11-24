@@ -31,31 +31,35 @@ if [ ! -d "/dev/shm" ]; then
     mount -t tmpfs tmpfs /dev/shm 2>/dev/null || true
 fi
 
+BUILD_CONFIG="${BUILD_CONFIG:-DEBUG}"
+HOST_ARCH="$(uname -m)"
+
 # 3. BaseTools Verification
 echo ""
 echo "[3/6] Verifying EDK II BaseTools..."
-mkdir -p "$PROJECT_ROOT/edk2/BaseTools/Bin/Linux-aarch64"
+mkdir -p "$PROJECT_ROOT/edk2/BaseTools/Bin/Linux-$HOST_ARCH"
 if [ -f "$PROJECT_ROOT/edk2/BaseTools/Source/C/bin/GenFv" ]; then
-    cp "$PROJECT_ROOT/edk2/BaseTools/Source/C/bin/"* "$PROJECT_ROOT/edk2/BaseTools/Bin/Linux-aarch64/" 2>/dev/null || true
+    cp "$PROJECT_ROOT/edk2/BaseTools/Source/C/bin/"* "$PROJECT_ROOT/edk2/BaseTools/Bin/Linux-$HOST_ARCH/" 2>/dev/null || true
 fi
 
 # 4. EDK II Platform Build
 echo ""
-echo "[4/6] Executing EDK II Platform Compilation (R8QPkg)..."
+echo "[4/6] Executing EDK II Platform Compilation (R8QPkg) [Target: AARCH64, Config: $BUILD_CONFIG]..."
 export WORKSPACE="$PROJECT_ROOT/edk2"
 export PACKAGES_PATH="$PROJECT_ROOT/platform:$PROJECT_ROOT/edk2"
 export EDK_TOOLS_PATH="$PROJECT_ROOT/edk2/BaseTools"
-export PATH="$EDK_TOOLS_PATH/BinWrappers/PosixLike:$EDK_TOOLS_PATH/Bin/Linux-aarch64:$PATH"
+export PATH="$EDK_TOOLS_PATH/BinWrappers/PosixLike:$EDK_TOOLS_PATH/Bin/Linux-$HOST_ARCH:$PATH"
 export PYTHON_COMMAND=python3
+export GCC5_AARCH64_PREFIX="${GCC5_AARCH64_PREFIX:-aarch64-linux-gnu-}"
 
 cd "$PROJECT_ROOT/edk2"
-build -p R8QPkg/R8QPkg.dsc -a AARCH64 -t GCC5 -b DEBUG
+build -p R8QPkg/R8QPkg.dsc -a AARCH64 -t GCC5 -b "$BUILD_CONFIG"
 
 # 5. Packaging Proof-of-Concept Boot Image
 echo ""
 echo "[5/6] Packaging Proof-of-Concept Android Boot Image (v2)..."
 mkdir -p "$PROJECT_ROOT/build"
-OUTPUT_FD="$PROJECT_ROOT/edk2/Build/R8Q/DEBUG_GCC5/FV/R8Q_EFI.fd"
+OUTPUT_FD="$PROJECT_ROOT/edk2/Build/R8Q/${BUILD_CONFIG}_GCC5/FV/R8Q_EFI.fd"
 POC_IMG="$PROJECT_ROOT/build/r8q-uefi-boot-poc.img"
 
 if [ -f "$OUTPUT_FD" ]; then
@@ -63,7 +67,7 @@ if [ -f "$OUTPUT_FD" ]; then
     python3 "$PROJECT_ROOT/scripts/package_boot_img.py" "$PROJECT_ROOT/build/R8Q_EFI.fd" "$POC_IMG"
 else
     # If FD not built, package PrePi raw binary as proof-of-concept
-    PREPI_RAW="$PROJECT_ROOT/edk2/Build/R8Q/DEBUG_GCC5/AARCH64/R8QPkg/PrePi/PrePi/OUTPUT/PrePi.raw"
+    PREPI_RAW="$PROJECT_ROOT/edk2/Build/R8Q/${BUILD_CONFIG}_GCC5/AARCH64/R8QPkg/PrePi/PrePi/OUTPUT/PrePi.raw"
     if [ -f "$PREPI_RAW" ]; then
         cp "$PREPI_RAW" "$PROJECT_ROOT/build/PrePi.raw"
         python3 "$PROJECT_ROOT/scripts/package_boot_img.py" "$PROJECT_ROOT/build/PrePi.raw" "$POC_IMG"

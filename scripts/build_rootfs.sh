@@ -37,6 +37,16 @@ for deb in "$DEB_DIR_1"/*.deb "$DEB_DIR_2"/*.deb; do
 done
 echo "[ROOTFS] Extracted $PKG_COUNT packages into staging directory."
 
+if [ "$PKG_COUNT" -eq 0 ]; then
+    if [ -f "$OUTPUT_TAR" ]; then
+        echo "[ROOTFS] Using base userspace from $OUTPUT_TAR..."
+        tar -xzf "$OUTPUT_TAR" -C "$STAGING_DIR"
+    elif [ -f "$BUILD_DIR/r8q-rootfs.tar.gz" ]; then
+        echo "[ROOTFS] Using base userspace from $BUILD_DIR/r8q-rootfs.tar.gz..."
+        tar -xzf "$BUILD_DIR/r8q-rootfs.tar.gz" -C "$STAGING_DIR"
+    fi
+fi
+
 # 2. Establish standard FHS directories
 echo "[ROOTFS] Setting up FHS 3.0 directory tree..."
 mkdir -p "$STAGING_DIR"/{dev,proc,sys,mnt/storage,root/.ssh,home/r8q/.ssh,boot/efi,opt,media}

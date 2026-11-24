@@ -20,7 +20,7 @@ import os
 import sys
 import unittest
 
-PROJECT_ROOT = "/root/r8q-uefi"
+PROJECT_ROOT = os.environ.get("PROJECT_ROOT", os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 DOC_36A_2 = os.path.join(PROJECT_ROOT, "docs/phase3_6/PHASE3_6A_2_BOOTCHAIN_EVIDENCE_VALIDATION.md")
 
 class TestPhase36A2Validation(unittest.TestCase):

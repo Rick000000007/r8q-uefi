@@ -1,0 +1,124 @@
+name: R8Q Complete Platform Build Pipeline (Master)
+
+on:
+  push:
+    branches: [ "master" ]
+    tags: [ "v*" ]
+  pull_request:
+    branches: [ "master" ]
+  workflow_dispatch:
+    inputs:
+      build_config:
+        description: 'EDK II & Application Build Profile'
+        type: choice
+        options:
+          - RELEASE
+          - DEBUG
+        default: 'RELEASE'
+      clean_build:
+        description: 'Perform clean build from scratch'
+        type: boolean
+        default: false
+      run_acceptance_tests:
+        description: 'Execute full automated regression & acceptance test suite'
+        type: boolean
+        default: true
+      release_version:
+        description: 'Release Tag Version (e.g. v1.0.0-terminal)'
+        type: string
+        default: 'v1.0.0-terminal'
+      publish_release:
+        description: 'Publish official GitHub Release with distribution bundle'
+        type: boolean
+        default: false
+
+concurrency:
+  group: r8q-complete-build-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  safety-pre-audit:
+    name: Mandatory Non-Destructive CI Safety Gate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Verify Hardware Safety & Keystore Isolation
+        run: |
+          echo "=========================================================="
+          echo "   PROJECT R8Q: PRE-BUILD REPOSITORY SAFETY AUDIT"
+          echo "=========================================================="
+          # Verify zero unauthorized block device access or destructive physical commands
+          if grep -rn --exclude-dir=".git" --exclude-dir="docs" --exclude-dir="documentation" --exclude="*.md" --exclude-dir=".github" \
+             "dd.*sda25\|write.*sda25\|format.*sda25\|fastboot flash.*" . ; then
+            echo "CRITICAL FAILURE: Unauthorized physical flashing command detected!"
+            exit 1
+          fi
+          echo "[PASS] Hardware Knox Keyrefuge (/dev/block/sda25) strictly isolated."
+          echo "[PASS] Zero physical flashing or destructive block operations verified."
+
+  build-firmware:
+    name: Layer 2 - UEFI Firmware Volume
+    needs: safety-pre-audit
+    uses: ./.github/workflows/build-firmware.yml
+    with:
+      build_config: ${{ inputs.build_config || 'RELEASE' }}
+
+  build-boot-manager:
+    name: Layer 3 & 4 - Boot Manager & Setup Utility
+    needs: safety-pre-audit
+    uses: ./.github/workflows/build-boot-manager.yml
+    with:
+      build_config: ${{ inputs.build_config || 'DEBUG' }}
+
+  build-kernel:
+    name: Layer 5 - Linux Kernel & Device Tree
+    needs: safety-pre-audit
+    uses: ./.github/workflows/build-kernel.yml
+
+  build-initramfs:
+    name: Layer 5 - Early-Userspace Initramfs
+    needs: safety-pre-audit
+    uses: ./.github/workflows/build-initramfs.yml
+
+  build-debian-rootfs:
+    name: Layer 6 - Debian 12 ARM64 Terminal Rootfs
+    needs: safety-pre-audit
+    uses: ./.github/workflows/build-debian-rootfs.yml
+
+  build-esp:
+    name: Layer 4 & 5 - FAT32 EFI System Partition
+    needs: [build-boot-manager, build-kernel, build-initramfs]
+    uses: ./.github/workflows/build-esp.yml
+    with:
+      build_config: ${{ inputs.build_config || 'DEBUG' }}
+
+  build-complete-platform:
+    name: Platform Integration - Compound Boot Image & Full Tarball
+    needs: [build-firmware, build-esp, build-debian-rootfs]
+    uses: ./.github/workflows/build-complete-platform.yml
+
+  build-recovery:
+    name: Installer - LineageOS Recovery Flashable ZIP
+    needs: build-complete-platform
+    uses: ./.github/workflows/build-recovery.yml
+
+  test-platform:
+    name: QA - Acceptance & Regression Test Suite
+    needs: [build-complete-platform, build-esp]
+    if: ${{ always() && (inputs.run_acceptance_tests != false) }}
+    uses: ./.github/workflows/test-platform.yml
+
+  publish-release:
+    name: Distribution - GitHub Release & Asset Publication
+    needs: [build-recovery, test-platform]
+    if: ${{ inputs.publish_release == true || startsWith(github.ref, 'refs/tags/v') }}
+    uses: ./.github/workflows/build-release.yml
+    with:
+      release_version: ${{ inputs.release_version || 'v1.0.0-terminal' }}
+      publish_release: true
+    secrets: inherit

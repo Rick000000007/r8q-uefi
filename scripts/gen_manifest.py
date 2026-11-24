@@ -11,7 +11,7 @@ import json
 import hashlib
 from datetime import datetime, timezone
 
-PROJECT_ROOT = "/root/r8q-uefi"
+PROJECT_ROOT = os.environ.get("PROJECT_ROOT", os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 MANIFEST_DIR = os.path.join(PROJECT_ROOT, "manifests")
 
 # Security cleanup policy: Never include private cryptographic keys or credentials in release manifests

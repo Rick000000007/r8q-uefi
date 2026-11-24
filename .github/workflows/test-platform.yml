@@ -1,0 +1,38 @@
+name: Test R8Q Platform (Automated Verification)
+
+on:
+  push:
+    branches: [ "master" ]
+  pull_request:
+    branches: [ "master" ]
+  workflow_dispatch:
+  workflow_call:
+
+jobs:
+  test-platform:
+    name: Execute Full Regression & Acceptance Test Suite
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Test Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y e2fsprogs gzip cpio
+
+      - name: Run Complete Automated Test Suite (116+ Tests)
+        run: |
+          python3 -m unittest discover -s tests -p "test_*.py"
+
+      - name: Verify Security & Non-Destructive Invariants
+        run: |
+          echo "Asserting zero hardcoded sda25 access or unauthorized flashing..."
+          ! grep -rn --exclude-dir=".git" --exclude-dir="docs" --exclude-dir="documentation" --exclude="*.md" --exclude-dir=".github" "write.*sda25\|dd.*sda25\|fastboot flash.*" .
+          echo "Security assertions PASSED: zero block devices accessed, keystore isolated."
