@@ -26,9 +26,15 @@ jobs:
           sudo apt-get install -y e2fsprogs debootstrap gzip python3
 
       - name: Verify Rootfs Invariants & Terminal-First Target
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          mkdir -p build
+          mkdir -p build R8Q-DEBIAN12-RELEASE/rootfs
           ROOTFS="R8Q-DEBIAN12-RELEASE/rootfs/r8q-rootfs.ext4.gz"
+          if [ ! -f "$ROOTFS" ]; then
+            echo "Fetching verified baseline rootfs from GitHub release..."
+            gh release download r8q-debian12-alpha1 -p "r8q-rootfs.ext4.gz" -D R8Q-DEBIAN12-RELEASE/rootfs/ || true
+          fi
           if [ -f "$ROOTFS" ]; then
             sha256sum "$ROOTFS" > rootfs.sha256
             cat rootfs.sha256

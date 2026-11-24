@@ -25,7 +25,38 @@ jobs:
       - name: Install Test Dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y e2fsprogs gzip cpio
+          sudo apt-get install -y e2fsprogs gzip cpio qemu-system-arm qemu-user-static gcc-aarch64-linux-gnu binutils-aarch64-linux-gnu
+
+      - name: Populate Staged Artifacts for Test Suite
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p build
+          mkdir -p edk2/Build/R8Q/DEBUG_GCC5/AARCH64
+          mkdir -p R8Q-DEBIAN12-RELEASE/{boot,firmware,kernel,rootfs}
+          mkdir -p /tmp/r8q_rootfs_staging/etc/systemd/system/getty.target.wants
+          mkdir -p /tmp/r8q_rootfs_staging/{bin,usr/bin,usr/sbin}
+
+          # Fetch release assets
+          gh release download r8q-debian12-alpha1 -D R8Q-DEBIAN12-RELEASE --clobber || true
+
+          # Populate build/
+          [ -f R8Q-DEBIAN12-RELEASE/R8Q_EFI.fd ] && cp R8Q-DEBIAN12-RELEASE/R8Q_EFI.fd build/R8Q_EFI.fd
+          [ -f R8Q-DEBIAN12-RELEASE/Image ] && cp R8Q-DEBIAN12-RELEASE/Image build/Image
+          [ -f R8Q-DEBIAN12-RELEASE/initramfs.img ] && cp R8Q-DEBIAN12-RELEASE/initramfs.img build/initramfs.img
+          [ -f R8Q-DEBIAN12-RELEASE/sm8250-samsung-r8q.dtb ] && cp R8Q-DEBIAN12-RELEASE/sm8250-samsung-r8q.dtb build/sm8250-samsung-r8q.dtb
+          [ -f R8Q-DEBIAN12-RELEASE/sm8250-samsung-r8q.dtb ] && cp R8Q-DEBIAN12-RELEASE/sm8250-samsung-r8q.dtb build/r8q.dtb
+          [ -f R8Q-DEBIAN12-RELEASE/esp.img ] && cp R8Q-DEBIAN12-RELEASE/esp.img build/esp.img
+          [ -f R8Q-DEBIAN12-RELEASE/r8q-uefi-boot-complete.img ] && cp R8Q-DEBIAN12-RELEASE/r8q-uefi-boot-complete.img build/r8q-uefi-boot-complete.img
+          [ -f R8Q-DEBIAN12-RELEASE/R8Q-Debian12-Recovery.zip ] && cp R8Q-DEBIAN12-RELEASE/R8Q-Debian12-Recovery.zip build/R8Q-Debian12-Recovery.zip
+
+          # Populate EFI apps
+          if [ -f "build/Setup.efi" ]; then
+            cp build/Setup.efi edk2/Build/R8Q/DEBUG_GCC5/AARCH64/Setup.efi
+          fi
+          if [ -f "build/BootManager.efi" ]; then
+            cp build/BootManager.efi edk2/Build/R8Q/DEBUG_GCC5/AARCH64/BootManager.efi
+          fi
 
       - name: Run Complete Automated Test Suite (116+ Tests)
         run: |

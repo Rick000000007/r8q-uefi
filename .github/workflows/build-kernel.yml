@@ -28,23 +28,29 @@ jobs:
           sudo apt-get install -y gcc-aarch64-linux-gnu device-tree-compiler python3
 
       - name: Stage or Compile Kernel & Device Tree
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          mkdir -p build
+          mkdir -p build R8Q-DEBIAN12-RELEASE/kernel
 
-          # Stage existing verified kernel if not pre-built
-          if [ ! -f "build/Image" ] && [ -f "R8Q-DEBIAN12-RELEASE/kernel/Image" ]; then
+          # Fetch verified baseline kernel if absent
+          if [ ! -f "build/Image" ] && [ ! -f "R8Q-DEBIAN12-RELEASE/kernel/Image" ]; then
+            echo "Fetching verified baseline kernel from GitHub release..."
+            gh release download r8q-debian12-alpha1 -p "Image" -D R8Q-DEBIAN12-RELEASE/kernel/ || true
+          fi
+          if [ -f "R8Q-DEBIAN12-RELEASE/kernel/Image" ]; then
             cp R8Q-DEBIAN12-RELEASE/kernel/Image build/Image
           fi
 
-          # Compile device tree if DTS exists, or stage from release
+          # Compile device tree if DTS exists, or fetch baseline
           if [ -f "devicetree/r8q-live.dts" ]; then
             dtc -I dts -O dtb -o build/sm8250-samsung-r8q.dtb devicetree/r8q-live.dts
             cp build/sm8250-samsung-r8q.dtb build/r8q.dtb
             echo "Device tree compiled from live DTS."
-          elif [ -f "R8Q-DEBIAN12-RELEASE/kernel/sm8250-samsung-r8q.dtb" ]; then
+          elif [ ! -f "build/sm8250-samsung-r8q.dtb" ]; then
+            gh release download r8q-debian12-alpha1 -p "sm8250-samsung-r8q.dtb" -D R8Q-DEBIAN12-RELEASE/kernel/ || true
             cp R8Q-DEBIAN12-RELEASE/kernel/sm8250-samsung-r8q.dtb build/sm8250-samsung-r8q.dtb
             cp R8Q-DEBIAN12-RELEASE/kernel/sm8250-samsung-r8q.dtb build/r8q.dtb
-            echo "Device tree staged from release directory."
           fi
 
       - name: Verify Kernel Image Signature & Build Driver

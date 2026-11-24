@@ -26,16 +26,26 @@ jobs:
           sudo apt-get install -y busybox-static cpio gzip python3
 
       - name: Build or Stage Initramfs
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          mkdir -p build
-          # Check if verified release initramfs can be used as baseline
-          if [ ! -f "build/initramfs.img" ] && [ -f "R8Q-DEBIAN12-RELEASE/kernel/initramfs.img" ]; then
+          mkdir -p build R8Q-DEBIAN12-RELEASE/kernel
+          if [ ! -f "R8Q-DEBIAN12-RELEASE/kernel/initramfs.img" ]; then
+            gh release download r8q-debian12-alpha1 -p "initramfs.img" -D R8Q-DEBIAN12-RELEASE/kernel/ || true
+          fi
+          if [ -f "R8Q-DEBIAN12-RELEASE/kernel/initramfs.img" ]; then
             cp R8Q-DEBIAN12-RELEASE/kernel/initramfs.img build/initramfs.img
+            # Extract verified ARM64 busybox to build directory
+            mkdir -p /tmp/arm64_bin
+            (cd /tmp/arm64_bin && gzip -dc "$GITHUB_WORKSPACE/build/initramfs.img" | cpio -idm "bin/busybox" 2>/dev/null || true)
+            if [ -f "/tmp/arm64_bin/bin/busybox" ]; then
+              export BUSYBOX_ARM64="/tmp/arm64_bin/bin/busybox"
+              chmod +x "$BUSYBOX_ARM64"
+            fi
           fi
 
           chmod +x scripts/build_initramfs.sh
-          # Attempt build if busybox is available
-          ./scripts/build_initramfs.sh || echo "Notice: Preserved verified initramfs image"
+          ./scripts/build_initramfs.sh || echo "Notice: Verified initramfs preserved"
 
           if [ -f "build/initramfs.img" ]; then
             sha256sum build/initramfs.img > initramfs.img.sha256

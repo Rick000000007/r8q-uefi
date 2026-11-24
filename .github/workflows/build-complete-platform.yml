@@ -5,7 +5,6 @@ on:
     paths:
       - 'scripts/package_full_system.py'
       - 'scripts/package_complete_boot_img.py'
-      - 'R8Q-DEBIAN12-RELEASE/**'
       - '.github/workflows/build-complete-platform.yml'
   workflow_dispatch:
   workflow_call:
@@ -30,29 +29,54 @@ jobs:
           sudo apt-get install -y device-tree-compiler gzip tar
 
       - name: Stage Artifacts & Ensure Build Directory
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           mkdir -p build
-          mkdir -p R8Q-DEBIAN12-RELEASE/boot
-          mkdir -p R8Q-DEBIAN12-RELEASE/firmware
-          mkdir -p R8Q-DEBIAN12-RELEASE/kernel
-          mkdir -p R8Q-DEBIAN12-RELEASE/rootfs
+          mkdir -p R8Q-DEBIAN12-RELEASE/{boot,firmware,kernel,rootfs}
 
-          # Populate build/ from R8Q-DEBIAN12-RELEASE if files not present
-          if [ ! -f "build/R8Q_EFI.fd" ] && [ -f "R8Q-DEBIAN12-RELEASE/firmware/R8Q_EFI.fd" ]; then
+          # Fetch any missing baseline payloads from GitHub release
+          if [ ! -f "build/R8Q_EFI.fd" ] && [ ! -f "R8Q-DEBIAN12-RELEASE/firmware/R8Q_EFI.fd" ]; then
+            gh release download r8q-debian12-alpha1 -p "R8Q_EFI.fd" -D R8Q-DEBIAN12-RELEASE/firmware/ || true
+          fi
+          if [ -f "R8Q-DEBIAN12-RELEASE/firmware/R8Q_EFI.fd" ]; then
             cp R8Q-DEBIAN12-RELEASE/firmware/R8Q_EFI.fd build/R8Q_EFI.fd
           fi
-          if [ ! -f "build/Image" ] && [ -f "R8Q-DEBIAN12-RELEASE/kernel/Image" ]; then
+
+          if [ ! -f "build/Image" ] && [ ! -f "R8Q-DEBIAN12-RELEASE/kernel/Image" ]; then
+            gh release download r8q-debian12-alpha1 -p "Image" -D R8Q-DEBIAN12-RELEASE/kernel/ || true
+          fi
+          if [ -f "R8Q-DEBIAN12-RELEASE/kernel/Image" ]; then
             cp R8Q-DEBIAN12-RELEASE/kernel/Image build/Image
           fi
-          if [ ! -f "build/sm8250-samsung-r8q.dtb" ] && [ -f "R8Q-DEBIAN12-RELEASE/kernel/sm8250-samsung-r8q.dtb" ]; then
+
+          if [ ! -f "build/sm8250-samsung-r8q.dtb" ] && [ ! -f "R8Q-DEBIAN12-RELEASE/kernel/sm8250-samsung-r8q.dtb" ]; then
+            gh release download r8q-debian12-alpha1 -p "sm8250-samsung-r8q.dtb" -D R8Q-DEBIAN12-RELEASE/kernel/ || true
+          fi
+          if [ -f "R8Q-DEBIAN12-RELEASE/kernel/sm8250-samsung-r8q.dtb" ]; then
             cp R8Q-DEBIAN12-RELEASE/kernel/sm8250-samsung-r8q.dtb build/sm8250-samsung-r8q.dtb
             cp R8Q-DEBIAN12-RELEASE/kernel/sm8250-samsung-r8q.dtb build/r8q.dtb
           fi
-          if [ ! -f "build/initramfs.img" ] && [ -f "R8Q-DEBIAN12-RELEASE/kernel/initramfs.img" ]; then
+
+          if [ ! -f "build/initramfs.img" ] && [ ! -f "R8Q-DEBIAN12-RELEASE/kernel/initramfs.img" ]; then
+            gh release download r8q-debian12-alpha1 -p "initramfs.img" -D R8Q-DEBIAN12-RELEASE/kernel/ || true
+          fi
+          if [ -f "R8Q-DEBIAN12-RELEASE/kernel/initramfs.img" ]; then
             cp R8Q-DEBIAN12-RELEASE/kernel/initramfs.img build/initramfs.img
           fi
-          if [ ! -f "build/esp.img" ] && [ -f "R8Q-DEBIAN12-RELEASE/boot/esp.img" ]; then
+
+          if [ ! -f "build/esp.img" ] && [ ! -f "R8Q-DEBIAN12-RELEASE/boot/esp.img" ]; then
+            gh release download r8q-debian12-alpha1 -p "esp.img" -D R8Q-DEBIAN12-RELEASE/boot/ || true
+          fi
+          if [ -f "R8Q-DEBIAN12-RELEASE/boot/esp.img" ]; then
             cp R8Q-DEBIAN12-RELEASE/boot/esp.img build/esp.img
+          fi
+
+          if [ ! -f "R8Q-DEBIAN12-RELEASE/rootfs/r8q-rootfs.ext4.gz" ]; then
+            gh release download r8q-debian12-alpha1 -p "r8q-rootfs.ext4.gz" -D R8Q-DEBIAN12-RELEASE/rootfs/ || true
+          fi
+          if [ ! -f "R8Q-DEBIAN12-RELEASE/R8Q-Debian12-Recovery.zip" ]; then
+            gh release download r8q-debian12-alpha1 -p "R8Q-Debian12-Recovery.zip" -D R8Q-DEBIAN12-RELEASE/ || true
           fi
 
       - name: Build Compound Boot Image v2

@@ -32,18 +32,32 @@ jobs:
           sudo apt-get install -y parted dosfstools mtools python3
 
       - name: Prepare Staged Binaries & Build Directory
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           mkdir -p build
           mkdir -p edk2/Build/R8Q/DEBUG_GCC5/AARCH64
+          mkdir -p R8Q-DEBIAN12-RELEASE/kernel
 
-          # Populate kernel and initramfs from release cache if not present in build
-          if [ ! -f "build/Image" ] && [ -f "R8Q-DEBIAN12-RELEASE/kernel/Image" ]; then
+          # Populate kernel and initramfs from release cache if not present
+          if [ ! -f "build/Image" ] && [ ! -f "R8Q-DEBIAN12-RELEASE/kernel/Image" ]; then
+            gh release download r8q-debian12-alpha1 -p "Image" -D R8Q-DEBIAN12-RELEASE/kernel/ || true
+          fi
+          if [ -f "R8Q-DEBIAN12-RELEASE/kernel/Image" ]; then
             cp R8Q-DEBIAN12-RELEASE/kernel/Image build/Image
           fi
-          if [ ! -f "build/initramfs.img" ] && [ -f "R8Q-DEBIAN12-RELEASE/kernel/initramfs.img" ]; then
+
+          if [ ! -f "build/initramfs.img" ] && [ ! -f "R8Q-DEBIAN12-RELEASE/kernel/initramfs.img" ]; then
+            gh release download r8q-debian12-alpha1 -p "initramfs.img" -D R8Q-DEBIAN12-RELEASE/kernel/ || true
+          fi
+          if [ -f "R8Q-DEBIAN12-RELEASE/kernel/initramfs.img" ]; then
             cp R8Q-DEBIAN12-RELEASE/kernel/initramfs.img build/initramfs.img
           fi
-          if [ ! -f "build/sm8250-samsung-r8q.dtb" ] && [ -f "R8Q-DEBIAN12-RELEASE/kernel/sm8250-samsung-r8q.dtb" ]; then
+
+          if [ ! -f "build/sm8250-samsung-r8q.dtb" ] && [ ! -f "R8Q-DEBIAN12-RELEASE/kernel/sm8250-samsung-r8q.dtb" ]; then
+            gh release download r8q-debian12-alpha1 -p "sm8250-samsung-r8q.dtb" -D R8Q-DEBIAN12-RELEASE/kernel/ || true
+          fi
+          if [ -f "R8Q-DEBIAN12-RELEASE/kernel/sm8250-samsung-r8q.dtb" ]; then
             cp R8Q-DEBIAN12-RELEASE/kernel/sm8250-samsung-r8q.dtb build/sm8250-samsung-r8q.dtb
             cp R8Q-DEBIAN12-RELEASE/kernel/sm8250-samsung-r8q.dtb build/r8q.dtb
           fi

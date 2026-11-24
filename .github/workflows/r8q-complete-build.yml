@@ -110,7 +110,7 @@ jobs:
   test-platform:
     name: QA - Acceptance & Regression Test Suite
     needs: [build-complete-platform, build-esp]
-    if: ${{ always() && (inputs.run_acceptance_tests != false) }}
+    if: ${{ inputs.run_acceptance_tests != false }}
     uses: ./.github/workflows/test-platform.yml
 
   publish-release:

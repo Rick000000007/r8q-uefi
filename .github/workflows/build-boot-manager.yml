@@ -36,13 +36,20 @@ jobs:
       - name: Set up Dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y gcc-aarch64-linux-gnu build-essential python3
+          sudo apt-get install -y gcc-aarch64-linux-gnu build-essential python3 git
 
       - name: Verify POSIX Shared Memory
         run: |
           sudo mkdir -p /dev/shm
           sudo chmod 1777 /dev/shm
           sudo mount -t tmpfs tmpfs /dev/shm || true
+
+      - name: Ensure EDK II Source Tree
+        run: |
+          if [ ! -d "edk2/BaseTools" ]; then
+            echo "Cloning EDK II shallow tree (edk2-stable202411)..."
+            git clone --depth 1 --branch edk2-stable202411 https://github.com/tianocore/edk2.git edk2
+          fi
 
       - name: Build Setup.efi & BootManager.efi
         run: |
@@ -69,9 +76,6 @@ jobs:
             cp "$BIN_DIR/BootManager.efi" output_bins/
             cp "$BIN_DIR/Setup.efi" build/
             cp "$BIN_DIR/BootManager.efi" build/
-          elif [ -f "build/Setup.efi" ] && [ -f "build/BootManager.efi" ]; then
-            cp build/Setup.efi output_bins/
-            cp build/BootManager.efi output_bins/
           fi
 
           cd output_bins
