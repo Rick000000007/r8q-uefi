@@ -34,8 +34,7 @@ jobs:
           mkdir -p build
           mkdir -p edk2/Build/R8Q/DEBUG_GCC5/AARCH64
           mkdir -p R8Q-DEBIAN12-RELEASE/{boot,firmware,kernel,rootfs}
-          mkdir -p /tmp/r8q_rootfs_staging/etc/systemd/system/getty.target.wants
-          mkdir -p /tmp/r8q_rootfs_staging/{bin,usr/bin,usr/sbin}
+          mkdir -p /tmp/r8q_rootfs_staging
 
           # Fetch release assets
           gh release download r8q-debian12-alpha1 -D R8Q-DEBIAN12-RELEASE --clobber || true
@@ -50,12 +49,24 @@ jobs:
           [ -f R8Q-DEBIAN12-RELEASE/r8q-uefi-boot-complete.img ] && cp R8Q-DEBIAN12-RELEASE/r8q-uefi-boot-complete.img build/r8q-uefi-boot-complete.img
           [ -f R8Q-DEBIAN12-RELEASE/R8Q-Debian12-Recovery.zip ] && cp R8Q-DEBIAN12-RELEASE/R8Q-Debian12-Recovery.zip build/R8Q-Debian12-Recovery.zip
 
-          # Populate EFI apps
-          if [ -f "build/Setup.efi" ]; then
-            cp build/Setup.efi edk2/Build/R8Q/DEBUG_GCC5/AARCH64/Setup.efi
+          # Extract EFI apps from esp.img if available
+          if [ -f "build/esp.img" ]; then
+            mcopy -i "build/esp.img@@1M" ::EFI/R8Q/Setup.efi edk2/Build/R8Q/DEBUG_GCC5/AARCH64/Setup.efi 2>/dev/null || true
+            mcopy -i "build/esp.img@@1M" ::EFI/R8Q/BootManager.efi edk2/Build/R8Q/DEBUG_GCC5/AARCH64/BootManager.efi 2>/dev/null || true
+            [ -f "edk2/Build/R8Q/DEBUG_GCC5/AARCH64/Setup.efi" ] && cp edk2/Build/R8Q/DEBUG_GCC5/AARCH64/Setup.efi build/Setup.efi
+            [ -f "edk2/Build/R8Q/DEBUG_GCC5/AARCH64/BootManager.efi" ] && cp edk2/Build/R8Q/DEBUG_GCC5/AARCH64/BootManager.efi build/BootManager.efi
           fi
-          if [ -f "build/BootManager.efi" ]; then
-            cp build/BootManager.efi edk2/Build/R8Q/DEBUG_GCC5/AARCH64/BootManager.efi
+
+          # Extract rootfs userspace into /tmp/r8q_rootfs_staging
+          if [ -f "R8Q-DEBIAN12-RELEASE/r8q-rootfs.tar.gz" ]; then
+            cp R8Q-DEBIAN12-RELEASE/r8q-rootfs.tar.gz build/r8q-rootfs.tar.gz
+            tar -xzf build/r8q-rootfs.tar.gz -C /tmp/r8q_rootfs_staging
+          elif [ -f "R8Q-DEBIAN12-RELEASE/rootfs/r8q-rootfs.tar.gz" ]; then
+            cp R8Q-DEBIAN12-RELEASE/rootfs/r8q-rootfs.tar.gz build/r8q-rootfs.tar.gz
+            tar -xzf build/r8q-rootfs.tar.gz -C /tmp/r8q_rootfs_staging
+          fi
+          if [ -f "R8Q-DEBIAN12-RELEASE/r8q-rootfs.ext4.gz" ]; then
+            gzip -dc R8Q-DEBIAN12-RELEASE/r8q-rootfs.ext4.gz > build/r8q-rootfs.ext4
           fi
 
       - name: Run Complete Automated Test Suite (116+ Tests)

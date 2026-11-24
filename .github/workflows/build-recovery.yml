@@ -27,14 +27,19 @@ jobs:
           python-version: "3.11"
 
       - name: Run Recovery Packaging
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          mkdir -p build
+          mkdir -p build R8Q-DEBIAN12-RELEASE/boot
           BOOT_IMG="build/r8q-uefi-boot-complete.img"
-          if [ ! -f "$BOOT_IMG" ]; then
-            BOOT_IMG="R8Q-DEBIAN12-RELEASE/boot/r8q-uefi-boot-complete.img"
+          if [ ! -f "$BOOT_IMG" ] && [ ! -f "R8Q-DEBIAN12-RELEASE/boot/r8q-uefi-boot-complete.img" ]; then
+            gh release download r8q-debian12-alpha1 -p "r8q-uefi-boot-complete.img" -D R8Q-DEBIAN12-RELEASE/boot/ || true
+          fi
+          if [ -f "R8Q-DEBIAN12-RELEASE/boot/r8q-uefi-boot-complete.img" ]; then
+            cp R8Q-DEBIAN12-RELEASE/boot/r8q-uefi-boot-complete.img build/r8q-uefi-boot-complete.img
           fi
           python3 scripts/package_recovery_zip.py \
-            "$BOOT_IMG" \
+            build/r8q-uefi-boot-complete.img \
             build/R8Q-Debian12-Recovery.zip
           cp build/R8Q-Debian12-Recovery.zip R8Q-DEBIAN12-RELEASE/R8Q-Debian12-Recovery.zip
 

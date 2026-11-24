@@ -29,11 +29,11 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          mkdir -p build R8Q-DEBIAN12-RELEASE/rootfs
+          mkdir -p build R8Q-DEBIAN12-RELEASE/rootfs /tmp/r8q_rootfs_staging
           ROOTFS="R8Q-DEBIAN12-RELEASE/rootfs/r8q-rootfs.ext4.gz"
           if [ ! -f "$ROOTFS" ]; then
             echo "Fetching verified baseline rootfs from GitHub release..."
-            gh release download r8q-debian12-alpha1 -p "r8q-rootfs.ext4.gz" -D R8Q-DEBIAN12-RELEASE/rootfs/ || true
+            gh release download r8q-debian12-alpha1 -p "r8q-rootfs.ext4.gz" -p "r8q-rootfs.tar.gz" -D R8Q-DEBIAN12-RELEASE/rootfs/ || true
           fi
           if [ -f "$ROOTFS" ]; then
             sha256sum "$ROOTFS" > rootfs.sha256
@@ -48,6 +48,13 @@ jobs:
                 assert magic == b'\x53\xef', f'Invalid ext4 magic: {magic}'
             print('ext4 superblock verification: PASSED')
             "
+
+            # Prepare build and staging directories for test_rootfs_validation.py
+            gzip -dc "$ROOTFS" > build/r8q-rootfs.ext4
+            if [ -f "R8Q-DEBIAN12-RELEASE/rootfs/r8q-rootfs.tar.gz" ]; then
+              cp R8Q-DEBIAN12-RELEASE/rootfs/r8q-rootfs.tar.gz build/r8q-rootfs.tar.gz
+              tar -xzf build/r8q-rootfs.tar.gz -C /tmp/r8q_rootfs_staging
+            fi
           else
             echo "ERROR: Release rootfs not found at $ROOTFS"
             exit 1
