@@ -12,7 +12,7 @@ permissions:
 
 jobs:
   package-and-verify:
-    name: Package Release & Verify Integrity
+    name: Package Complete System & Release Artifacts
     runs-on: ubuntu-latest
 
     steps:
@@ -68,66 +68,97 @@ jobs:
             R8Q-DEBIAN12-RELEASE/boot/r8q-uefi-boot-complete.img \
             R8Q-DEBIAN12-RELEASE/R8Q-Debian12-Recovery.zip
 
+          echo "Packaging Full System Distribution Tarball..."
+          bash scripts/package_full_system.sh
+
+      - name: Validate System Artifacts & Archive Integrity
+        run: |
+          python3 -c "
+          import os, sys, zipfile, tarfile, gzip
+
+          rel_dir = 'R8Q-DEBIAN12-RELEASE'
+          print('Auditing generated release artifacts...')
+
+          # 1. Assert non-empty files
+          for root, _, files in os.walk(rel_dir):
+              for f in files:
+                  p = os.path.join(root, f)
+                  sz = os.path.getsize(p)
+                  if sz == 0:
+                      print(f'Error: Empty file detected: {p}', file=sys.stderr)
+                      sys.exit(1)
+
+          # 2. Validate Recovery ZIP integrity
+          rec_zip = os.path.join(rel_dir, 'R8Q-Debian12-Recovery.zip')
+          with zipfile.ZipFile(rec_zip, 'r') as z:
+              assert z.testzip() is None, 'Recovery ZIP corrupted'
+              names = z.namelist()
+              assert 'r8q-uefi-boot-complete.img' in names, 'Missing boot image in ZIP'
+              assert 'META-INF/com/google/android/update-binary' in names, 'Missing update-binary in ZIP'
+          print('Recovery ZIP integrity: PASSED')
+
+          # 3. Validate Rootfs Gzip & Ext4 Superblock
+          rootfs_gz = os.path.join(rel_dir, 'rootfs', 'r8q-rootfs.ext4.gz')
+          with gzip.open(rootfs_gz, 'rb') as f:
+              header = f.read(2048) # read superblock at 1024
+              magic = header[1024+0x38:1024+0x3A]
+              assert magic == b'\x53\xef', f'Invalid ext4 magic: {magic}'
+          print('Debian 12 ARM64 rootfs ext4 header validation: PASSED')
+
+          # 4. Validate Full System Tarball
+          full_tar = os.path.join(rel_dir, 'R8Q-Debian12-Full-System.tar.gz')
+          with tarfile.open(full_tar, 'r:gz') as t:
+              members = t.getnames()
+              required = [
+                  'R8Q-Debian12-Full-System/boot/r8q-uefi-boot-complete.img',
+                  'R8Q-Debian12-Full-System/boot/esp.img',
+                  'R8Q-Debian12-Full-System/firmware/R8Q_EFI.fd',
+                  'R8Q-Debian12-Full-System/kernel/Image',
+                  'R8Q-Debian12-Full-System/kernel/sm8250-samsung-r8q.dtb',
+                  'R8Q-Debian12-Full-System/kernel/initramfs.img',
+                  'R8Q-Debian12-Full-System/rootfs/r8q-rootfs.ext4.gz',
+                  'R8Q-Debian12-Full-System/R8Q-Debian12-Recovery.zip',
+                  'R8Q-Debian12-Full-System/README.md',
+                  'R8Q-Debian12-Full-System/SHA256SUMS'
+              ]
+              for req in required:
+                  assert req in members, f'Missing required full system member: {req}'
+          print('Full System Tarball structure & member validation: PASSED')
+          "
+
       - name: Verify Release Checksums
         run: |
           cd R8Q-DEBIAN12-RELEASE
           echo "Verifying local artifact checksums against SHA256SUMS..."
           sha256sum --ignore-missing -c SHA256SUMS
 
-      - name: Upload Artifact - Recovery ZIP
+      - name: Upload Artifact - Full System Package
         uses: actions/upload-artifact@v4
         with:
-          name: R8Q-Debian12-Recovery.zip
-          path: R8Q-DEBIAN12-RELEASE/R8Q-Debian12-Recovery.zip
+          name: r8q-debian12-full-system
+          path: R8Q-DEBIAN12-RELEASE/R8Q-Debian12-Full-System.tar.gz
           retention-days: 90
 
-      - name: Upload Artifact - Compound Boot Image
+      - name: Upload Artifact - Recovery Installer
         uses: actions/upload-artifact@v4
         with:
-          name: r8q-uefi-boot-complete.img
-          path: R8Q-DEBIAN12-RELEASE/boot/r8q-uefi-boot-complete.img
+          name: r8q-debian12-recovery-installer
+          path: |
+            R8Q-DEBIAN12-RELEASE/R8Q-Debian12-Recovery.zip
+            R8Q-DEBIAN12-RELEASE/INSTALLATION-USB.md
+            R8Q-DEBIAN12-RELEASE/INSTALLER-AUDIT.md
+            R8Q-DEBIAN12-RELEASE/SHA256SUMS-RECOVERY-ZIP.txt
           retention-days: 90
 
-      - name: Upload Artifact - EFI Firmware
+      - name: Upload Artifact - Standalone Components
         uses: actions/upload-artifact@v4
         with:
-          name: R8Q_EFI.fd
-          path: R8Q-DEBIAN12-RELEASE/firmware/R8Q_EFI.fd
-          retention-days: 90
-
-      - name: Upload Artifact - Linux Kernel Image
-        uses: actions/upload-artifact@v4
-        with:
-          name: Image
-          path: R8Q-DEBIAN12-RELEASE/kernel/Image
-          retention-days: 90
-
-      - name: Upload Artifact - Device Tree Blob
-        uses: actions/upload-artifact@v4
-        with:
-          name: sm8250-samsung-r8q.dtb
-          path: R8Q-DEBIAN12-RELEASE/kernel/sm8250-samsung-r8q.dtb
-          retention-days: 90
-
-      - name: Upload Artifact - Rescue Initramfs
-        uses: actions/upload-artifact@v4
-        with:
-          name: initramfs.img
-          path: R8Q-DEBIAN12-RELEASE/kernel/initramfs.img
-          retention-days: 90
-
-      - name: Upload Artifact - EFI System Partition
-        uses: actions/upload-artifact@v4
-        with:
-          name: esp.img
-          path: R8Q-DEBIAN12-RELEASE/boot/esp.img
-          retention-days: 90
-
-      - name: Upload Artifact - Compressed Debian 12 Rootfs
-        uses: actions/upload-artifact@v4
-        with:
-          name: r8q-rootfs.ext4.gz
-          path: R8Q-DEBIAN12-RELEASE/rootfs/r8q-rootfs.ext4.gz
+          name: r8q-debian12-standalone-components
+          path: |
+            R8Q-DEBIAN12-RELEASE/boot/
+            R8Q-DEBIAN12-RELEASE/firmware/
+            R8Q-DEBIAN12-RELEASE/kernel/
+            R8Q-DEBIAN12-RELEASE/rootfs/r8q-rootfs.ext4.gz
           retention-days: 90
 
       - name: Upload Artifact - Documentation Suite
@@ -139,22 +170,12 @@ jobs:
             R8Q-DEBIAN12-RELEASE/SHA256SUMS*
           retention-days: 90
 
-      - name: Upload Artifact - Full Release Package Bundle
-        uses: actions/upload-artifact@v4
-        with:
-          name: r8q-debian12-release-package
-          path: |
-            R8Q-DEBIAN12-RELEASE/*.md
-            R8Q-DEBIAN12-RELEASE/SHA256SUMS*
-            R8Q-DEBIAN12-RELEASE/R8Q-Debian12-Recovery.zip
-          retention-days: 90
-
       - name: Sync GitHub Release Assets
         if: github.ref == 'refs/heads/master'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          echo "Syncing all verified release documentation and recovery ZIP to GitHub Release..."
+          echo "Syncing all verified release documentation, recovery ZIP, and full system package to GitHub Release..."
           cd R8Q-DEBIAN12-RELEASE
           gh release upload r8q-debian12-alpha1 \
             BOOT-ARCHITECTURE.md \
@@ -165,6 +186,7 @@ jobs:
             INSTALLER-AUDIT.md \
             PARTITION-LAYOUT.md \
             R8Q-Debian12-Recovery.zip \
+            R8Q-Debian12-Full-System.tar.gz \
             README.md \
             RECOVERY.md \
             SHA256SUMS \

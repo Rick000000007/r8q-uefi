@@ -32,6 +32,7 @@ Every artifact has undergone deep structural validation (magic number inspection
 | **`r8q-rootfs.tar.gz`** | `rootfs/r8q-rootfs.tar.gz` | 158,123,670 | 150.79 MiB | `f732533c71d4c6dcbd67de246f8610f7aecdd31781149d9692dceeeba351aa15` | Gzip Tarball Root Filesystem Archive | AArch64 (Debian 12 Bookworm) | **YES** (`4312b18`) | **VALIDATED**: Standard tarball distribution containing complete FHS 3.0 userspace for direct MicroSD extraction. |
 | **`esp.img`** | `boot/esp.img` | 268,435,456 | 256.00 MiB | `3f7485e5ad33ef2f8f3c03b2ef96f5f18f145c5a4c72361728f7029d8df05600` | GPT Disk Image (FAT32 EFI System Partition) | AArch64 / UEFI AA64 | **YES** (`4312b18`) | **VALIDATED**: Protective MBR (`0x55AA`); GPT `EFI PART`; 254 MiB FAT32 partition `R8Q_BOOT`; contains `EFI/BOOT/BOOTAA64.EFI`, R8Q diagnostic EFI tools, `startup.nsh`. |
 | **`r8q-uefi-boot-complete.img`** | `boot/r8q-uefi-boot-complete.img` | 24,461,312 | 23.33 MiB | `b2d6f721fe52633e4bee4e1a626514fc5cbe166102803d8b6f0a5c581c5cb100` | Android Boot Image v2 Compound Container | AArch64 / ARM64 (ABL Stageable) | **YES** (`4312b18`) | **VALIDATED**: Magic `ANDROID!`; header v2 (1660 B); compound kernel 21,391,936 B with 64B wrapper (`code0 = 0x14000010`, `ARM\x64`), `R8Q_EFI.fd`, `Image`, `initramfs.img`, `dtb`. |
+| **`R8Q-Debian12-Full-System.tar.gz`** | `R8Q-Debian12-Full-System.tar.gz` | 215,220,111 | 205.25 MiB | `645702bdb954dbe528d2e41fc766897aacb9c58e282d0b93b3e106308197847c` | Gzip Tarball Complete System Distribution | AArch64 (Complete R8Q OS) | **YES** (`4312b18`) | **VALIDATED**: Comprehensive release bundle containing all installation components: rootfs, kernel, firmware, DTB, initramfs, ESP, recovery ZIP, manifests, and documentation. |
 | **`R8Q-Debian12-Recovery.zip`** | `R8Q-Debian12-Recovery.zip` | 10,234,189 | 9.76 MiB | `d969430b84cc69f40cdf3325add813dcbdf0c9704f0e9e226af6b59ad3ec1fe6` | LineageOS Recovery Flashable ZIP Package | AArch64 / ARM64 (LineageOS OTA) | **YES** (`4312b18`) | **VALIDATED**: Verified AOSP OTA archive with POSIX shell `update-binary`, device model verification, metadata assertions, 55.53 MiB safety margin, bit-exact payload. |
 
 ---
@@ -132,6 +133,21 @@ Every artifact has undergone deep structural validation (magic number inspection
   - `r8q-uefi-boot-complete.img.sha256`: Cryptographic digest.
 - **Safety Margin:** Confirmed 55.53 MiB unwritten headroom on `sda24`, terminating safely 113,736 sectors before `sda25` (`keyrefuge`).
 
+### 3.9 Complete System Archive: `R8Q-Debian12-Full-System.tar.gz`
+- **Original Path:** `/root/r8q-uefi/R8Q-DEBIAN12-RELEASE/R8Q-Debian12-Full-System.tar.gz`
+- **Release Path:** `R8Q-DEBIAN12-RELEASE/R8Q-Debian12-Full-System.tar.gz`
+- **Format:** Gzip Tarball Archive (`.tar.gz`).
+- **Archive Contents:**
+  - Complete Debian 12 Bookworm ARM64 rootfs (`rootfs/r8q-rootfs.ext4.gz`)
+  - Standalone EFI System Partition image (`boot/esp.img`)
+  - ARM64 Linux Kernel (`kernel/Image`) and SM8250 Device Tree (`kernel/sm8250-samsung-r8q.dtb`)
+  - EDK II UEFI Firmware Volume (`firmware/R8Q_EFI.fd`) and Rescue Initramfs (`kernel/initramfs.img`)
+  - Compound ABL Boot Image (`boot/r8q-uefi-boot-complete.img`)
+  - LineageOS Recovery Flashable ZIP (`R8Q-Debian12-Recovery.zip`)
+  - Full project documentation, partition maps, safety audit reports, and checksum manifests.
+- **Decompressed Size:** ~500 MiB uncompressed payload (including 256 MiB ESP).
+- **Target Audience:** Complete offline installation bundle for workstations preparing boot media and external MicroSD storage.
+
 ---
 
 ## 4. Cryptographic Proof & Reproduction Commands
@@ -143,4 +159,4 @@ cd R8Q-DEBIAN12-RELEASE
 sha256sum -c SHA256SUMS
 ```
 
-All 11 checks must report `OK`.
+All 12 checks must report `OK`.
