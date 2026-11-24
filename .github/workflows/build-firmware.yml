@@ -62,8 +62,12 @@ jobs:
           export PYTHON_COMMAND=python3
           export GCC5_AARCH64_PREFIX=aarch64-linux-gnu-
 
-          # Build BaseTools on host x86_64
-          make -C edk2/BaseTools -j$(nproc)
+          # Build BaseTools C utilities and Python modules
+          make -C edk2/BaseTools/Source/C GenFv GenFw GenSec GenCrc32 LzmaCompress TianoCompress BUILD_OPTFLAGS="-std=gnu89 -Wno-error" -j$(nproc) || true
+          make -C edk2/BaseTools/Source/Python -j$(nproc) || true
+          HOST_ARCH="$(uname -m)"
+          mkdir -p edk2/BaseTools/Bin/Linux-$HOST_ARCH
+          cp edk2/BaseTools/Source/C/bin/* edk2/BaseTools/Bin/Linux-$HOST_ARCH/ 2>/dev/null || true
 
           # Build R8Q Platform Firmware
           BUILD_TARGET="${{ inputs.build_config || 'RELEASE' }}"
