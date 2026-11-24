@@ -119,7 +119,7 @@ jobs:
                   'R8Q-Debian12-Full-System/rootfs/r8q-rootfs.ext4.gz',
                   'R8Q-Debian12-Full-System/R8Q-Debian12-Recovery.zip',
                   'R8Q-Debian12-Full-System/README.md',
-                  'R8Q-Debian12-Full-System/SHA256SUMS'
+                  'R8Q-Debian12-Full-System/BUILD-MANIFEST.md'
               ]
               for req in required:
                   assert req in members, f'Missing required full system member: {req}'
