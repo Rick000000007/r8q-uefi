@@ -60,10 +60,12 @@ jobs:
           # Extract rootfs userspace into /tmp/r8q_rootfs_staging
           if [ -f "R8Q-DEBIAN12-RELEASE/r8q-rootfs.tar.gz" ]; then
             cp R8Q-DEBIAN12-RELEASE/r8q-rootfs.tar.gz build/r8q-rootfs.tar.gz
-            tar -xzf build/r8q-rootfs.tar.gz -C /tmp/r8q_rootfs_staging
+            sudo tar -xzf build/r8q-rootfs.tar.gz -C /tmp/r8q_rootfs_staging
+            sudo chmod -R a+rX /tmp/r8q_rootfs_staging
           elif [ -f "R8Q-DEBIAN12-RELEASE/rootfs/r8q-rootfs.tar.gz" ]; then
             cp R8Q-DEBIAN12-RELEASE/rootfs/r8q-rootfs.tar.gz build/r8q-rootfs.tar.gz
-            tar -xzf build/r8q-rootfs.tar.gz -C /tmp/r8q_rootfs_staging
+            sudo tar -xzf build/r8q-rootfs.tar.gz -C /tmp/r8q_rootfs_staging
+            sudo chmod -R a+rX /tmp/r8q_rootfs_staging
           fi
           if [ -f "R8Q-DEBIAN12-RELEASE/r8q-rootfs.ext4.gz" ]; then
             gzip -dc R8Q-DEBIAN12-RELEASE/r8q-rootfs.ext4.gz > build/r8q-rootfs.ext4
