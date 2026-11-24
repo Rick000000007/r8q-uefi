@@ -69,7 +69,7 @@ jobs:
             R8Q-DEBIAN12-RELEASE/R8Q-Debian12-Recovery.zip
 
           echo "Packaging Full System Distribution Tarball..."
-          bash scripts/package_full_system.sh
+          python3 scripts/package_full_system.py
 
       - name: Validate System Artifacts & Archive Integrity
         run: |
