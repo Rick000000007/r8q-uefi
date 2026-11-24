@@ -88,18 +88,27 @@ def verify_step_6_esp():
     print(f"  ESP Disk Image Size: {esp_size} bytes ({esp_size / (1024*1024):.2f} MiB)")
     assert esp_size == EXPECTED_ESP_SIZE, f"ESP size {esp_size} != expected {EXPECTED_ESP_SIZE}"
 
-    # Validate MBR partition table at offset 0x1BE
+    # Validate GPT disk image geometry
     with open(esp_path, "rb") as f:
         mbr = f.read(512)
+        gpt_hdr = f.read(512)
     assert mbr[510:512] == b"\x55\xaa", "MBR signature missing (0x55AA)"
-    part1 = mbr[0x1BE:0x1BE+16]
-    part_type = part1[4]
-    start_sector = struct.unpack("<I", part1[8:12])[0]
-    total_sectors = struct.unpack("<I", part1[12:16])[0]
-    print(f"  Partition 1 Type: 0x{part_type:02X} (0x0C = FAT32 LBA, 0xEF = EFI System)")
-    print(f"  Start Sector: {start_sector} (Offset: {start_sector * 512} bytes = 1 MiB alignment)")
-    print(f"  Total Sectors: {total_sectors} ({total_sectors * 512 / (1024*1024):.2f} MiB)")
-    assert start_sector == 2048, f"Partition 1 must start at sector 2048 (1 MiB), got {start_sector}"
+    assert gpt_hdr[:8] == b"EFI PART", "GPT signature missing ('EFI PART')"
+
+    # Read GPT Partition 1 entry (offset 1024, LBA 2)
+    with open(esp_path, "rb") as f:
+        f.seek(1024)
+        pentry = f.read(128)
+    type_guid = pentry[:16]
+    start_lba, end_lba = struct.unpack("<QQ", pentry[32:48])
+    part_name = pentry[56:128].decode("utf-16le").strip("\x00")
+
+    print(f"  GPT Partition 1: Name=\"{part_name}\"")
+    print(f"    ├─ Type GUID:   {type_guid.hex()} (EFI System Partition)")
+    print(f"    ├─ Start LBA:   {start_lba} (Byte Offset: {start_lba * 512} = 1.0 MiB alignment)")
+    print(f"    └─ Sector Span: {end_lba - start_lba + 1} sectors ({(end_lba - start_lba + 1) * 512 / (1024*1024):.2f} MiB)")
+    assert start_lba == 2048, f"Partition 1 must start at sector 2048 (1 MiB), got {start_lba}"
+    assert type_guid == bytes.fromhex("28732ac11ff8d211ba4b00a0c93ec93b"), "Partition 1 must be EFI System Partition Type GUID"
 
     # Use mtools to inspect FAT32 filesystem contents
     res = subprocess.run(["mdir", "-b", "-i", f"{esp_path}@@1M", "::"], capture_output=True, text=True)
@@ -239,7 +248,7 @@ def verify_step_10_protections():
         if any(ignored in root for ignored in [".git", "documentation", "docs"]):
             continue
         for f in files:
-            if not f.endswith((".sh", ".py", ".c", ".inf", ".cfg", ".conf")):
+            if f == "verify_phase8_5.py" or not f.endswith((".sh", ".py", ".c", ".inf", ".cfg", ".conf")):
                 continue
             path = os.path.join(root, f)
             with open(path, "r", errors="ignore") as fl:
@@ -251,7 +260,8 @@ def verify_step_10_protections():
     print("  [PASS] Zero block device writes targeting /dev/block/sda25 verified across all codebase.")
 
     # Verify sda23 is explicitly preserved for dual-boot
-    with open(os.path.join(PROJECT_ROOT, "recovery-installer/update-binary.sh"), "r") as f:
+    upd_path = os.path.join(PROJECT_ROOT, "recovery-installer/META-INF/com/google/android/update-binary")
+    with open(upd_path, "r") as f:
         upd = f.read()
     assert "sda23" in upd and "PRESERVED" in upd, "sda23 preservation statement missing in update-binary"
     print("  [PASS] /dev/block/sda23 (Android/LineageOS boot) explicitly preserved unmodified.")

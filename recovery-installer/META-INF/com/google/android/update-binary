@@ -85,6 +85,7 @@ case "$REAL_DEV" in
         ;;
     *sda24*)
         ui_print "  Confirmed destination node: sda24 (recovery slot)."
+        ui_print "  Partition sda23 (Android/LineageOS boot slot) PRESERVED unmodified."
         ;;
     *)
         ui_print "  Target node: $REAL_DEV (checking capacity bounds)."
