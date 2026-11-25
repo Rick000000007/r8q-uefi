@@ -16,6 +16,9 @@ on:
       build_config:
         type: string
         default: 'DEBUG'
+      use_workflow_artifacts:
+        type: boolean
+        default: false
 
 jobs:
   build-esp:
@@ -29,37 +32,69 @@ jobs:
       - name: Install Filesystem Tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y parted dosfstools mtools python3
+          sudo apt-get install -y parted dosfstools mtools device-tree-compiler python3
 
-      - name: Prepare Staged Binaries & Build Directory
+      - name: Download Upstream Boot Manager & EFI Apps (Workflow Run)
+        if: ${{ inputs.use_workflow_artifacts == true }}
+        uses: actions/download-artifact@v4
+        with:
+          name: r8q-boot-manager-and-setup
+          path: edk2/Build/R8Q/DEBUG_GCC5/AARCH64
+
+      - name: Download Upstream Kernel & DTB (Workflow Run)
+        if: ${{ inputs.use_workflow_artifacts == true }}
+        uses: actions/download-artifact@v4
+        with:
+          name: r8q-kernel-and-dtb
+          path: .
+
+      - name: Download Upstream Initramfs (Workflow Run)
+        if: ${{ inputs.use_workflow_artifacts == true }}
+        uses: actions/download-artifact@v4
+        with:
+          name: r8q-initramfs
+          path: .
+
+      - name: Verify Upstream Artifacts & Stage Build Directory
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           mkdir -p build
           mkdir -p edk2/Build/R8Q/DEBUG_GCC5/AARCH64
-          mkdir -p R8Q-DEBIAN12-RELEASE/kernel
+          mkdir -p R8Q-DEBIAN12-RELEASE/{boot,kernel}
 
-          # Populate kernel and initramfs from release cache if not present
-          if [ ! -f "build/Image" ] && [ ! -f "R8Q-DEBIAN12-RELEASE/kernel/Image" ]; then
-            gh release download r8q-debian12-alpha1 -p "Image" -D R8Q-DEBIAN12-RELEASE/kernel/ || true
-          fi
-          if [ -f "R8Q-DEBIAN12-RELEASE/kernel/Image" ]; then
-            cp R8Q-DEBIAN12-RELEASE/kernel/Image build/Image
-          fi
-
-          if [ ! -f "build/initramfs.img" ] && [ ! -f "R8Q-DEBIAN12-RELEASE/kernel/initramfs.img" ]; then
-            gh release download r8q-debian12-alpha1 -p "initramfs.img" -D R8Q-DEBIAN12-RELEASE/kernel/ || true
-          fi
-          if [ -f "R8Q-DEBIAN12-RELEASE/kernel/initramfs.img" ]; then
-            cp R8Q-DEBIAN12-RELEASE/kernel/initramfs.img build/initramfs.img
-          fi
-
-          if [ ! -f "build/sm8250-samsung-r8q.dtb" ] && [ ! -f "R8Q-DEBIAN12-RELEASE/kernel/sm8250-samsung-r8q.dtb" ]; then
-            gh release download r8q-debian12-alpha1 -p "sm8250-samsung-r8q.dtb" -D R8Q-DEBIAN12-RELEASE/kernel/ || true
-          fi
-          if [ -f "R8Q-DEBIAN12-RELEASE/kernel/sm8250-samsung-r8q.dtb" ]; then
-            cp R8Q-DEBIAN12-RELEASE/kernel/sm8250-samsung-r8q.dtb build/sm8250-samsung-r8q.dtb
-            cp R8Q-DEBIAN12-RELEASE/kernel/sm8250-samsung-r8q.dtb build/r8q.dtb
+          if [ "${{ inputs.use_workflow_artifacts }}" = "true" ]; then
+            echo "Verifying downloaded CI upstream artifact digests..."
+            (cd edk2/Build/R8Q/DEBUG_GCC5/AARCH64 && sha256sum -c SHA256SUMS.txt)
+            sha256sum -c Image.sha256
+            sha256sum -c r8q.dtb.sha256
+            sha256sum -c initramfs.img.sha256
+          else
+            # Standalone workflow fallback: fetch verified baseline assets without ignoring errors
+            if [ ! -f "build/Image" ]; then
+              gh release download r8q-debian12-alpha1 -p "Image" -D R8Q-DEBIAN12-RELEASE/kernel/ --clobber
+              cp R8Q-DEBIAN12-RELEASE/kernel/Image build/Image
+            fi
+            if [ ! -f "build/initramfs.img" ]; then
+              gh release download r8q-debian12-alpha1 -p "initramfs.img" -D R8Q-DEBIAN12-RELEASE/kernel/ --clobber
+              cp R8Q-DEBIAN12-RELEASE/kernel/initramfs.img build/initramfs.img
+            fi
+            if [ -f "devicetree/r8q-live.dts" ]; then
+              dtc -I dts -O dtb -o build/r8q.dtb devicetree/r8q-live.dts
+            elif [ ! -f "build/r8q.dtb" ]; then
+              gh release download r8q-debian12-alpha1 -p "sm8250-samsung-r8q.dtb" -D R8Q-DEBIAN12-RELEASE/kernel/ --clobber
+              cp R8Q-DEBIAN12-RELEASE/kernel/sm8250-samsung-r8q.dtb build/r8q.dtb
+            fi
+            if [ ! -f "edk2/Build/R8Q/DEBUG_GCC5/AARCH64/BootManager.efi" ] || [ ! -f "edk2/Build/R8Q/DEBUG_GCC5/AARCH64/Shell.efi" ]; then
+              gh release download r8q-debian12-alpha1 -p "esp.img" -p "BootManager.efi" -p "Setup.efi" -D R8Q-DEBIAN12-RELEASE/boot/ --clobber
+              for app in Shell.efi sysinfo.efi cpuinfo.efi memmap.efi diagnostics.efi LinuxBoot.efi storage.efi display.efi battery.efi thermal.efi fdtinfo.efi firmware.efi CoreTest.efi StorageTest.efi ShellTest.efi; do
+                if mdir -b -i "R8Q-DEBIAN12-RELEASE/boot/esp.img@@1M" "::EFI/R8Q/${app}" >/dev/null 2>&1; then
+                  mcopy -n -i "R8Q-DEBIAN12-RELEASE/boot/esp.img@@1M" "::EFI/R8Q/${app}" "edk2/Build/R8Q/DEBUG_GCC5/AARCH64/${app}"
+                fi
+              done
+              cp R8Q-DEBIAN12-RELEASE/boot/BootManager.efi edk2/Build/R8Q/DEBUG_GCC5/AARCH64/BootManager.efi
+              cp R8Q-DEBIAN12-RELEASE/boot/Setup.efi edk2/Build/R8Q/DEBUG_GCC5/AARCH64/Setup.efi
+            fi
           fi
 
       - name: Execute ESP Disk Builder
@@ -84,11 +119,36 @@ jobs:
           fi
           echo "ESP geometry verification PASSED: exactly 256 MiB (268,435,456 bytes)"
 
-          # Validate FAT32 partition structure via mtools
+          # Validate FAT32 partition structure & mandatory EFI/Linux payloads via mtools
           TARGET_PART="$ESP_PATH@@1M"
           mdir -i "$TARGET_PART" ::EFI
           mdir -i "$TARGET_PART" ::EFI/BOOT
           mdir -i "$TARGET_PART" ::EFI/R8Q
+
+          REQUIRED_FILES=(
+            "::/EFI/BOOT/BOOTAA64.EFI"
+            "::/EFI/R8Q/BootManager.efi"
+            "::/EFI/R8Q/Setup.efi"
+            "::/EFI/R8Q/Shell.efi"
+            "::/EFI/R8Q/sysinfo.efi"
+            "::/EFI/R8Q/cpuinfo.efi"
+            "::/EFI/R8Q/memmap.efi"
+            "::/EFI/R8Q/diagnostics.efi"
+            "::/EFI/R8Q/LinuxBoot.efi"
+            "::/EFI/R8Q/Image"
+            "::/EFI/R8Q/initramfs.img"
+            "::/EFI/R8Q/r8q.dtb"
+            "::/startup.nsh"
+          )
+          BARE_LIST=$(mdir -b -i "$TARGET_PART" :: ::/EFI/BOOT ::/EFI/R8Q)
+          for req in "${REQUIRED_FILES[@]}"; do
+            if ! echo "$BARE_LIST" | grep -qix "$req"; then
+              echo "ERROR: Required ESP payload missing: $req"
+              echo "$BARE_LIST"
+              exit 1
+            fi
+          done
+          echo "ESP EFI binary & Linux payload verification PASSED."
 
           sha256sum "$ESP_PATH" > esp.img.sha256
           cat esp.img.sha256

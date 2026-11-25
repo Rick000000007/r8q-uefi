@@ -64,10 +64,10 @@ def main():
         with open(boot_img, 'rb') as f:
             z.writestr(info, f.read(), compress_type=zipfile.ZIP_DEFLATED)
 
-        # Add sha256 sum file
+        # Add sha256 sum file matching the packaged boot container
         info = zipfile.ZipInfo("r8q-uefi-boot-complete.img.sha256", date_time=fixed_time)
         info.external_attr = 0o644 << 16
-        z.writestr(info, f"{EXPECTED_BOOT_SHA256}  r8q-uefi-boot-complete.img\n".encode('utf-8'), compress_type=zipfile.ZIP_DEFLATED)
+        z.writestr(info, f"{csum}  r8q-uefi-boot-complete.img\n".encode('utf-8'), compress_type=zipfile.ZIP_DEFLATED)
 
         # Add template files
         template_files = [

@@ -33,34 +33,46 @@ jobs:
         run: |
           mkdir -p build R8Q-DEBIAN12-RELEASE/kernel
 
-          # Fetch verified baseline kernel if absent
-          if [ ! -f "build/Image" ] && [ ! -f "R8Q-DEBIAN12-RELEASE/kernel/Image" ]; then
+          # Fetch verified baseline kernel if absent (upstream pre-built EFI stub Image)
+          if [ ! -f "build/Image" ]; then
             echo "Fetching verified baseline kernel from GitHub release..."
-            gh release download r8q-debian12-alpha1 -p "Image" -D R8Q-DEBIAN12-RELEASE/kernel/ || true
-          fi
-          if [ -f "R8Q-DEBIAN12-RELEASE/kernel/Image" ]; then
+            gh release download r8q-debian12-alpha1 -p "Image" -D R8Q-DEBIAN12-RELEASE/kernel/ --clobber
             cp R8Q-DEBIAN12-RELEASE/kernel/Image build/Image
           fi
 
-          # Compile device tree if DTS exists, or fetch baseline
-          if [ -f "devicetree/r8q-live.dts" ]; then
-            dtc -I dts -O dtb -o build/sm8250-samsung-r8q.dtb devicetree/r8q-live.dts
-            cp build/sm8250-samsung-r8q.dtb build/r8q.dtb
-            echo "Device tree compiled from live DTS."
-          elif [ ! -f "build/sm8250-samsung-r8q.dtb" ]; then
-            gh release download r8q-debian12-alpha1 -p "sm8250-samsung-r8q.dtb" -D R8Q-DEBIAN12-RELEASE/kernel/ || true
+          # Fetch mainline compact DTB used in sda24 compound boot container
+          if [ ! -f "build/sm8250-samsung-r8q.dtb" ]; then
+            gh release download r8q-debian12-alpha1 -p "sm8250-samsung-r8q.dtb" -D R8Q-DEBIAN12-RELEASE/kernel/ --clobber
             cp R8Q-DEBIAN12-RELEASE/kernel/sm8250-samsung-r8q.dtb build/sm8250-samsung-r8q.dtb
-            cp R8Q-DEBIAN12-RELEASE/kernel/sm8250-samsung-r8q.dtb build/r8q.dtb
+          fi
+
+          # Compile live device tree separately as build/r8q.dtb without overwriting mainline DTB
+          if [ -f "devicetree/r8q-live.dts" ]; then
+            dtc -I dts -O dtb -o build/r8q.dtb devicetree/r8q-live.dts
+            echo "Live device tree compiled to build/r8q.dtb."
+          else
+            cp build/sm8250-samsung-r8q.dtb build/r8q.dtb
           fi
 
       - name: Verify Kernel Image Signature & Build Driver
         run: |
           chmod +x scripts/build_kernel.sh
           ./scripts/build_kernel.sh
+          python3 -c "
+          import os
+          for dtb in ['build/sm8250-samsung-r8q.dtb', 'build/r8q.dtb']:
+              assert os.path.isfile(dtb), f'Missing DTB: {dtb}'
+              with open(dtb, 'rb') as f:
+                  magic = f.read(4)
+              assert magic == bytes.fromhex('d00dfeed'), f'Invalid FDT magic in {dtb}: {magic.hex()}'
+              print(f'DTB validated: {dtb} ({os.path.getsize(dtb)} bytes)')
+          "
           sha256sum build/Image > Image.sha256
           sha256sum build/sm8250-samsung-r8q.dtb > dtb.sha256
+          sha256sum build/r8q.dtb > r8q.dtb.sha256
           cat Image.sha256
           cat dtb.sha256
+          cat r8q.dtb.sha256
 
       - name: Upload Kernel Artifacts
         uses: actions/upload-artifact@v4
@@ -72,4 +84,5 @@ jobs:
             build/r8q.dtb
             Image.sha256
             dtb.sha256
+            r8q.dtb.sha256
           retention-days: 30

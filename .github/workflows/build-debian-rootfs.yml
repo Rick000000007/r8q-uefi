@@ -31,41 +31,44 @@ jobs:
         run: |
           mkdir -p build R8Q-DEBIAN12-RELEASE/rootfs /tmp/r8q_rootfs_staging
           ROOTFS="R8Q-DEBIAN12-RELEASE/rootfs/r8q-rootfs.ext4.gz"
-          if [ ! -f "$ROOTFS" ]; then
+          if [ ! -f "$ROOTFS" ] || [ ! -f "R8Q-DEBIAN12-RELEASE/rootfs/r8q-rootfs.tar.gz" ]; then
             echo "Fetching verified baseline rootfs from GitHub release..."
-            gh release download r8q-debian12-alpha1 -p "r8q-rootfs.ext4.gz" -p "r8q-rootfs.tar.gz" -D R8Q-DEBIAN12-RELEASE/rootfs/ || true
+            gh release download r8q-debian12-alpha1 -p "r8q-rootfs.ext4.gz" -p "r8q-rootfs.tar.gz" -D R8Q-DEBIAN12-RELEASE/rootfs/ --clobber
           fi
-          if [ -f "$ROOTFS" ]; then
-            sha256sum "$ROOTFS" > rootfs.sha256
-            cat rootfs.sha256
+          sha256sum "$ROOTFS" > rootfs.sha256
+          cat rootfs.sha256
 
-            # Verify ext4 magic number at superblock offset 1024 + 0x38
-            python3 -c "
-            import gzip
-            with gzip.open('$ROOTFS', 'rb') as f:
-                header = f.read(2048)
-                magic = header[1024+0x38:1024+0x3A]
-                assert magic == b'\x53\xef', f'Invalid ext4 magic: {magic}'
-            print('ext4 superblock verification: PASSED')
-            "
+          # Verify ext4 magic number at superblock offset 1024 + 0x38
+          python3 -c "
+          import gzip
+          with gzip.open('$ROOTFS', 'rb') as f:
+              header = f.read(2048)
+              magic = header[1024+0x38:1024+0x3A]
+              assert magic == b'\x53\xef', f'Invalid ext4 magic: {magic}'
+          print('ext4 superblock verification: PASSED')
+          "
 
-            # Prepare build and staging directories for test_rootfs_validation.py
-            gzip -dc "$ROOTFS" > build/r8q-rootfs.ext4
-            if [ -f "R8Q-DEBIAN12-RELEASE/rootfs/r8q-rootfs.tar.gz" ]; then
-              cp R8Q-DEBIAN12-RELEASE/rootfs/r8q-rootfs.tar.gz build/r8q-rootfs.tar.gz
-              sudo tar -xzf build/r8q-rootfs.tar.gz -C /tmp/r8q_rootfs_staging
-              sudo chmod -R a+rX /tmp/r8q_rootfs_staging
-              sudo chmod 0440 /tmp/r8q_rootfs_staging/etc/sudoers.d/r8q
-            fi
-          else
-            echo "ERROR: Release rootfs not found at $ROOTFS"
-            exit 1
-          fi
+          # Prepare build and staging directories for test_rootfs_validation.py
+          gzip -dc "$ROOTFS" > build/r8q-rootfs.ext4
+          cp R8Q-DEBIAN12-RELEASE/rootfs/r8q-rootfs.tar.gz build/r8q-rootfs.tar.gz
+          sudo tar -xzf build/r8q-rootfs.tar.gz -C /tmp/r8q_rootfs_staging
+          sudo chmod -R a+rX /tmp/r8q_rootfs_staging
+          sudo chmod 0440 /tmp/r8q_rootfs_staging/etc/sudoers.d/r8q
 
       - name: Run Rootfs Regression Tests
         run: |
           export PRODUCTION_BUILD=1
           python3 tests/test_rootfs_validation.py
+
+      - name: Upload Rootfs Archives
+        uses: actions/upload-artifact@v4
+        with:
+          name: r8q-debian12-rootfs
+          path: |
+            R8Q-DEBIAN12-RELEASE/rootfs/r8q-rootfs.ext4.gz
+            R8Q-DEBIAN12-RELEASE/rootfs/r8q-rootfs.tar.gz
+            rootfs.sha256
+          retention-days: 7
 
       - name: Upload Rootfs Metadata
         uses: actions/upload-artifact@v4

@@ -31,30 +31,38 @@ jobs:
         run: |
           mkdir -p build R8Q-DEBIAN12-RELEASE/kernel
           if [ ! -f "R8Q-DEBIAN12-RELEASE/kernel/initramfs.img" ]; then
-            gh release download r8q-debian12-alpha1 -p "initramfs.img" -D R8Q-DEBIAN12-RELEASE/kernel/ || true
+            gh release download r8q-debian12-alpha1 -p "initramfs.img" -D R8Q-DEBIAN12-RELEASE/kernel/ --clobber
           fi
-          if [ -f "R8Q-DEBIAN12-RELEASE/kernel/initramfs.img" ]; then
-            cp R8Q-DEBIAN12-RELEASE/kernel/initramfs.img build/initramfs.img
-            # Extract verified ARM64 busybox to build directory
-            mkdir -p /tmp/arm64_bin
-            (cd /tmp/arm64_bin && gzip -dc "$GITHUB_WORKSPACE/build/initramfs.img" | cpio -idm "bin/busybox" 2>/dev/null || true)
-            if [ -f "/tmp/arm64_bin/bin/busybox" ]; then
-              export BUSYBOX_ARM64="/tmp/arm64_bin/bin/busybox"
-              chmod +x "$BUSYBOX_ARM64"
-            fi
-          fi
+          cp R8Q-DEBIAN12-RELEASE/kernel/initramfs.img build/initramfs.img
 
           chmod +x scripts/build_initramfs.sh
           ./scripts/build_initramfs.sh
 
-          if [ -f "build/initramfs.img" ]; then
-            sha256sum build/initramfs.img > initramfs.img.sha256
-            cat initramfs.img.sha256
-          fi
+          sha256sum build/initramfs.img > initramfs.img.sha256
+          cat initramfs.img.sha256
 
       - name: Validate Initramfs Archive
         run: |
           python3 tests/test_initramfs_validation.py
+          python3 -c "
+          import gzip, subprocess
+          entries = set(subprocess.check_output(['sh', '-c', 'gzip -dc build/initramfs.img | cpio -t 2>/dev/null'], text=True).splitlines())
+          required = [
+              'bin/busybox',
+              'lib/ld-linux-aarch64.so.1',
+              'lib/libc.so.6',
+              'lib/modules/virtio_blk.ko',
+              'lib/modules/ext4.ko',
+              'lib/modules/jbd2.ko',
+              'lib/modules/mbcache.ko',
+              'lib/modules/crc16.ko',
+          ]
+          for item in required:
+              assert item in entries, f'Missing critical initramfs member: {item}'
+          print('Initramfs ARM64 libraries & kernel modules verified PASSED.')
+          "
+          sha256sum build/initramfs.img > initramfs.img.sha256
+          cat initramfs.img.sha256
 
       - name: Upload Initramfs Artifact
         uses: actions/upload-artifact@v4

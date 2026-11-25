@@ -67,13 +67,15 @@ jobs:
     uses: ./.github/workflows/build-firmware.yml
     with:
       build_config: ${{ inputs.build_config || 'RELEASE' }}
+      clean_build: ${{ inputs.clean_build || false }}
 
   build-boot-manager:
     name: Layer 3 & 4 - Boot Manager & Setup Utility
     needs: safety-pre-audit
     uses: ./.github/workflows/build-boot-manager.yml
     with:
-      build_config: ${{ inputs.build_config || 'DEBUG' }}
+      build_config: 'DEBUG'
+      clean_build: ${{ inputs.clean_build || false }}
 
   build-kernel:
     name: Layer 5 - Linux Kernel & Device Tree
@@ -95,30 +97,38 @@ jobs:
     needs: [build-boot-manager, build-kernel, build-initramfs]
     uses: ./.github/workflows/build-esp.yml
     with:
-      build_config: ${{ inputs.build_config || 'DEBUG' }}
+      build_config: 'DEBUG'
+      use_workflow_artifacts: true
 
   build-complete-platform:
     name: Platform Integration - Compound Boot Image & Full Tarball
-    needs: [build-firmware, build-esp, build-debian-rootfs]
+    needs: [build-firmware, build-kernel, build-initramfs, build-esp, build-debian-rootfs]
     uses: ./.github/workflows/build-complete-platform.yml
+    with:
+      use_workflow_artifacts: true
 
   build-recovery:
     name: Installer - LineageOS Recovery Flashable ZIP
     needs: build-complete-platform
     uses: ./.github/workflows/build-recovery.yml
+    with:
+      use_workflow_artifacts: true
 
   test-platform:
     name: QA - Acceptance & Regression Test Suite
-    needs: [build-complete-platform, build-esp]
-    if: ${{ inputs.run_acceptance_tests != false }}
+    needs: [build-firmware, build-boot-manager, build-kernel, build-initramfs, build-debian-rootfs, build-esp, build-complete-platform, build-recovery]
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.run_acceptance_tests != false }}
     uses: ./.github/workflows/test-platform.yml
+    with:
+      use_workflow_artifacts: true
 
   publish-release:
     name: Distribution - GitHub Release & Asset Publication
-    needs: [build-recovery, test-platform]
+    needs: [build-complete-platform, build-recovery, test-platform]
     if: ${{ inputs.publish_release == true || startsWith(github.ref, 'refs/tags/v') }}
     uses: ./.github/workflows/build-release.yml
     with:
       release_version: ${{ inputs.release_version || 'v1.0.0-terminal' }}
-      publish_release: true
+      publish_release: ${{ inputs.publish_release == true || startsWith(github.ref, 'refs/tags/v') }}
+      use_workflow_artifacts: true
     secrets: inherit

@@ -8,6 +8,10 @@ on:
       - '.github/workflows/build-complete-platform.yml'
   workflow_dispatch:
   workflow_call:
+    inputs:
+      use_workflow_artifacts:
+        type: boolean
+        default: false
 
 jobs:
   build-complete-platform:
@@ -28,6 +32,41 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y device-tree-compiler gzip tar
 
+      - name: Download Upstream Firmware Artifact (Workflow Run)
+        if: ${{ inputs.use_workflow_artifacts == true }}
+        uses: actions/download-artifact@v4
+        with:
+          name: r8q-uefi-firmware-volume
+          path: .
+
+      - name: Download Upstream Kernel & DTB (Workflow Run)
+        if: ${{ inputs.use_workflow_artifacts == true }}
+        uses: actions/download-artifact@v4
+        with:
+          name: r8q-kernel-and-dtb
+          path: .
+
+      - name: Download Upstream Initramfs (Workflow Run)
+        if: ${{ inputs.use_workflow_artifacts == true }}
+        uses: actions/download-artifact@v4
+        with:
+          name: r8q-initramfs
+          path: .
+
+      - name: Download Upstream ESP Disk Image (Workflow Run)
+        if: ${{ inputs.use_workflow_artifacts == true }}
+        uses: actions/download-artifact@v4
+        with:
+          name: r8q-esp
+          path: .
+
+      - name: Download Upstream Debian Rootfs (Workflow Run)
+        if: ${{ inputs.use_workflow_artifacts == true }}
+        uses: actions/download-artifact@v4
+        with:
+          name: r8q-debian12-rootfs
+          path: .
+
       - name: Stage Artifacts & Ensure Build Directory
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -35,57 +74,57 @@ jobs:
           mkdir -p build
           mkdir -p R8Q-DEBIAN12-RELEASE/{boot,firmware,kernel,rootfs}
 
-          # Fetch any missing baseline payloads from GitHub release
-          if [ ! -f "build/R8Q_EFI.fd" ] && [ ! -f "R8Q-DEBIAN12-RELEASE/firmware/R8Q_EFI.fd" ]; then
-            gh release download r8q-debian12-alpha1 -p "R8Q_EFI.fd" -D R8Q-DEBIAN12-RELEASE/firmware/ || true
-          fi
-          if [ -f "R8Q-DEBIAN12-RELEASE/firmware/R8Q_EFI.fd" ]; then
-            cp R8Q-DEBIAN12-RELEASE/firmware/R8Q_EFI.fd build/R8Q_EFI.fd
+          if [ "${{ inputs.use_workflow_artifacts }}" = "true" ]; then
+            echo "Verifying all upstream CI workflow artifacts..."
+            sha256sum -c R8Q_EFI.fd.sha256
+            sha256sum -c Image.sha256
+            sha256sum -c dtb.sha256
+            sha256sum -c r8q.dtb.sha256
+            sha256sum -c initramfs.img.sha256
+            sha256sum -c esp.img.sha256
+            sha256sum -c rootfs.sha256
+          else
+            # Standalone trigger: fetch verified baseline payloads without ignoring errors
+            if [ ! -f "build/R8Q_EFI.fd" ]; then
+              gh release download r8q-debian12-alpha1 -p "R8Q_EFI.fd" -D R8Q-DEBIAN12-RELEASE/firmware/ --clobber
+              cp R8Q-DEBIAN12-RELEASE/firmware/R8Q_EFI.fd build/R8Q_EFI.fd
+            fi
+            if [ ! -f "build/Image" ]; then
+              gh release download r8q-debian12-alpha1 -p "Image" -D R8Q-DEBIAN12-RELEASE/kernel/ --clobber
+              cp R8Q-DEBIAN12-RELEASE/kernel/Image build/Image
+            fi
+            if [ ! -f "build/sm8250-samsung-r8q.dtb" ]; then
+              gh release download r8q-debian12-alpha1 -p "sm8250-samsung-r8q.dtb" -D R8Q-DEBIAN12-RELEASE/kernel/ --clobber
+              cp R8Q-DEBIAN12-RELEASE/kernel/sm8250-samsung-r8q.dtb build/sm8250-samsung-r8q.dtb
+              cp R8Q-DEBIAN12-RELEASE/kernel/sm8250-samsung-r8q.dtb build/r8q.dtb
+            fi
+            if [ ! -f "build/initramfs.img" ]; then
+              gh release download r8q-debian12-alpha1 -p "initramfs.img" -D R8Q-DEBIAN12-RELEASE/kernel/ --clobber
+              cp R8Q-DEBIAN12-RELEASE/kernel/initramfs.img build/initramfs.img
+            fi
+            if [ ! -f "build/esp.img" ]; then
+              gh release download r8q-debian12-alpha1 -p "esp.img" -D R8Q-DEBIAN12-RELEASE/boot/ --clobber
+              cp R8Q-DEBIAN12-RELEASE/boot/esp.img build/esp.img
+            fi
+            if [ ! -f "R8Q-DEBIAN12-RELEASE/rootfs/r8q-rootfs.ext4.gz" ]; then
+              gh release download r8q-debian12-alpha1 -p "r8q-rootfs.ext4.gz" -D R8Q-DEBIAN12-RELEASE/rootfs/ --clobber
+            fi
           fi
 
-          if [ ! -f "build/Image" ] && [ ! -f "R8Q-DEBIAN12-RELEASE/kernel/Image" ]; then
-            gh release download r8q-debian12-alpha1 -p "Image" -D R8Q-DEBIAN12-RELEASE/kernel/ || true
-          fi
-          if [ -f "R8Q-DEBIAN12-RELEASE/kernel/Image" ]; then
-            cp R8Q-DEBIAN12-RELEASE/kernel/Image build/Image
-          fi
-
-          if [ ! -f "build/sm8250-samsung-r8q.dtb" ] && [ ! -f "R8Q-DEBIAN12-RELEASE/kernel/sm8250-samsung-r8q.dtb" ]; then
-            gh release download r8q-debian12-alpha1 -p "sm8250-samsung-r8q.dtb" -D R8Q-DEBIAN12-RELEASE/kernel/ || true
-          fi
-          if [ -f "R8Q-DEBIAN12-RELEASE/kernel/sm8250-samsung-r8q.dtb" ]; then
-            cp R8Q-DEBIAN12-RELEASE/kernel/sm8250-samsung-r8q.dtb build/sm8250-samsung-r8q.dtb
-            cp R8Q-DEBIAN12-RELEASE/kernel/sm8250-samsung-r8q.dtb build/r8q.dtb
-          fi
-
-          if [ ! -f "build/initramfs.img" ] && [ ! -f "R8Q-DEBIAN12-RELEASE/kernel/initramfs.img" ]; then
-            gh release download r8q-debian12-alpha1 -p "initramfs.img" -D R8Q-DEBIAN12-RELEASE/kernel/ || true
-          fi
-          if [ -f "R8Q-DEBIAN12-RELEASE/kernel/initramfs.img" ]; then
-            cp R8Q-DEBIAN12-RELEASE/kernel/initramfs.img build/initramfs.img
-          fi
-
-          if [ ! -f "build/esp.img" ] && [ ! -f "R8Q-DEBIAN12-RELEASE/boot/esp.img" ]; then
-            gh release download r8q-debian12-alpha1 -p "esp.img" -D R8Q-DEBIAN12-RELEASE/boot/ || true
-          fi
-          if [ -f "R8Q-DEBIAN12-RELEASE/boot/esp.img" ]; then
-            cp R8Q-DEBIAN12-RELEASE/boot/esp.img build/esp.img
-          fi
-
-          if [ ! -f "R8Q-DEBIAN12-RELEASE/rootfs/r8q-rootfs.ext4.gz" ]; then
-            gh release download r8q-debian12-alpha1 -p "r8q-rootfs.ext4.gz" -D R8Q-DEBIAN12-RELEASE/rootfs/ || true
-          fi
-          if [ ! -f "R8Q-DEBIAN12-RELEASE/R8Q-Debian12-Recovery.zip" ]; then
-            gh release download r8q-debian12-alpha1 -p "R8Q-Debian12-Recovery.zip" -D R8Q-DEBIAN12-RELEASE/ || true
-          fi
+          # Sync build/ into release staging layout before compound packaging
+          cp build/R8Q_EFI.fd R8Q-DEBIAN12-RELEASE/firmware/R8Q_EFI.fd
+          cp build/Image R8Q-DEBIAN12-RELEASE/kernel/Image
+          cp build/sm8250-samsung-r8q.dtb R8Q-DEBIAN12-RELEASE/kernel/sm8250-samsung-r8q.dtb
+          cp build/initramfs.img R8Q-DEBIAN12-RELEASE/kernel/initramfs.img
+          cp build/esp.img R8Q-DEBIAN12-RELEASE/boot/esp.img
 
       - name: Build Compound Boot Image v2
         run: |
           python3 scripts/package_complete_boot_img.py
           cp build/r8q-uefi-boot-complete.img R8Q-DEBIAN12-RELEASE/boot/r8q-uefi-boot-complete.img
-          if [ -f "build/esp.img" ]; then
-            cp build/esp.img R8Q-DEBIAN12-RELEASE/boot/esp.img
-          fi
+          cp build/sm8250-samsung-r8q.dtb R8Q-DEBIAN12-RELEASE/kernel/sm8250-samsung-r8q.dtb
+          sha256sum build/r8q-uefi-boot-complete.img > r8q-uefi-boot-complete.img.sha256
+          cat r8q-uefi-boot-complete.img.sha256
 
       - name: Validate Compound Boot Image Invariants & sda24 Ceiling
         run: |
@@ -106,25 +145,75 @@ jobs:
           print(f'Safety validation PASSED: +{headroom:.2f} MiB headroom in sda24 before sda25 boundary')
           "
 
+      - name: Package Matching Recovery ZIP for Full System Tarball
+        env:
+          ALLOW_CUSTOM_BOOT_HASH: "1"
+          PRODUCTION_BUILD: "1"
+        run: |
+          python3 scripts/package_recovery_zip.py \
+            R8Q-DEBIAN12-RELEASE/boot/r8q-uefi-boot-complete.img \
+            R8Q-DEBIAN12-RELEASE/R8Q-Debian12-Recovery.zip
+          (
+            cd R8Q-DEBIAN12-RELEASE
+            sha256sum R8Q-Debian12-Recovery.zip INSTALLATION-USB.md INSTALLER-AUDIT.md > SHA256SUMS-RECOVERY-ZIP.txt
+            sha256sum -b boot/r8q-uefi-boot-complete.img | sed 's|boot/||' >> SHA256SUMS-RECOVERY-ZIP.txt
+          )
+
       - name: Build Full System Tarball
         run: |
           python3 scripts/package_full_system.py
 
-      - name: Verify Release Checksums
+      - name: Validate Full System Tarball & Generate CI Checksums
         run: |
+          python3 -c "
+          import tarfile
+          with tarfile.open('R8Q-DEBIAN12-RELEASE/R8Q-Debian12-Full-System.tar.gz', 'r:gz') as t:
+              members = t.getnames()
+              required = [
+                  'R8Q-Debian12-Full-System/boot/r8q-uefi-boot-complete.img',
+                  'R8Q-Debian12-Full-System/boot/esp.img',
+                  'R8Q-Debian12-Full-System/firmware/R8Q_EFI.fd',
+                  'R8Q-Debian12-Full-System/kernel/Image',
+                  'R8Q-Debian12-Full-System/kernel/sm8250-samsung-r8q.dtb',
+                  'R8Q-Debian12-Full-System/kernel/initramfs.img',
+                  'R8Q-Debian12-Full-System/rootfs/r8q-rootfs.ext4.gz',
+                  'R8Q-Debian12-Full-System/R8Q-Debian12-Recovery.zip',
+                  'R8Q-Debian12-Full-System/README.md',
+                  'R8Q-Debian12-Full-System/INSTALLATION.md',
+              ]
+              for req in required:
+                  assert req in members, f'Missing full system tarball member: {req}'
+          print('Full system tarball integrity validation PASSED.')
+          "
           cd R8Q-DEBIAN12-RELEASE
-          sha256sum --ignore-missing -c SHA256SUMS
+          sha256sum \
+            firmware/R8Q_EFI.fd \
+            kernel/Image \
+            kernel/sm8250-samsung-r8q.dtb \
+            kernel/initramfs.img \
+            rootfs/r8q-rootfs.ext4.gz \
+            boot/esp.img \
+            boot/r8q-uefi-boot-complete.img \
+            R8Q-Debian12-Recovery.zip \
+            R8Q-Debian12-Full-System.tar.gz \
+            > SHA256SUMS.ci
+          sha256sum -c SHA256SUMS.ci
+          cat SHA256SUMS.ci
 
       - name: Upload Compound Boot Image Artifact
         uses: actions/upload-artifact@v4
         with:
           name: r8q-complete-boot-img
-          path: build/r8q-uefi-boot-complete.img
+          path: |
+            build/r8q-uefi-boot-complete.img
+            r8q-uefi-boot-complete.img.sha256
           retention-days: 30
 
       - name: Upload Full System Package Artifact
         uses: actions/upload-artifact@v4
         with:
           name: r8q-full-system-distribution
-          path: R8Q-DEBIAN12-RELEASE/R8Q-Debian12-Full-System.tar.gz
-          retention-days: 90
+          path: |
+            R8Q-DEBIAN12-RELEASE/R8Q-Debian12-Full-System.tar.gz
+            R8Q-DEBIAN12-RELEASE/SHA256SUMS.ci
+          retention-days: 30

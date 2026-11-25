@@ -11,6 +11,10 @@ on:
       - 'recovery-installer/**'
   workflow_dispatch:
   workflow_call:
+    inputs:
+      use_workflow_artifacts:
+        type: boolean
+        default: false
 
 jobs:
   build-recovery-zip:
@@ -26,32 +30,48 @@ jobs:
         with:
           python-version: "3.11"
 
+      - name: Download Upstream Compound Boot Image (Workflow Run)
+        if: ${{ inputs.use_workflow_artifacts == true }}
+        uses: actions/download-artifact@v4
+        with:
+          name: r8q-complete-boot-img
+          path: .
+
       - name: Run Recovery Packaging
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ALLOW_CUSTOM_BOOT_HASH: "1"
+          PRODUCTION_BUILD: "1"
         run: |
           mkdir -p build R8Q-DEBIAN12-RELEASE/boot
           BOOT_IMG="build/r8q-uefi-boot-complete.img"
-          if [ ! -f "$BOOT_IMG" ] && [ ! -f "R8Q-DEBIAN12-RELEASE/boot/r8q-uefi-boot-complete.img" ]; then
-            gh release download r8q-debian12-alpha1 -p "r8q-uefi-boot-complete.img" -D R8Q-DEBIAN12-RELEASE/boot/ || true
-          fi
-          if [ -f "R8Q-DEBIAN12-RELEASE/boot/r8q-uefi-boot-complete.img" ]; then
+          if [ "${{ inputs.use_workflow_artifacts }}" = "true" ]; then
+            sha256sum -c r8q-uefi-boot-complete.img.sha256
+          elif [ ! -f "$BOOT_IMG" ]; then
+            gh release download r8q-debian12-alpha1 -p "r8q-uefi-boot-complete.img" -D R8Q-DEBIAN12-RELEASE/boot/ --clobber
             cp R8Q-DEBIAN12-RELEASE/boot/r8q-uefi-boot-complete.img build/r8q-uefi-boot-complete.img
           fi
           python3 scripts/package_recovery_zip.py \
             build/r8q-uefi-boot-complete.img \
             build/R8Q-Debian12-Recovery.zip
           cp build/R8Q-Debian12-Recovery.zip R8Q-DEBIAN12-RELEASE/R8Q-Debian12-Recovery.zip
+          sha256sum build/R8Q-Debian12-Recovery.zip > R8Q-Debian12-Recovery.zip.sha256
+          cat R8Q-Debian12-Recovery.zip.sha256
 
       - name: Validate Recovery ZIP & Strict sda25 Safety
         run: |
           python3 -c "
-          import zipfile
+          import hashlib, zipfile
           with zipfile.ZipFile('build/R8Q-Debian12-Recovery.zip', 'r') as z:
+              assert z.testzip() is None, 'Recovery ZIP corrupted'
               assert 'META-INF/com/google/android/update-binary' in z.namelist()
               updater = z.read('META-INF/com/google/android/update-binary').decode('utf-8', errors='ignore')
               assert 'sda25' in updater and 'CRITICAL SECURITY HAZARD' in updater, 'sda25 protection missing!'
               assert 'r8q-uefi-boot-complete.img' in z.namelist()
+              assert 'r8q-uefi-boot-complete.img.sha256' in z.namelist()
+              boot_sha = hashlib.sha256(z.read('r8q-uefi-boot-complete.img')).hexdigest()
+              sha_line = z.read('r8q-uefi-boot-complete.img.sha256').decode('utf-8').strip().split()[0]
+              assert boot_sha == sha_line, f'ZIP SHA256 mismatch: {sha_line} != {boot_sha}'
           print('LineageOS Recovery ZIP validation: PASSED')
           "
 
@@ -59,5 +79,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: r8q-recovery-installer-zip
-          path: build/R8Q-Debian12-Recovery.zip
+          path: |
+            build/R8Q-Debian12-Recovery.zip
+            R8Q-Debian12-Recovery.zip.sha256
           retention-days: 30

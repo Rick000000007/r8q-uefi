@@ -13,13 +13,16 @@ on:
       publish_release:
         description: 'Publish official GitHub Release asset bundle'
         type: boolean
-        default: true
+        default: false
   workflow_call:
     inputs:
       release_version:
         type: string
         default: 'v1.0.0-terminal'
       publish_release:
+        type: boolean
+        default: false
+      use_workflow_artifacts:
         type: boolean
         default: false
 
@@ -59,39 +62,61 @@ jobs:
           fi
           echo "[PASS] Zero unauthorized physical block writes verified."
 
+      - name: Download Upstream Artifacts (Workflow Run)
+        if: ${{ inputs.use_workflow_artifacts == true }}
+        uses: actions/download-artifact@v4
+        with:
+          path: .ci-artifacts
+
       - name: Ensure Complete Release Component Structure
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           echo "Verifying release components in R8Q-DEBIAN12-RELEASE/..."
-          mkdir -p R8Q-DEBIAN12-RELEASE/boot
-          mkdir -p R8Q-DEBIAN12-RELEASE/firmware
-          mkdir -p R8Q-DEBIAN12-RELEASE/kernel
-          mkdir -p R8Q-DEBIAN12-RELEASE/rootfs
+          mkdir -p R8Q-DEBIAN12-RELEASE/{boot,firmware,kernel,rootfs}
 
-          # Populate build outputs from local build directory if freshly generated
-          if [ -f "build/r8q-uefi-boot-complete.img" ]; then
-            cp build/r8q-uefi-boot-complete.img R8Q-DEBIAN12-RELEASE/boot/
-          fi
-          if [ -f "build/esp.img" ]; then
-            cp build/esp.img R8Q-DEBIAN12-RELEASE/boot/
-          fi
-          if [ -f "build/R8Q_EFI.fd" ]; then
-            cp build/R8Q_EFI.fd R8Q-DEBIAN12-RELEASE/firmware/
-          fi
-          if [ -f "build/Image" ]; then
-            cp build/Image R8Q-DEBIAN12-RELEASE/kernel/
-          fi
-          if [ -f "build/sm8250-samsung-r8q.dtb" ]; then
-            cp build/sm8250-samsung-r8q.dtb R8Q-DEBIAN12-RELEASE/kernel/
-          fi
-          if [ -f "build/initramfs.img" ]; then
-            cp build/initramfs.img R8Q-DEBIAN12-RELEASE/kernel/
+          if [ "${{ inputs.use_workflow_artifacts }}" = "true" ]; then
+            cp .ci-artifacts/r8q-uefi-firmware-volume/build/R8Q_EFI.fd R8Q-DEBIAN12-RELEASE/firmware/R8Q_EFI.fd
+            cp .ci-artifacts/r8q-kernel-and-dtb/build/Image R8Q-DEBIAN12-RELEASE/kernel/Image
+            cp .ci-artifacts/r8q-kernel-and-dtb/build/sm8250-samsung-r8q.dtb R8Q-DEBIAN12-RELEASE/kernel/sm8250-samsung-r8q.dtb
+            cp .ci-artifacts/r8q-initramfs/build/initramfs.img R8Q-DEBIAN12-RELEASE/kernel/initramfs.img
+            cp .ci-artifacts/r8q-esp/build/esp.img R8Q-DEBIAN12-RELEASE/boot/esp.img
+            cp .ci-artifacts/r8q-complete-boot-img/build/r8q-uefi-boot-complete.img R8Q-DEBIAN12-RELEASE/boot/r8q-uefi-boot-complete.img
+            cp .ci-artifacts/r8q-debian12-rootfs/R8Q-DEBIAN12-RELEASE/rootfs/r8q-rootfs.ext4.gz R8Q-DEBIAN12-RELEASE/rootfs/r8q-rootfs.ext4.gz
+            cp .ci-artifacts/r8q-recovery-installer-zip/build/R8Q-Debian12-Recovery.zip R8Q-DEBIAN12-RELEASE/R8Q-Debian12-Recovery.zip
+          else
+            # Standalone workflow trigger: stage from local build/ if present, else fetch release baseline strictly
+            [ -f "build/r8q-uefi-boot-complete.img" ] && cp build/r8q-uefi-boot-complete.img R8Q-DEBIAN12-RELEASE/boot/
+            [ -f "build/esp.img" ] && cp build/esp.img R8Q-DEBIAN12-RELEASE/boot/
+            [ -f "build/R8Q_EFI.fd" ] && cp build/R8Q_EFI.fd R8Q-DEBIAN12-RELEASE/firmware/
+            [ -f "build/Image" ] && cp build/Image R8Q-DEBIAN12-RELEASE/kernel/
+            [ -f "build/sm8250-samsung-r8q.dtb" ] && cp build/sm8250-samsung-r8q.dtb R8Q-DEBIAN12-RELEASE/kernel/
+            [ -f "build/initramfs.img" ] && cp build/initramfs.img R8Q-DEBIAN12-RELEASE/kernel/
+
+            [ ! -f "R8Q-DEBIAN12-RELEASE/firmware/R8Q_EFI.fd" ] && gh release download r8q-debian12-alpha1 -p "R8Q_EFI.fd" -D R8Q-DEBIAN12-RELEASE/firmware/ --clobber
+            [ ! -f "R8Q-DEBIAN12-RELEASE/kernel/Image" ] && gh release download r8q-debian12-alpha1 -p "Image" -D R8Q-DEBIAN12-RELEASE/kernel/ --clobber
+            [ ! -f "R8Q-DEBIAN12-RELEASE/kernel/sm8250-samsung-r8q.dtb" ] && gh release download r8q-debian12-alpha1 -p "sm8250-samsung-r8q.dtb" -D R8Q-DEBIAN12-RELEASE/kernel/ --clobber
+            [ ! -f "R8Q-DEBIAN12-RELEASE/kernel/initramfs.img" ] && gh release download r8q-debian12-alpha1 -p "initramfs.img" -D R8Q-DEBIAN12-RELEASE/kernel/ --clobber
+            [ ! -f "R8Q-DEBIAN12-RELEASE/boot/esp.img" ] && gh release download r8q-debian12-alpha1 -p "esp.img" -D R8Q-DEBIAN12-RELEASE/boot/ --clobber
+            [ ! -f "R8Q-DEBIAN12-RELEASE/boot/r8q-uefi-boot-complete.img" ] && gh release download r8q-debian12-alpha1 -p "r8q-uefi-boot-complete.img" -D R8Q-DEBIAN12-RELEASE/boot/ --clobber
+            [ ! -f "R8Q-DEBIAN12-RELEASE/rootfs/r8q-rootfs.ext4.gz" ] && gh release download r8q-debian12-alpha1 -p "r8q-rootfs.ext4.gz" -D R8Q-DEBIAN12-RELEASE/rootfs/ --clobber
           fi
 
       - name: Package LineageOS Recovery ZIP
+        env:
+          ALLOW_CUSTOM_BOOT_HASH: "1"
+          PRODUCTION_BUILD: "1"
         run: |
-          python3 scripts/package_recovery_zip.py \
-            R8Q-DEBIAN12-RELEASE/boot/r8q-uefi-boot-complete.img \
-            R8Q-DEBIAN12-RELEASE/R8Q-Debian12-Recovery.zip
+          if [ ! -f "R8Q-DEBIAN12-RELEASE/R8Q-Debian12-Recovery.zip" ]; then
+            python3 scripts/package_recovery_zip.py \
+              R8Q-DEBIAN12-RELEASE/boot/r8q-uefi-boot-complete.img \
+              R8Q-DEBIAN12-RELEASE/R8Q-Debian12-Recovery.zip
+          fi
+          (
+            cd R8Q-DEBIAN12-RELEASE
+            sha256sum R8Q-Debian12-Recovery.zip INSTALLATION-USB.md INSTALLER-AUDIT.md > SHA256SUMS-RECOVERY-ZIP.txt
+            sha256sum -b boot/r8q-uefi-boot-complete.img | sed 's|boot/||' >> SHA256SUMS-RECOVERY-ZIP.txt
+          )
 
       - name: Package Full System Distribution Tarball
         run: |
@@ -154,8 +179,18 @@ jobs:
       - name: Verify Release Checksums
         run: |
           cd R8Q-DEBIAN12-RELEASE
-          echo "Verifying release artifact checksums against SHA256SUMS..."
-          sha256sum --ignore-missing -c SHA256SUMS
+          sha256sum \
+            firmware/R8Q_EFI.fd \
+            kernel/Image \
+            kernel/sm8250-samsung-r8q.dtb \
+            kernel/initramfs.img \
+            rootfs/r8q-rootfs.ext4.gz \
+            boot/esp.img \
+            boot/r8q-uefi-boot-complete.img \
+            R8Q-Debian12-Recovery.zip \
+            R8Q-Debian12-Full-System.tar.gz \
+            > SHA256SUMS.ci
+          sha256sum -c SHA256SUMS.ci
 
       - name: Upload Artifact - Full System Package
         uses: actions/upload-artifact@v4
@@ -205,7 +240,6 @@ jobs:
             R8Q-Debian12-Full-System.tar.gz \
             README.md \
             RECOVERY.md \
-            SHA256SUMS \
-            SHA256SUMS-RECOVERY-ZIP.txt \
+            SHA256SUMS* \
             TROUBLESHOOTING.md \
-            --clobber || echo "Release upload completed"
+            --clobber

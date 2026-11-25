@@ -18,11 +18,18 @@ on:
           - DEBUG
           - RELEASE
         default: 'DEBUG'
+      clean_build:
+        description: 'Perform clean application build'
+        type: boolean
+        default: false
   workflow_call:
     inputs:
       build_config:
         type: string
         default: 'DEBUG'
+      clean_build:
+        type: boolean
+        default: false
 
 jobs:
   build-boot-manager:
@@ -36,13 +43,13 @@ jobs:
       - name: Set up Dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y gcc-aarch64-linux-gnu build-essential uuid-dev mtools python3 git
+          sudo apt-get install -y gcc-aarch64-linux-gnu build-essential uuid-dev mtools python3 git util-linux
 
       - name: Verify POSIX Shared Memory
         run: |
           sudo mkdir -p /dev/shm
           sudo chmod 1777 /dev/shm
-          sudo mount -t tmpfs tmpfs /dev/shm || true
+          mountpoint -q /dev/shm || sudo mount -t tmpfs tmpfs /dev/shm
 
       - name: Ensure EDK II Source Tree
         run: |
@@ -62,47 +69,63 @@ jobs:
           export PYTHON_COMMAND=python3
           export GCC5_AARCH64_PREFIX=aarch64-linux-gnu-
 
+          if [ "${{ inputs.clean_build }}" = "true" ]; then
+            rm -rf edk2/Build/R8Q
+          fi
+
           # Build BaseTools C utilities and Python modules
           make -C edk2/BaseTools/Source/C GenFfs GenFv GenFw GenSec GenCrc32 LzmaCompress TianoCompress DevicePath VolInfo BUILD_OPTFLAGS="-std=gnu89 -Wno-error" COPT="-std=gnu89 -Wno-error" EXTRA_OPTFLAGS="-std=gnu89 -Wno-error" -j$(nproc)
           make -C edk2/BaseTools/Source/Python -j$(nproc)
           HOST_ARCH="$(uname -m)"
           mkdir -p edk2/BaseTools/Bin/Linux-$HOST_ARCH edk2/Conf
-          cp edk2/BaseTools/Source/C/bin/* edk2/BaseTools/Bin/Linux-$HOST_ARCH/ 2>/dev/null || true
+          cp -f edk2/BaseTools/Source/C/bin/* edk2/BaseTools/Bin/Linux-$HOST_ARCH/
+          test -x "edk2/BaseTools/Bin/Linux-$HOST_ARCH/GenFfs"
           for tmpl in build_rule tools_def target; do
             [ -f "edk2/BaseTools/Conf/${tmpl}.template" ] && cp -n "edk2/BaseTools/Conf/${tmpl}.template" "edk2/Conf/${tmpl}.txt"
           done
 
           TARGET="${{ inputs.build_config || 'DEBUG' }}"
           cd edk2
-          build -p R8QPkg/R8QPkg.dsc -m R8QPkg/Applications/Setup/Setup.inf -a AARCH64 -t GCC5 -b "$TARGET"
-          build -p R8QPkg/R8QPkg.dsc -m R8QPkg/Applications/BootManager/BootManager.inf -a AARCH64 -t GCC5 -b "$TARGET"
+          build -p R8QPkg/R8QPkg.dsc -a AARCH64 -t GCC5 -b "$TARGET"
 
       - name: Verify Applications & PE32+ Signatures
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           mkdir -p output_bins build
           TARGET="${{ inputs.build_config || 'DEBUG' }}"
           BIN_DIR="edk2/Build/R8Q/${TARGET}_GCC5/AARCH64"
-          if [ -f "$BIN_DIR/Setup.efi" ] && [ -f "$BIN_DIR/BootManager.efi" ]; then
-            cp "$BIN_DIR/Setup.efi" output_bins/
-            cp "$BIN_DIR/BootManager.efi" output_bins/
-            cp "$BIN_DIR/Setup.efi" build/
-            cp "$BIN_DIR/BootManager.efi" build/
-          elif [ -f "build/Setup.efi" ] && [ -f "build/BootManager.efi" ]; then
-            cp build/Setup.efi output_bins/
-            cp build/BootManager.efi output_bins/
-          else
-            gh release download r8q-debian12-alpha1 -p "esp.img" -D build/ || true
-            if [ -f "build/esp.img" ]; then
-              mcopy -i "build/esp.img@@1M" ::EFI/R8Q/Setup.efi output_bins/ 2>/dev/null || true
-              mcopy -i "build/esp.img@@1M" ::EFI/R8Q/BootManager.efi output_bins/ 2>/dev/null || true
-              cp output_bins/* build/ 2>/dev/null || true
+          REQUIRED_APPS=(
+            Setup BootManager Shell LinuxBoot
+            sysinfo cpuinfo memmap diagnostics
+            storage display battery thermal
+            fdtinfo firmware CoreTest StorageTest ShellTest
+          )
+          for app in "${REQUIRED_APPS[@]}"; do
+            if [ ! -f "$BIN_DIR/${app}.efi" ]; then
+              echo "ERROR: Required EFI application missing: $BIN_DIR/${app}.efi"
+              exit 1
             fi
-          fi
+            cp "$BIN_DIR/${app}.efi" output_bins/
+          done
+          cp "$BIN_DIR/Setup.efi" build/
+          cp "$BIN_DIR/BootManager.efi" build/
+
+          python3 -c "
+          import os, struct
+          for name in ['Setup.efi', 'BootManager.efi', 'Shell.efi', 'sysinfo.efi', 'LinuxBoot.efi']:
+              p = os.path.join('output_bins', name)
+              with open(p, 'rb') as f:
+                  data = f.read()
+              assert data[:2] == b'MZ', f'{name}: missing MZ signature'
+              pe_off = struct.unpack_from('<I', data, 0x3C)[0]
+              assert data[pe_off:pe_off+4] == b'PE\x00\x00', f'{name}: missing PE header'
+              machine = struct.unpack_from('<H', data, pe_off+4)[0]
+              assert machine == 0xAA64, f'{name}: expected AArch64 0xAA64, got 0x{machine:X}'
+              print(f'PE32+ AArch64 verification PASSED: {name} ({len(data)} bytes)')
+          "
 
           cd output_bins
-          sha256sum Setup.efi BootManager.efi > SHA256SUMS.txt
+          sha256sum *.efi > SHA256SUMS.txt
+          sha256sum -c SHA256SUMS.txt
           cat SHA256SUMS.txt
 
       - name: Upload Boot Manager Artifacts

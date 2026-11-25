@@ -18,11 +18,18 @@ on:
           - RELEASE
           - DEBUG
         default: 'RELEASE'
+      clean_build:
+        description: 'Perform clean firmware build'
+        type: boolean
+        default: false
   workflow_call:
     inputs:
       build_config:
         type: string
         default: 'RELEASE'
+      clean_build:
+        type: boolean
+        default: false
 
 jobs:
   build-uefi-firmware:
@@ -36,13 +43,13 @@ jobs:
       - name: Set up Build Toolchain
         run: |
           sudo apt-get update
-          sudo apt-get install -y gcc-aarch64-linux-gnu binutils-aarch64-linux-gnu build-essential uuid-dev python3 git
+          sudo apt-get install -y gcc-aarch64-linux-gnu binutils-aarch64-linux-gnu build-essential uuid-dev python3 git util-linux
 
       - name: Verify POSIX Shared Memory
         run: |
           sudo mkdir -p /dev/shm
           sudo chmod 1777 /dev/shm
-          sudo mount -t tmpfs tmpfs /dev/shm || true
+          mountpoint -q /dev/shm || sudo mount -t tmpfs tmpfs /dev/shm
 
       - name: Ensure EDK II Source Tree
         run: |
@@ -64,12 +71,17 @@ jobs:
           export PYTHON_COMMAND=python3
           export GCC5_AARCH64_PREFIX=aarch64-linux-gnu-
 
+          if [ "${{ inputs.clean_build }}" = "true" ]; then
+            rm -rf edk2/Build/R8Q
+          fi
+
           # Build BaseTools C utilities and Python modules
           make -C edk2/BaseTools/Source/C GenFfs GenFv GenFw GenSec GenCrc32 LzmaCompress TianoCompress DevicePath VolInfo BUILD_OPTFLAGS="-std=gnu89 -Wno-error" COPT="-std=gnu89 -Wno-error" EXTRA_OPTFLAGS="-std=gnu89 -Wno-error" -j$(nproc)
           make -C edk2/BaseTools/Source/Python -j$(nproc)
           HOST_ARCH="$(uname -m)"
           mkdir -p edk2/BaseTools/Bin/Linux-$HOST_ARCH edk2/Conf
-          cp edk2/BaseTools/Source/C/bin/* edk2/BaseTools/Bin/Linux-$HOST_ARCH/ 2>/dev/null || true
+          cp -f edk2/BaseTools/Source/C/bin/* edk2/BaseTools/Bin/Linux-$HOST_ARCH/
+          test -x "edk2/BaseTools/Bin/Linux-$HOST_ARCH/GenFfs"
           for tmpl in build_rule tools_def target; do
             [ -f "edk2/BaseTools/Conf/${tmpl}.template" ] && cp -n "edk2/BaseTools/Conf/${tmpl}.template" "edk2/Conf/${tmpl}.txt"
           done
@@ -80,31 +92,30 @@ jobs:
           build -p R8QPkg/R8QPkg.dsc -a AARCH64 -t GCC5 -b "$BUILD_TARGET"
 
       - name: Validate Firmware Output & Compute Digest
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           mkdir -p build R8Q-DEBIAN12-RELEASE/firmware
-          FD_PATH="edk2/Build/R8Q/RELEASE_GCC5/FV/R8Q_EFI.fd"
-          if [ ! -f "$FD_PATH" ]; then
-            FD_PATH="edk2/Build/R8Q/DEBUG_GCC5/FV/R8Q_EFI.fd"
-          fi
-          if [ ! -f "$FD_PATH" ] && [ -f "R8Q-DEBIAN12-RELEASE/firmware/R8Q_EFI.fd" ]; then
-            FD_PATH="R8Q-DEBIAN12-RELEASE/firmware/R8Q_EFI.fd"
-          fi
-          if [ ! -f "$FD_PATH" ]; then
-            gh release download r8q-debian12-alpha1 -p "R8Q_EFI.fd" -D R8Q-DEBIAN12-RELEASE/firmware/ || true
-            FD_PATH="R8Q-DEBIAN12-RELEASE/firmware/R8Q_EFI.fd"
-          fi
+          BUILD_TARGET="${{ inputs.build_config || 'RELEASE' }}"
+          FD_PATH="edk2/Build/R8Q/${BUILD_TARGET}_GCC5/FV/R8Q_EFI.fd"
 
-          if [ -f "$FD_PATH" ]; then
-            cp "$FD_PATH" build/R8Q_EFI.fd
-            ls -lh build/R8Q_EFI.fd
-            sha256sum build/R8Q_EFI.fd > R8Q_EFI.fd.sha256
-            cat R8Q_EFI.fd.sha256
-          else
-            echo "ERROR: Firmware volume R8Q_EFI.fd could not be located"
+          if [ ! -f "$FD_PATH" ]; then
+            echo "ERROR: Compiled firmware volume not found at $FD_PATH"
             exit 1
           fi
+
+          cp "$FD_PATH" build/R8Q_EFI.fd
+          python3 -c "
+          import os
+          p = 'build/R8Q_EFI.fd'
+          size = os.path.getsize(p)
+          assert size == 4194304, f'Unexpected R8Q_EFI.fd size: {size} != 4194304'
+          with open(p, 'rb') as f:
+              hdr = f.read(64)
+          assert hdr[0x28:0x2C] == b'_FVH', f'Missing EDK2 _FVH signature: {hdr[0x28:0x2C]}'
+          print(f'Firmware volume validated: {size} bytes, signature _FVH')
+          "
+          ls -lh build/R8Q_EFI.fd
+          sha256sum build/R8Q_EFI.fd > R8Q_EFI.fd.sha256
+          cat R8Q_EFI.fd.sha256
 
       - name: Upload Firmware Artifact
         uses: actions/upload-artifact@v4
