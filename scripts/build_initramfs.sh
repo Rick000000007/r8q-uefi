@@ -32,16 +32,16 @@ elif [ -f "/usr/bin/busybox" ] && \
     echo "[INITRAMFS] Host busybox is not ARM64. Extracting verified ARM64 busybox from baseline initramfs..."
     mkdir -p /tmp/arm64_extract
     BASELINE_INITRAMFS=""
-    for p in "$PROJECT_ROOT/build/initramfs.img" "$PROJECT_ROOT/R8Q-DEBIAN12-RELEASE/kernel/initramfs.img" "$PROJECT_ROOT/R8Q-DEBIAN12-RELEASE/initramfs.img"; do
+    for p in "$PROJECT_ROOT/build/initramfs.img" "$PROJECT_ROOT/R8Q-DEBIAN12-RELEASE/initramfs/initramfs.img" "$PROJECT_ROOT/R8Q-DEBIAN12-RELEASE/kernel/initramfs.img" "$PROJECT_ROOT/R8Q-DEBIAN12-RELEASE/initramfs.img"; do
         if [ -f "$p" ]; then
             BASELINE_INITRAMFS="$p"
             break
         fi
     done
     if [ -n "$BASELINE_INITRAMFS" ]; then
-        (cd /tmp/arm64_extract && gzip -dc "$BASELINE_INITRAMFS" | cpio -idm "bin/busybox" 2>/dev/null || true)
+        (cd /tmp/arm64_extract && gzip -dc "$BASELINE_INITRAMFS" | cpio -idm 2>/dev/null || true)
         if [ -f "/tmp/arm64_extract/bin/busybox" ]; then
-            cp "/tmp/arm64_extract/bin/busybox" "$INITRAMFS_ROOT/bin/busybox"
+            cp -a /tmp/arm64_extract/* "$INITRAMFS_ROOT/" 2>/dev/null || true
         fi
     fi
 elif [ -f "/usr/bin/busybox" ]; then

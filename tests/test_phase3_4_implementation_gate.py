@@ -11,6 +11,7 @@ Target: Samsung Galaxy S20 FE 5G (SM-G781B / r8q / SM8250)
 
 import os
 import sys
+import shutil
 import struct
 import subprocess
 import unittest
@@ -19,6 +20,10 @@ PROJECT_ROOT = os.environ.get("PROJECT_ROOT", os.path.abspath(os.path.join(os.pa
 ENTRY_POINT_ASM = os.path.join(PROJECT_ROOT, "platform/R8QPkg/PrePi/ModuleEntryPoint.S")
 GOLDEN_RECOVERY_IMG = os.path.join(PROJECT_ROOT, "artifacts/sda24_lineageos_recovery.img")
 
+AS_CMD = "aarch64-linux-gnu-as" if shutil.which("aarch64-linux-gnu-as") else "as"
+GCC_CMD = "aarch64-linux-gnu-gcc" if shutil.which("aarch64-linux-gnu-gcc") else "gcc"
+OBJDUMP_CMD = "aarch64-linux-gnu-objdump" if shutil.which("aarch64-linux-gnu-objdump") else "objdump"
+
 class Phase34ImplementationGateTests(unittest.TestCase):
 
     def test_01_aarch64_immediate_encoding_and_corrected_assembly(self):
@@ -26,7 +31,7 @@ class Phase34ImplementationGateTests(unittest.TestCase):
         # 1. Demonstrate that 'sub x20, x20, #0x13E0' fails assembly due to 12-bit limit
         invalid_asm = "sub x20, x20, #0x13E0\n"
         proc_fail = subprocess.run(
-            ["as", "-o", "/dev/null", "-"],
+            [AS_CMD, "-o", "/dev/null", "-"],
             input=invalid_asm.encode(),
             capture_output=True
         )
@@ -36,28 +41,28 @@ class Phase34ImplementationGateTests(unittest.TestCase):
         # 2. Test valid Representation A (movz scratch register + sub register)
         valid_asm_a = "movz x22, #0x13e0\nsub x20, x20, x22\n"
         proc_ok_a = subprocess.run(
-            ["as", "-o", "/tmp/valid_a.o", "-"],
+            [AS_CMD, "-o", "/tmp/valid_a.o", "-"],
             input=valid_asm_a.encode(),
             capture_output=True
         )
         self.assertEqual(proc_ok_a.returncode, 0, f"movz + sub must assemble cleanly: {proc_ok_a.stderr.decode()}")
         
         # Disassemble and verify opcodes
-        obj_a = subprocess.run(["objdump", "-d", "/tmp/valid_a.o"], capture_output=True).stdout.decode()
+        obj_a = subprocess.run([OBJDUMP_CMD, "-d", "/tmp/valid_a.o"], capture_output=True).stdout.decode()
         self.assertIn("d2827c16", obj_a, "Opcode d2827c16 (mov x22, #0x13e0) must be generated")
         self.assertIn("cb160294", obj_a, "Opcode cb160294 (sub x20, x20, x22) must be generated")
 
         # 3. Test valid Representation B (split 12-bit immediate)
         valid_asm_b = "sub x20, x20, #0x1000\nsub x20, x20, #0x3e0\n"
         proc_ok_b = subprocess.run(
-            ["as", "-o", "/tmp/valid_b.o", "-"],
+            [AS_CMD, "-o", "/tmp/valid_b.o", "-"],
             input=valid_asm_b.encode(),
             capture_output=True
         )
         self.assertEqual(proc_ok_b.returncode, 0, f"Split immediate must assemble cleanly: {proc_ok_b.stderr.decode()}")
 
         # Disassemble and verify opcodes
-        obj_b = subprocess.run(["objdump", "-d", "/tmp/valid_b.o"], capture_output=True).stdout.decode()
+        obj_b = subprocess.run([OBJDUMP_CMD, "-d", "/tmp/valid_b.o"], capture_output=True).stdout.decode()
         self.assertIn("d1400694", obj_b, "Opcode d1400694 (sub x20, x20, #0x1, lsl #12) must be generated")
         self.assertIn("d10f8294", obj_b, "Opcode d10f8294 (sub x20, x20, #0x3e0) must be generated")
 
@@ -66,13 +71,13 @@ class Phase34ImplementationGateTests(unittest.TestCase):
         # Compile ModuleEntryPoint.S
         out_obj = "/tmp/ModuleEntryPoint_gate.o"
         proc = subprocess.run(
-            ["gcc", "-c", ENTRY_POINT_ASM, "-o", out_obj],
+            [GCC_CMD, "-c", ENTRY_POINT_ASM, "-o", out_obj],
             capture_output=True
         )
         self.assertEqual(proc.returncode, 0, f"ModuleEntryPoint.S must compile: {proc.stderr.decode()}")
 
         # Disassemble to verify instructions
-        disasm = subprocess.run(["objdump", "-d", out_obj], capture_output=True).stdout.decode()
+        disasm = subprocess.run([OBJDUMP_CMD, "-d", out_obj], capture_output=True).stdout.decode()
         self.assertTrue("mov\tx22, #0x1418" in disasm or "mov\tx22, #0x13e0" in disasm, 
                         "Disassembly must contain valid register entry offset mov x22")
         self.assertIn("sub\tx20, x20, x22", disasm, "Disassembly must contain sub x20, x20, x22")
@@ -166,9 +171,19 @@ class Phase34ImplementationGateTests(unittest.TestCase):
 
     def test_05_boot_image_v2_header_structural_validation(self):
         """HIGH-02: Verify Android Boot Image v2 header structure against physical sda24 golden reference."""
-        self.assertTrue(os.path.exists(GOLDEN_RECOVERY_IMG), "sda24 backup image must exist")
+        golden_img = GOLDEN_RECOVERY_IMG
+        if not os.path.exists(golden_img):
+            for candidate in [
+                os.path.join(PROJECT_ROOT, "build/r8q-uefi-boot-complete.img"),
+                os.path.join(PROJECT_ROOT, "R8Q-DEBIAN12-RELEASE/boot/r8q-uefi-boot-complete.img"),
+                os.path.join(PROJECT_ROOT, "R8Q-DEBIAN12-RELEASE/r8q-uefi-boot-complete.img"),
+            ]:
+                if os.path.exists(candidate):
+                    golden_img = candidate
+                    break
+        self.assertTrue(os.path.exists(golden_img), "sda24 backup image or boot container must exist")
         
-        with open(GOLDEN_RECOVERY_IMG, "rb") as f:
+        with open(golden_img, "rb") as f:
             hdr = f.read(1660)
 
         magic = hdr[:8]

@@ -39,6 +39,7 @@
   DevicePathLib|MdePkg/Library/UefiDevicePathLib/UefiDevicePathLib.inf
   StackCheckLib|MdePkg/Library/StackCheckLibNull/StackCheckLibNull.inf
   NULL|MdePkg/Library/StackCheckLibNull/StackCheckLibNull.inf
+  NULL|MdePkg/Library/CompilerIntrinsicsLib/CompilerIntrinsicsLib.inf
 
   # UEFI Shell & HII Support Libraries
   FileHandleLib|MdePkg/Library/UefiFileHandleLib/UefiFileHandleLib.inf

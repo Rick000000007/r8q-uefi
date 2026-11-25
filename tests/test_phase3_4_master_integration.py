@@ -16,6 +16,7 @@ Target: Samsung Galaxy S20 FE 5G (SM-G781B / r8q / SM8250)
 
 import os
 import sys
+import shutil
 import struct
 import subprocess
 import unittest
@@ -28,23 +29,27 @@ BOOT_COMPLETE_IMG = os.path.join(PROJECT_ROOT, "build/r8q-uefi-boot-complete.img
 GOLDEN_RECOVERY_IMG = os.path.join(PROJECT_ROOT, "artifacts/sda24_lineageos_recovery.img")
 QEMU_LOG = os.path.join(PROJECT_ROOT, "logs/qemu_linux_boot.log")
 
+AS_CMD = "aarch64-linux-gnu-as" if shutil.which("aarch64-linux-gnu-as") else "as"
+GCC_CMD = "aarch64-linux-gnu-gcc" if shutil.which("aarch64-linux-gnu-gcc") else "gcc"
+OBJDUMP_CMD = "aarch64-linux-gnu-objdump" if shutil.which("aarch64-linux-gnu-objdump") else "objdump"
+
 class Phase34MasterIntegrationTests(unittest.TestCase):
 
     def test_01_aarch64_relocation_assembly_and_machine_code(self):
         """1. BOOT EXECUTION FLOW: Verify AArch64 immediate limits and valid relocation opcodes."""
         # Demonstrate invalid immediate > 4095
         invalid_asm = "sub x20, x20, #0x13E0\n"
-        proc_fail = subprocess.run(["as", "-o", "/dev/null", "-"], input=invalid_asm.encode(), capture_output=True)
+        proc_fail = subprocess.run([AS_CMD, "-o", "/dev/null", "-"], input=invalid_asm.encode(), capture_output=True)
         self.assertNotEqual(proc_fail.returncode, 0, "Immediate > 4095 must fail GNU as")
         self.assertIn(b"out of range", proc_fail.stderr)
 
         # Compile ModuleEntryPoint.S to an object file
         out_obj = "/tmp/ModuleEntryPoint_master.o"
-        proc = subprocess.run(["gcc", "-c", ENTRY_POINT_ASM, "-o", out_obj], capture_output=True)
+        proc = subprocess.run([GCC_CMD, "-c", ENTRY_POINT_ASM, "-o", out_obj], capture_output=True)
         self.assertEqual(proc.returncode, 0, f"ModuleEntryPoint.S must compile cleanly: {proc.stderr.decode()}")
 
         # Disassemble and verify required instructions
-        disasm = subprocess.run(["objdump", "-d", out_obj], capture_output=True).stdout.decode()
+        disasm = subprocess.run([OBJDUMP_CMD, "-d", out_obj], capture_output=True).stdout.decode()
         self.assertIn("sub\tx20, x20, x22", disasm, "Must contain register subtraction sub x20, x20, x22")
         self.assertIn("dc\tcvau, x22", disasm, "Must contain Point-of-Unification data cache clean dc cvau")
         self.assertIn("ic\tiallu", disasm, "Must contain instruction cache invalidate to PoU ic iallu")

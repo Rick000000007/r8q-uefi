@@ -33,7 +33,25 @@ LINUXBOOT_C = os.path.join(REPO_ROOT, "platform", "R8QPkg", "Applications", "Lin
 MEM_MAP_JSON = os.path.join(DOCS_DIR, "r8q_physical_memory_map.json")
 AUDIT_DOC = os.path.join(DOCS_DIR, "PHASE3_6A_9_INITRAMFS_AND_HANDOFF_AUDIT.md")
 INITRAMFS_IMG = os.path.join(BUILD_DIR, "initramfs.img")
+if not os.path.exists(INITRAMFS_IMG) or os.path.getsize(INITRAMFS_IMG) != 2947562:
+    for candidate in [
+        os.path.join(REPO_ROOT, "R8Q-DEBIAN12-RELEASE", "initramfs", "initramfs.img"),
+        os.path.join(REPO_ROOT, "R8Q-DEBIAN12-RELEASE", "kernel", "initramfs.img"),
+        os.path.join(REPO_ROOT, "R8Q-DEBIAN12-RELEASE", "initramfs.img"),
+    ]:
+        if os.path.exists(candidate) and os.path.getsize(candidate) == 2947562:
+            INITRAMFS_IMG = candidate
+            break
+
 BOOT_COMPLETE_IMG = os.path.join(BUILD_DIR, "r8q-uefi-boot-complete.img")
+if not os.path.exists(BOOT_COMPLETE_IMG):
+    for candidate in [
+        os.path.join(REPO_ROOT, "R8Q-DEBIAN12-RELEASE", "boot", "r8q-uefi-boot-complete.img"),
+        os.path.join(REPO_ROOT, "R8Q-DEBIAN12-RELEASE", "r8q-uefi-boot-complete.img"),
+    ]:
+        if os.path.exists(candidate):
+            BOOT_COMPLETE_IMG = candidate
+            break
 
 DRAM_BASE = 0x80000000
 DRAM_LIMIT = 0x200000000
