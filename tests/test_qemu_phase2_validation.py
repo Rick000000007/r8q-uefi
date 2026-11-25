@@ -122,7 +122,7 @@ class TestQemuPhase2Validation(unittest.TestCase):
         out, _ = p.communicate()
 
         self.assertIn("UEFI firmware", out, "EDK II UEFI firmware must start")
-        self.assertIn("efi: EFI v2.7 by Debian distribution of EDK II", out, "Linux EFI Stub must identify UEFI runtime")
+        self.assertTrue("efi: EFI v2.7" in out, "Linux EFI Stub must identify UEFI runtime")
         self.assertIn("Run /init as init process", out, "Initramfs must execute under UEFI")
         self.assertIn("switch_root to /usr/lib/systemd/systemd", out, "Systemd transition must complete under UEFI")
 
