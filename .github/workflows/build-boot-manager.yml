@@ -63,7 +63,7 @@ jobs:
           export GCC5_AARCH64_PREFIX=aarch64-linux-gnu-
 
           # Build BaseTools C utilities and Python modules
-          make -C edk2/BaseTools/Source/C GenFv GenFw GenSec GenCrc32 LzmaCompress TianoCompress BUILD_OPTFLAGS="-std=gnu89 -Wno-error" COPT="-std=gnu89 -Wno-error" EXTRA_OPTFLAGS="-std=gnu89 -Wno-error" -j$(nproc)
+          make -C edk2/BaseTools/Source/C GenFfs GenFv GenFw GenSec GenCrc32 LzmaCompress TianoCompress DevicePath VolInfo BUILD_OPTFLAGS="-std=gnu89 -Wno-error" COPT="-std=gnu89 -Wno-error" EXTRA_OPTFLAGS="-std=gnu89 -Wno-error" -j$(nproc)
           make -C edk2/BaseTools/Source/Python -j$(nproc)
           HOST_ARCH="$(uname -m)"
           mkdir -p edk2/BaseTools/Bin/Linux-$HOST_ARCH edk2/Conf
