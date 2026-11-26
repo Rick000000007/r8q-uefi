@@ -428,6 +428,10 @@ class TestUnifiedInstallerPackage(unittest.TestCase):
         res_model = self._run([
             "install.sh",
             "--dry-run",
+            "--arch",
+            "aarch64",
+            "--soc",
+            "qcom,sm8250",
             "--device-model",
             "SM-S918B",
             "--device-codename",
