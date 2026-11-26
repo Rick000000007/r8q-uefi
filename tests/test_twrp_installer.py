@@ -410,11 +410,39 @@ class TestTwrpInstallerCompatibility(unittest.TestCase):
         # 2. Wrong device model / codename must abort at Stage 01 with exit 11
         rc_m, pipe_m, _, _ = self._run_twrp_update_binary(
             self.zip_path,
-            extra_env={"R8Q_DEVICE_MODEL": "SM-S918B", "R8Q_DEVICE_CODENAME": "dm3q"},
+            extra_env={
+                "R8Q_DEVICE_ARCH": "aarch64",
+                "R8Q_DEVICE_SOC": "qcom,sm8250",
+                "R8Q_DEVICE_MODEL": "SM-S918B",
+                "R8Q_DEVICE_CODENAME": "dm3q",
+            },
         )
         self.assertEqual(rc_m, 11)
         self.assertIn("Unsupported or mismatched device", pipe_m)
         self.assertNotIn("[STAGE 02/11]", pipe_m)
+
+        # 2b. Wrong CPU architecture must abort at Stage 01 with exit 10
+        rc_a, pipe_a, _, _ = self._run_twrp_update_binary(
+            self.zip_path,
+            extra_env={
+                "R8Q_DEVICE_ARCH": "x86_64",
+                "R8Q_DEVICE_SOC": "qcom,sm8250",
+                "R8Q_DEVICE_MODEL": "SM-G781B",
+                "R8Q_DEVICE_CODENAME": "r8q",
+            },
+        )
+        self.assertEqual(rc_a, 10)
+        self.assertIn("Architecture mismatch", pipe_a)
+        self.assertNotIn("[STAGE 02/11]", pipe_a)
+
+        # 2c. Insufficient storage space must abort at Stage 01 with exit 13
+        rc_sp, pipe_sp, _, _ = self._run_twrp_update_binary(
+            self.zip_path,
+            extra_env={"R8Q_MIN_SPACE_BYTES": "999999999999999999"},
+        )
+        self.assertEqual(rc_sp, 13)
+        self.assertIn("Insufficient storage space", pipe_sp)
+        self.assertNotIn("[STAGE 02/11]", pipe_sp)
 
         # 3. Forced --install mode must halt at Stage 03 safety lock (exit 42 or CI exit 30)
         rc_inst, pipe_inst, _, _ = self._run_twrp_update_binary(
