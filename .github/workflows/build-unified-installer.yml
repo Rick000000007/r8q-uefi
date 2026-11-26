@@ -32,7 +32,7 @@ permissions:
 
 jobs:
   build-unified-installer:
-    name: Assemble, Test & Upload R8Q-Debian12-ARM64-Installer.zip
+    name: Assemble, Test & Upload R8Q-Debian12-ARM64-TWRP-Installer.zip
     runs-on: ubuntu-latest
 
     steps:
@@ -47,7 +47,7 @@ jobs:
       - name: Install Packaging & Verification Tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y mtools device-tree-compiler unzip
+          sudo apt-get install -y busybox mtools device-tree-compiler unzip
 
       - name: Download Artifact - UEFI Firmware Volume
         if: ${{ inputs.use_workflow_artifacts == true }}
@@ -149,24 +149,24 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           path: .ci-artifacts
 
-      - name: Assemble & Package R8Q-Debian12-ARM64-Installer.zip
+      - name: Assemble & Package R8Q-Debian12-ARM64-TWRP-Installer.zip
         run: |
           chmod +x scripts/build_unified_installer.py
           python3 scripts/build_unified_installer.py \
             --artifacts-dir .ci-artifacts \
             --stage-dir dist-installer/stage \
-            --output dist-installer/R8Q-Debian12-ARM64-Installer.zip \
+            --output dist-installer/R8Q-Debian12-ARM64-TWRP-Installer.zip \
             --version "${{ inputs.release_version || 'v1.0.0-terminal' }}"
           rm -rf dist-installer/stage .ci-artifacts
-          ls -lh dist-installer/R8Q-Debian12-ARM64-Installer.zip
-          cat dist-installer/R8Q-Debian12-ARM64-Installer.zip.sha256
+          ls -lh dist-installer/R8Q-Debian12-ARM64-TWRP-Installer.zip
+          cat dist-installer/R8Q-Debian12-ARM64-TWRP-Installer.zip.sha256
 
-      - name: Test Archive Extraction, Checksums, Verification & Dry-Run Execution
+      - name: Test Archive Extraction, Checksums, TWRP Entry Point & Dry-Run Execution
         run: |
           EXTRACT_TMP="/tmp/r8q_unified_extract"
           rm -rf "$EXTRACT_TMP"
           mkdir -p "$EXTRACT_TMP"
-          unzip -q dist-installer/R8Q-Debian12-ARM64-Installer.zip -d "$EXTRACT_TMP"
+          unzip -q dist-installer/R8Q-Debian12-ARM64-TWRP-Installer.zip -d "$EXTRACT_TMP"
           PKG_DIR="$EXTRACT_TMP/R8Q-Debian12-ARM64-Installer"
 
           (
@@ -179,14 +179,16 @@ jobs:
             ./install.sh --dry-run
           )
 
-          R8Q_UNIFIED_INSTALLER_ZIP="$PWD/dist-installer/R8Q-Debian12-ARM64-Installer.zip" \
+          R8Q_UNIFIED_INSTALLER_ZIP="$PWD/dist-installer/R8Q-Debian12-ARM64-TWRP-Installer.zip" \
             python3 -m unittest tests/test_unified_installer.py -v
+          R8Q_TWRP_INSTALLER_ZIP="$PWD/dist-installer/R8Q-Debian12-ARM64-TWRP-Installer.zip" \
+            python3 -m unittest tests/test_twrp_installer.py -v
           rm -rf "$EXTRACT_TMP"
 
-      - name: Upload Artifact - R8Q-Debian12-ARM64-Installer.zip
+      - name: Upload Artifact - R8Q-Debian12-ARM64-TWRP-Installer.zip
         uses: actions/upload-artifact@v4
         with:
-          name: R8Q-Debian12-ARM64-Installer.zip
-          path: dist-installer/R8Q-Debian12-ARM64-Installer.zip
+          name: R8Q-Debian12-ARM64-TWRP-Installer.zip
+          path: dist-installer/R8Q-Debian12-ARM64-TWRP-Installer.zip
           retention-days: 30
           if-no-files-found: error

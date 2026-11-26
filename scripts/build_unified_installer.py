@@ -16,8 +16,10 @@ import json
 import os
 import shutil
 import stat
+import struct
 import subprocess
 import sys
+import tempfile
 import zipfile
 
 SCRIPTS_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -31,6 +33,7 @@ from validate_and_stage_distribution import (  # noqa: E402
 )
 
 PACKAGE_ROOT_NAME = "R8Q-Debian12-ARM64-Installer"
+TWRP_META_DEFAULT_DIR = os.path.abspath(os.path.join(SCRIPTS_DIR, "..", "installer", "twrp", "META-INF"))
 
 SHELL_NSH_SCRIPTS = [
     "startup.nsh",
@@ -221,10 +224,91 @@ def assemble_installer_tree(
     return pkg_dir
 
 
-def write_installer_zip(pkg_dir: str, output_zip: str) -> tuple[int, str]:
-    """Archive pkg_dir cleanly into output_zip preserving POSIX modes and deterministic order."""
-    os.makedirs(os.path.dirname(output_zip), exist_ok=True)
+def sign_zip_whole_file(zip_path: str, cert_pem: str, key_pem: str) -> None:
+    """Apply an AOSP SignApk v1 WholeFileSignature footer using OpenSSL CMS DER."""
+    with open(zip_path, "rb") as f:
+        raw = f.read()
+
+    if len(raw) < 22 or raw[-22:-18] != b"PK\x05\x06" or raw[-2:] != b"\x00\x00":
+        raise ValueError(f"Unexpected ZIP EOCD layout before whole-file signing: {zip_path}")
+
+    signed_data = raw[:-2]
+    with tempfile.NamedTemporaryFile(delete=False) as tf:
+        tf.write(signed_data)
+        tmp_in = tf.name
+
+    try:
+        proc = subprocess.run(
+            [
+                "openssl",
+                "cms",
+                "-sign",
+                "-signer",
+                cert_pem,
+                "-inkey",
+                key_pem,
+                "-in",
+                tmp_in,
+                "-binary",
+                "-outform",
+                "DER",
+                "-noattr",
+                "-md",
+                "sha256",
+            ],
+            capture_output=True,
+            check=True,
+        )
+        sig_der = proc.stdout
+    finally:
+        if os.path.exists(tmp_in):
+            os.remove(tmp_in)
+
+    footer_size = 6
+    comment_len = len(sig_der) + footer_size
+    sig_start = comment_len
+    if comment_len > 0xFFFF:
+        raise ValueError(f"WholeFileSignature comment length exceeds 65535 bytes ({comment_len})")
+
+    footer = struct.pack("<HHH", sig_start, 0xFFFF, comment_len)
+    comment = sig_der + footer
+    if b"PK\x05\x06" in comment:
+        raise ValueError("EOCD marker sequence appeared inside signature comment")
+
+    with open(zip_path, "wb") as f:
+        f.write(signed_data)
+        f.write(struct.pack("<H", comment_len))
+        f.write(comment)
+
+
+def write_installer_zip(
+    pkg_dir: str,
+    output_zip: str,
+    twrp_meta_dir: str | None = TWRP_META_DEFAULT_DIR,
+    sign_cert: str = "",
+    sign_key: str = "",
+) -> tuple[int, str]:
+    """Archive pkg_dir (and optional root TWRP META-INF/) cleanly into output_zip."""
+    os.makedirs(os.path.dirname(os.path.abspath(output_zip)), exist_ok=True)
     stage_parent = os.path.dirname(pkg_dir)
+
+    meta_dirs: list[tuple[str, str]] = []
+    meta_files: list[tuple[str, str, int]] = []
+    if twrp_meta_dir and os.path.isdir(twrp_meta_dir):
+        meta_parent = os.path.dirname(os.path.abspath(twrp_meta_dir))
+        meta_dirs.append(("META-INF", os.path.abspath(twrp_meta_dir)))
+        for root, dirs, files in os.walk(twrp_meta_dir):
+            for d in sorted(dirs):
+                full_d = os.path.join(root, d)
+                rel_d = os.path.relpath(full_d, meta_parent).replace(os.sep, "/")
+                meta_dirs.append((rel_d, full_d))
+            for fname in sorted(files):
+                full_f = os.path.join(root, fname)
+                rel_f = os.path.relpath(full_f, meta_parent).replace(os.sep, "/")
+                mode = 0o755 if fname == "update-binary" or fname.endswith(".sh") else 0o644
+                meta_files.append((rel_f, full_f, mode))
+        meta_dirs.sort(key=lambda x: x[0])
+        meta_files.sort(key=lambda x: x[0])
 
     all_dirs: list[str] = []
     all_files: list[str] = []
@@ -237,7 +321,20 @@ def write_installer_zip(pkg_dir: str, output_zip: str) -> tuple[int, str]:
     all_dirs.sort()
     all_files.sort()
 
-    with zipfile.ZipFile(output_zip, "w", compression=zipfile.ZIP_DEFLATED, allowZip64=True) as zf:
+    # Use strict 32-bit ZIP headers (allowZip64=False) for maximum TWRP libziparchive/minzip compatibility
+    with zipfile.ZipFile(output_zip, "w", compression=zipfile.ZIP_DEFLATED, allowZip64=False) as zf:
+        for rel_dir, _ in meta_dirs:
+            d_info = zipfile.ZipInfo(f"{rel_dir}/")
+            d_info.external_attr = (stat.S_IFDIR | 0o755) << 16 | 0x10
+            zf.writestr(d_info, b"")
+
+        for rel_file, full_path, mode in meta_files:
+            zinfo = zipfile.ZipInfo(rel_file)
+            zinfo.external_attr = (stat.S_IFREG | mode) << 16
+            zinfo.compress_type = zipfile.ZIP_DEFLATED
+            with open(full_path, "rb") as src_f:
+                zf.writestr(zinfo, src_f.read())
+
         root_info = zipfile.ZipInfo(f"{PACKAGE_ROOT_NAME}/")
         root_info.external_attr = (stat.S_IFDIR | 0o755) << 16 | 0x10
         zf.writestr(root_info, b"")
@@ -259,6 +356,9 @@ def write_installer_zip(pkg_dir: str, output_zip: str) -> tuple[int, str]:
                     while chunk := src_f.read(1024 * 1024):
                         dst_f.write(chunk)
 
+    if sign_cert and sign_key:
+        sign_zip_whole_file(output_zip, sign_cert, sign_key)
+
     with zipfile.ZipFile(output_zip, "r") as zchk:
         bad = zchk.testzip()
         if bad is not None:
@@ -274,12 +374,22 @@ def write_installer_zip(pkg_dir: str, output_zip: str) -> tuple[int, str]:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Build unified R8Q-Debian12-ARM64-Installer.zip")
+    parser = argparse.ArgumentParser(description="Build unified R8Q-Debian12-ARM64 TWRP & workstation Installer ZIP")
     parser.add_argument("--artifacts-dir", required=True, help="Directory holding verified upstream CI artifacts.")
-    parser.add_argument("--output", required=True, help="Output path for R8Q-Debian12-ARM64-Installer.zip.")
+    parser.add_argument("--output", required=True, help="Output path for installer ZIP.")
     parser.add_argument("--stage-dir", default="", help="Optional staging workspace parent directory.")
     parser.add_argument("--version", default="v1.0.0-terminal", help="Package version label.")
+    parser.add_argument(
+        "--twrp-meta-dir",
+        default=TWRP_META_DEFAULT_DIR,
+        help="Optional TWRP META-INF directory to embed at ZIP root (pass '' to omit).",
+    )
+    parser.add_argument("--sign-cert", default="", help="Optional X.509 certificate PEM for SignApk WholeFileSignature.")
+    parser.add_argument("--sign-key", default="", help="Optional private key PEM for SignApk WholeFileSignature.")
     args = parser.parse_args()
+
+    if bool(args.sign_cert) != bool(args.sign_key):
+        parser.error("--sign-cert and --sign-key must be supplied together")
 
     repo_root = os.path.abspath(os.path.join(SCRIPTS_DIR, ".."))
     ctx = validate_upstream_artifacts(os.path.abspath(args.artifacts_dir))
@@ -289,7 +399,13 @@ def main() -> int:
     stage_parent = os.path.abspath(args.stage_dir) if args.stage_dir else os.path.dirname(os.path.abspath(args.output))
     os.makedirs(stage_parent, exist_ok=True)
     pkg_dir = assemble_installer_tree(repo_root, stage_parent, args.version, sources)
-    write_installer_zip(pkg_dir, os.path.abspath(args.output))
+    write_installer_zip(
+        pkg_dir,
+        os.path.abspath(args.output),
+        twrp_meta_dir=args.twrp_meta_dir or None,
+        sign_cert=args.sign_cert,
+        sign_key=args.sign_key,
+    )
     return 0
 
 

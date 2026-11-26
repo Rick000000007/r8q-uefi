@@ -1,0 +1,6 @@
+ui_print("================================================");
+ui_print("  PROJECT R8Q: DEBIAN 12 ARM64 TWRP INSTALLER   ");
+ui_print("  Samsung Galaxy S20 FE 5G (SM-G781B / r8q)     ");
+ui_print("  Handled directly by TWRP update-binary v3     ");
+ui_print("================================================");
+show_progress(1.0, 0);

@@ -1,6 +1,6 @@
-#!/usr/bin/env bash
+#!/bin/sh
 # Stage 10 [Steps 15-17]: Configure systemd terminal-first, optional GNOME layer (opt-in), & boot entries
-set -euo pipefail
+set -eu
 
 [ "${R8Q_STAGE_DONE_09:-0}" = "1" ] || {
     echo "[ERROR] Out-of-order execution: 09-install-rootfs.sh must complete before 10-configure-boot.sh" >&2
@@ -10,7 +10,7 @@ set -euo pipefail
 ROOT="${R8Q_INSTALLER_ROOT:?R8Q_INSTALLER_ROOT must be set via install.sh}"
 MODE="${R8Q_MODE:-dry-run}"
 # shellcheck source=../config/boot.conf
-source "$ROOT/config/boot.conf"
+. "$ROOT/config/boot.conf"
 
 echo "[STAGE 10/11] [STEPS 15-17/19] Validating systemd terminal-first, optional GNOME policy, and boot entries..."
 
@@ -23,35 +23,77 @@ echo "[STAGE 10/11] [STEPS 15-17/19] Validating systemd terminal-first, optional
     exit 46
 }
 
-python3 -B - "$ROOT/payload/debian-rootfs/r8q-rootfs.tar.gz" "$ROOT/payload/boot-manager/Config" "$BOOT_DEFAULT_ENTRY" "$BOOT_TIMEOUT_SECONDS" << 'PYEOF'
-import os, sys, tarfile
+ROOTFS_TAR="$ROOT/payload/debian-rootfs/r8q-rootfs.tar.gz"
+CFG_DIR="$ROOT/payload/boot-manager/Config"
 
-tar_path, cfg_dir, exp_default, exp_timeout = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
+tar -ztvf "$ROOTFS_TAR" | awk '
+{
+    perm = $1;
+    line = $0;
+    arrow = index(line, " -> ");
+    if (arrow > 0) {
+        left = substr(line, 1, arrow - 1);
+        linkname = substr(line, arrow + 4);
+        sub(/^.*[[:space:]]/, "", left);
+        path = left;
+    } else {
+        path = $NF;
+        linkname = "";
+    }
+    sub(/^\.\//, "", path);
 
-with tarfile.open(tar_path, "r:gz") as tar:
-    by_name = {m.name.lstrip("./"): m for m in tar}
+    if (path == "etc/systemd/system/default.target") {
+        has_default = 1;
+        is_symlink = (substr(perm, 1, 1) == "l");
+        default_link = linkname;
+    }
+    if (path == "etc/systemd/system/display-manager.service") {
+        has_dm = 1;
+    }
+    if (path == "etc/systemd/system/getty.target.wants/getty@tty1.service") {
+        has_tty1 = 1;
+    }
+    if (path == "etc/systemd/system/getty.target.wants/serial-getty@ttyMSM0.service") {
+        has_msm0 = 1;
+    }
+}
+END {
+    if (!has_default || !is_symlink) {
+        print "[ERROR] default.target symlink missing in Debian rootfs" > "/dev/stderr";
+        exit 46;
+    }
+    if (index(default_link, "multi-user.target") == 0 || index(default_link, "graphical.target") > 0) {
+        printf "[ERROR] Expected default.target -> multi-user.target, got %s\n", default_link > "/dev/stderr";
+        exit 46;
+    }
+    if (has_dm) {
+        print "[ERROR] display-manager.service must NOT auto-start" > "/dev/stderr";
+        exit 46;
+    }
+    if (!has_tty1) {
+        print "[ERROR] Missing getty@tty1.service" > "/dev/stderr";
+        exit 46;
+    }
+    if (!has_msm0) {
+        print "[ERROR] Missing serial-getty@ttyMSM0.service" > "/dev/stderr";
+        exit 46;
+    }
+}
+'
 
-default_target = by_name.get("etc/systemd/system/default.target")
-assert default_target is not None and default_target.issym(), "default.target symlink missing in Debian rootfs"
-assert "multi-user.target" in default_target.linkname, f"Expected multi-user.target, got {default_target.linkname}"
-assert "graphical.target" not in default_target.linkname, "GNOME graphical.target must NOT be default"
-assert "etc/systemd/system/display-manager.service" not in by_name, "display-manager.service must NOT auto-start"
-assert "etc/systemd/system/getty.target.wants/getty@tty1.service" in by_name, "Missing getty@tty1.service"
-assert "etc/systemd/system/getty.target.wants/serial-getty@ttyMSM0.service" in by_name, "Missing serial-getty@ttyMSM0.service"
+BOOT_CFG="$CFG_DIR/boot.cfg"
+[ -f "$BOOT_CFG" ] || { echo "[ERROR] Missing boot.cfg: $BOOT_CFG" >&2; exit 46; }
+grep -Fq "default=$BOOT_DEFAULT_ENTRY" "$BOOT_CFG" || { echo "[ERROR] boot.cfg default OS mismatch" >&2; exit 46; }
+grep -Fq "timeout=$BOOT_TIMEOUT_SECONDS" "$BOOT_CFG" || { echo "[ERROR] boot.cfg timeout mismatch" >&2; exit 46; }
 
-boot_cfg = open(os.path.join(cfg_dir, "boot.cfg"), encoding="utf-8").read()
-assert f"default={exp_default}" in boot_cfg, "boot.cfg default OS mismatch"
-assert f"timeout={exp_timeout}" in boot_cfg, "boot.cfg timeout mismatch"
+for entry in debian.conf kali.conf ubuntu.conf; do
+    p="$CFG_DIR/entries/$entry"
+    [ -f "$p" ] || { echo "[ERROR] Missing boot entry config: $p" >&2; exit 46; }
+    for field in title linux initrd dtb options; do
+        grep -Fq "$field" "$p" || { echo "[ERROR] $entry: missing field '$field'" >&2; exit 46; }
+    done
+done
 
-for entry in ["debian.conf", "kali.conf", "ubuntu.conf"]:
-    p = os.path.join(cfg_dir, "entries", entry)
-    assert os.path.isfile(p), f"Missing boot entry config: {p}"
-    content = open(p, encoding="utf-8").read()
-    for field in ["title", "linux", "initrd", "dtb", "options"]:
-        assert field in content, f"{entry}: missing field '{field}'"
-
-print("  [VERIFIED] Terminal-first systemd (multi-user.target), optional GNOME opt-in only, and BootManager entries OK.")
-PYEOF
-
+echo "  [VERIFIED] Terminal-first systemd (multi-user.target), optional GNOME opt-in only, and BootManager entries OK."
 echo "  [$MODE] Optional GNOME remains opt-in only ($OPTIONAL_GNOME_TARGET not active by default)."
 echo "[STAGE 10/11] Boot & systemd configuration stage PASSED."

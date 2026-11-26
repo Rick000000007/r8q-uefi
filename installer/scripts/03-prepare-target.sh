@@ -1,6 +1,6 @@
-#!/usr/bin/env bash
+#!/bin/sh
 # Stage 03 [Steps 7-8]: Partition map audit, hardware safety lock, and target preparation
-set -euo pipefail
+set -eu
 
 [ "${R8Q_STAGE_DONE_02:-0}" = "1" ] || {
     echo "[ERROR] Out-of-order execution: 02-verify-payloads.sh must complete before 03-prepare-target.sh" >&2
@@ -10,9 +10,9 @@ set -euo pipefail
 ROOT="${R8Q_INSTALLER_ROOT:?R8Q_INSTALLER_ROOT must be set via install.sh}"
 MODE="${R8Q_MODE:-verify}"
 # shellcheck source=../config/device.conf
-source "$ROOT/config/device.conf"
+. "$ROOT/config/device.conf"
 # shellcheck source=../config/partition-map.conf
-source "$ROOT/config/partition-map.conf"
+. "$ROOT/config/partition-map.conf"
 
 echo "[STAGE 03/11] [STEP 7/19] Validating partition map boundaries & sda25 Knox Keyrefuge guard..."
 echo "  Verified boundary: sda24 ($SDA24_START_SECTOR+$SDA24_SECTORS) | Zero-Access Guard: sda25 ($SDA25_START_SECTOR)"

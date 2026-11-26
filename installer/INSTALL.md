@@ -2,7 +2,16 @@
 
 Self-contained installation bundle targeting **Samsung Galaxy S20 FE 5G (`SM-G781B` / `r8q` / Qualcomm Snapdragon 865 `SM8250`)**.
 
-## Quick Usage
+## TWRP Recovery Installation (`R8Q-Debian12-ARM64-TWRP-Installer.zip`)
+
+`R8Q-Debian12-ARM64-TWRP-Installer.zip` embeds a POSIX `/sbin/sh` recovery entry point at `META-INF/com/google/android/update-binary` (Recovery API v3) and standard `META-INF/com/google/android/updater-script` at ZIP root alongside `R8Q-Debian12-ARM64-Installer/`:
+
+1. Copy `R8Q-Debian12-ARM64-TWRP-Installer.zip` (and optional `R8Q-Debian12-ARM64-TWRP-Installer.zip.sha256`) to MicroSD (`/external_sd`) or internal storage (`/sdcard`), or flash via `adb sideload`.
+2. In TWRP (`twrp-3.7.x`, `android-12.1` for `r8q`), tap **Install** and select `R8Q-Debian12-ARM64-TWRP-Installer.zip` (leave **Zip signature verification** disabled unless signed with your recovery's `/system/etc/security/otacerts.zip` key).
+3. `META-INF/com/google/android/update-binary` validates TWRP arguments (`$1` API version, `$2` `OUTFD`, `$3` ZIP path), extracts `R8Q-Debian12-ARM64-Installer/`, invokes `./install.sh` under `/sbin/sh` (BusyBox `ash` — no `bash` or `python3` required), streams all 19 installation steps to TWRP's UI console with progress updates, and returns the exact installer exit status.
+4. While `PHYSICAL_WRITES_ENABLED=0` in `config/device.conf`, flashing runs in non-destructive `--dry-run` mode with zero physical writes to internal UFS (`sda23`, `sda24`, `sda25`).
+
+## Quick Usage (Extracted / CLI)
 
 Run all commands from inside the extracted `R8Q-Debian12-ARM64-Installer/` directory:
 

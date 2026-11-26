@@ -1,13 +1,15 @@
-#!/usr/bin/env bash
+#!/bin/sh
 # Project R8Q — Safe Rollback & Recovery Orchestrator
 # Physical block writes remain strictly locked unless explicitly authorized with verified backups.
-set -euo pipefail
+set -eu
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
+# shellcheck source=scripts/lib-common.sh
+. "$SCRIPT_DIR/scripts/lib-common.sh"
 # shellcheck source=config/device.conf
-source "$SCRIPT_DIR/config/device.conf"
+. "$SCRIPT_DIR/config/device.conf"
 # shellcheck source=config/partition-map.conf
-source "$SCRIPT_DIR/config/partition-map.conf"
+. "$SCRIPT_DIR/config/partition-map.conf"
 
 MODE="plan"
 BACKUP_IMG=""
@@ -48,12 +50,13 @@ echo "Tier 3 (Download Mode): Vol Up + Vol Down + USB -> Heimdall / Odin3 factor
 echo "Strict Policy: /dev/block/sda25 (keyrefuge) and /dev/block/sda (whole disk) NEVER accessed."
 
 if [ -n "$TARGET_PART" ]; then
-    R8Q_TARGET_PARTITION="$TARGET_PART" "$SCRIPT_DIR/verify-device.sh" --mode verify --target-profile r8q --target-partition "$TARGET_PART" || exit $?
+    SH_BIN="$(r8q_detect_sh)"
+    R8Q_TARGET_PARTITION="$TARGET_PART" "$SH_BIN" "$SCRIPT_DIR/verify-device.sh" --mode verify --target-profile r8q --target-partition "$TARGET_PART" || exit $?
 fi
 
 if [ -n "$BACKUP_IMG" ]; then
     [ -f "$BACKUP_IMG" ] || { echo "[ERROR] Backup image missing: $BACKUP_IMG" >&2; exit 3; }
-    SIZE="$(stat -c '%s' "$BACKUP_IMG" 2>/dev/null || wc -c < "$BACKUP_IMG")"
+    SIZE="$(r8q_filesize "$BACKUP_IMG")"
     [ "$SIZE" -eq "$SDA24_BYTES" ] || {
         echo "[ERROR] Backup size mismatch: got $SIZE B, expected exact sda24 size $SDA24_BYTES B." >&2
         exit 4

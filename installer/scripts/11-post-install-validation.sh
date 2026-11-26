@@ -1,6 +1,6 @@
-#!/usr/bin/env bash
+#!/bin/sh
 # Stage 11 [Steps 18-19]: Post-installation integrity audit & structured installation report
-set -euo pipefail
+set -eu
 
 [ "${R8Q_STAGE_DONE_10:-0}" = "1" ] || {
     echo "[ERROR] Out-of-order execution: 10-configure-boot.sh must complete before 11-post-install-validation.sh" >&2
@@ -10,11 +10,11 @@ set -euo pipefail
 ROOT="${R8Q_INSTALLER_ROOT:?R8Q_INSTALLER_ROOT must be set via install.sh}"
 MODE="${R8Q_MODE:-dry-run}"
 # shellcheck source=../config/device.conf
-source "$ROOT/config/device.conf"
+. "$ROOT/config/device.conf"
 # shellcheck source=../config/partition-map.conf
-source "$ROOT/config/partition-map.conf"
+. "$ROOT/config/partition-map.conf"
 # shellcheck source=../config/boot.conf
-source "$ROOT/config/boot.conf"
+. "$ROOT/config/boot.conf"
 
 EXPECTED_CHAIN="01,02,03,04,05,06,07,08,09,10"
 if [ "${R8Q_COMPLETED_STEPS:-}" != "$EXPECTED_CHAIN" ]; then

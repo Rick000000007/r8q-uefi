@@ -1,0 +1,236 @@
+#!/sbin/sh
+# ==============================================================================
+# PROJECT R8Q — TWRP Recovery Entry Point (META-INF/com/google/android/update-binary)
+# Target: Samsung Galaxy S20 FE 5G (SM-G781B / r8q / Qualcomm SM8250 / ARM64)
+# Recovery Interface: TWRP >= 3.6 (android-11 / android-12.1) & Edify OUTFD v3
+# ==============================================================================
+set -eu
+
+# Preserve caller PATH first (e.g. test harnesses), ensure recovery /sbin & /system/bin present
+PATH="${PATH:-/sbin:/system/bin}:/sbin:/system/bin:/system/xbin"
+export PATH
+
+PACKAGE_ROOT_NAME="R8Q-Debian12-ARM64-Installer"
+MIN_EXTRACT_FREE_BYTES=681574400
+
+# 1. Validate TWRP update-binary invocation arguments: <api_version> <outfd> <zip_path> [retry]
+if [ $# -lt 3 ]; then
+    echo "[ERROR] Invalid update-binary arguments (expected: <api_version> <outfd> <zip_path>)." >&2
+    exit 2
+fi
+
+API_VER="$1"
+OUTFD="$2"
+ZIP_PATH="$3"
+RETRY_FLAG="${4:-}"
+
+case "$API_VER" in
+    ''|*[!0-9]*)
+        echo "[ERROR] Invalid recovery API version: '$API_VER'" >&2
+        exit 2
+        ;;
+esac
+if [ "$API_VER" -lt 1 ]; then
+    echo "[ERROR] Unsupported recovery API version: $API_VER" >&2
+    exit 2
+fi
+
+case "$OUTFD" in
+    ''|*[!0-9]*)
+        echo "[ERROR] Invalid OUTFD file descriptor: '$OUTFD'" >&2
+        exit 2
+        ;;
+esac
+if [ "$OUTFD" -gt 2 ] && [ -d /proc/self/fd ] && [ ! -e "/proc/self/fd/$OUTFD" ]; then
+    echo "[ERROR] OUTFD pipe descriptor $OUTFD is not open." >&2
+    exit 2
+fi
+
+ui_print() {
+    if [ -n "${OUTFD:-}" ] && [ -e "/proc/self/fd/$OUTFD" ]; then
+        printf 'ui_print %s\nui_print\n' "$1" > "/proc/self/fd/$OUTFD"
+    else
+        printf '%s\n' "$1"
+    fi
+}
+
+set_progress() {
+    if [ -n "${OUTFD:-}" ] && [ -e "/proc/self/fd/$OUTFD" ]; then
+        printf 'set_progress %s\n' "$1" > "/proc/self/fd/$OUTFD"
+    fi
+}
+
+if [ -z "$ZIP_PATH" ] || [ ! -f "$ZIP_PATH" ] || [ ! -s "$ZIP_PATH" ]; then
+    ui_print "ERROR: Installer ZIP package missing or empty: '$ZIP_PATH'"
+    echo "[ERROR] Installer ZIP package missing or empty: '$ZIP_PATH'" >&2
+    exit 3
+fi
+
+# Detect POSIX shell and unzip implementations available in TWRP
+SH_BIN=""
+if [ -n "${R8Q_SH_BIN:-}" ] && [ -x "$R8Q_SH_BIN" ]; then
+    SH_BIN="$R8Q_SH_BIN"
+else
+    for cand in /sbin/sh /system/bin/sh /bin/sh; do
+        if [ -x "$cand" ]; then
+            SH_BIN="$cand"
+            break
+        fi
+    done
+    if [ -z "$SH_BIN" ] && command -v sh >/dev/null 2>&1; then
+        SH_BIN="$(command -v sh)"
+    fi
+fi
+[ -n "$SH_BIN" ] || {
+    ui_print "ERROR: No POSIX sh shell available in recovery."
+    echo "[ERROR] No POSIX sh shell found." >&2
+    exit 4
+}
+export R8Q_SH_BIN="$SH_BIN"
+
+run_unzip() {
+    if [ -n "${R8Q_UNZIP_BIN:-}" ] && [ -x "$R8Q_UNZIP_BIN" ]; then
+        "$R8Q_UNZIP_BIN" "$@"
+    elif command -v unzip >/dev/null 2>&1; then
+        unzip "$@"
+    elif command -v busybox >/dev/null 2>&1; then
+        busybox unzip "$@"
+    else
+        return 127
+    fi
+}
+
+ui_print "=================================================="
+ui_print "  PROJECT R8Q — TWRP UNIFIED INSTALLER (DEBIAN 12)"
+ui_print "  Target: Samsung Galaxy S20 FE 5G (SM-G781B/r8q) "
+ui_print "=================================================="
+ui_print "  Recovery API: v$API_VER | ZIP: $ZIP_PATH"
+[ -z "$RETRY_FLAG" ] || ui_print "  Recovery Retry Flag: $RETRY_FLAG"
+set_progress 0.02
+
+# 2. Verify package structure and available extraction headroom
+STAGE_BASE="${R8Q_STAGE_BASE:-/tmp}"
+mkdir -p "$STAGE_BASE"
+STAGE_DIR="$STAGE_BASE/r8q-twrp-installer-$$"
+trap 'rm -rf "$STAGE_DIR"' EXIT INT TERM
+
+STAGE_FREE_BYTES="$( (df -kP "$STAGE_BASE" 2>/dev/null || df -k "$STAGE_BASE" 2>/dev/null || true) | awk 'NR > 1 && NF >= 4 { avail=$(NF-2) } END { if (avail ~ /^[0-9]+$/) printf "%.0f\n", avail * 1024 }')"
+if [ -n "$STAGE_FREE_BYTES" ] && [ "$STAGE_FREE_BYTES" -lt "$MIN_EXTRACT_FREE_BYTES" ]; then
+    ui_print "ERROR: Insufficient staging space in $STAGE_BASE ($STAGE_FREE_BYTES B < $MIN_EXTRACT_FREE_BYTES B)."
+    echo "[ERROR] Insufficient staging space in $STAGE_BASE: $STAGE_FREE_BYTES B < $MIN_EXTRACT_FREE_BYTES B" >&2
+    exit 6
+fi
+
+ui_print "[TWRP] Verifying package layout inside archive..."
+ZIP_LISTING="$(run_unzip -l "$ZIP_PATH" 2>&1)" || {
+    RC=$?
+    ui_print "ERROR: Failed to inspect ZIP archive (unzip exit $RC)."
+    echo "[ERROR] unzip -l failed ($RC): $ZIP_LISTING" >&2
+    exit "$RC"
+}
+if ! printf '%s\n' "$ZIP_LISTING" | grep -Fq "${PACKAGE_ROOT_NAME}/install.sh"; then
+    ui_print "ERROR: Master installer '${PACKAGE_ROOT_NAME}/install.sh' not found in ZIP!"
+    echo "[ERROR] Missing ${PACKAGE_ROOT_NAME}/install.sh inside $ZIP_PATH" >&2
+    exit 5
+fi
+
+# 3. Extract installer package safely
+ui_print "[TWRP] Extracting unified installer payload to temporary workspace..."
+mkdir -p "$STAGE_DIR"
+chmod 700 "$STAGE_DIR"
+if ! run_unzip -oq "$ZIP_PATH" "${PACKAGE_ROOT_NAME}/*" -d "$STAGE_DIR" >/dev/null 2>&1; then
+    ui_print "ERROR: Failed to extract ${PACKAGE_ROOT_NAME} from ZIP!"
+    echo "[ERROR] ZIP extraction failed for $ZIP_PATH" >&2
+    exit 7
+fi
+set_progress 0.08
+
+PKG_DIR="$STAGE_DIR/$PACKAGE_ROOT_NAME"
+MASTER_INSTALLER="$PKG_DIR/install.sh"
+if [ ! -f "$MASTER_INSTALLER" ] || [ ! -s "$MASTER_INSTALLER" ]; then
+    ui_print "ERROR: Extracted master installer missing or empty: $MASTER_INSTALLER"
+    echo "[ERROR] Master installer missing after extraction: $MASTER_INSTALLER" >&2
+    exit 5
+fi
+
+chmod 755 "$PKG_DIR"/*.sh "$PKG_DIR"/scripts/*.sh 2>/dev/null || true
+
+# Determine execution mode respecting device.conf physical write lock
+LOCK_VAL="$(awk -F '=' '/^PHYSICAL_WRITES_ENABLED=/{print $2; exit}' "$PKG_DIR/config/device.conf" 2>/dev/null || echo 0)"
+REQ_MODE="${R8Q_INSTALL_MODE:-}"
+case "$REQ_MODE" in
+    dry-run|verify|install)
+        INSTALL_FLAG="--${REQ_MODE}"
+        ;;
+    "")
+        if [ "${LOCK_VAL:-0}" -eq 0 ]; then
+            INSTALL_FLAG="--dry-run"
+        else
+            INSTALL_FLAG="--install"
+        fi
+        ;;
+    *)
+        ui_print "ERROR: Invalid R8Q_INSTALL_MODE='$REQ_MODE'"
+        echo "[ERROR] Invalid R8Q_INSTALL_MODE='$REQ_MODE'" >&2
+        exit 2
+        ;;
+esac
+
+# Avoid false storage failures on RAM /tmp tmpfs when real target media (/external_sd or /data) is mounted
+if [ -z "${R8Q_SPACE_CHECK_DIR:-}" ]; then
+    ZIP_PARENT="$(dirname "$ZIP_PATH")"
+    for cand in /external_sd /storage/sdcard1 /data "$ZIP_PARENT"; do
+        if [ -d "$cand" ] && [ "$cand" != "/tmp" ] && [ "$cand" != "$STAGE_BASE" ]; then
+            CAND_FREE="$( (df -kP "$cand" 2>/dev/null || df -k "$cand" 2>/dev/null || true) | awk 'NR > 1 && NF >= 4 { avail=$(NF-2) } END { if (avail ~ /^[0-9]+$/) printf "%.0f\n", avail * 1024 }')"
+            if [ -n "$CAND_FREE" ] && [ "$CAND_FREE" -ge 3221225472 ]; then
+                export R8Q_SPACE_CHECK_DIR="$cand"
+                break
+            fi
+        fi
+    done
+fi
+
+# 4 & 5 & 6 & 7. Run master installer, stream output & progress, halt immediately on failure, preserve exit status
+ui_print "[TWRP] Starting master installer ($INSTALL_FLAG)..."
+set_progress 0.10
+
+RC_FILE="$STAGE_DIR/.master_install.rc"
+(
+    set +e
+    "$SH_BIN" "$MASTER_INSTALLER" "$INSTALL_FLAG" 2>&1
+    printf '%s\n' "$?" > "$RC_FILE"
+) | while IFS= read -r line; do
+    ui_print "  $line"
+    case "$line" in
+        *"[STAGE 01/11]"*) set_progress 0.14 ;;
+        *"[STAGE 02/11]"*) set_progress 0.24 ;;
+        *"[STAGE 03/11]"*) set_progress 0.32 ;;
+        *"[STAGE 04/11]"*) set_progress 0.40 ;;
+        *"[STAGE 05/11]"*) set_progress 0.48 ;;
+        *"[STAGE 06/11]"*) set_progress 0.56 ;;
+        *"[STAGE 07/11]"*) set_progress 0.64 ;;
+        *"[STAGE 08/11]"*) set_progress 0.72 ;;
+        *"[STAGE 09/11]"*) set_progress 0.80 ;;
+        *"[STAGE 10/11]"*) set_progress 0.90 ;;
+        *"[STAGE 11/11]"*) set_progress 0.97 ;;
+    esac
+done
+
+INSTALL_RC="$(cat "$RC_FILE" 2>/dev/null || echo 1)"
+case "$INSTALL_RC" in
+    ''|*[!0-9]*) INSTALL_RC=1 ;;
+esac
+
+if [ "$INSTALL_RC" -ne 0 ]; then
+    ui_print "--------------------------------------------------"
+    ui_print "FAILED: Installation halted cleanly (exit code $INSTALL_RC)."
+    ui_print "No protected partitions or UFS storage modified."
+    ui_print "--------------------------------------------------"
+    exit "$INSTALL_RC"
+fi
+
+set_progress 1.00
+ui_print "--------------------------------------------------"
+ui_print "SUCCESS: Project R8Q installer finished ($INSTALL_FLAG)."
+ui_print "--------------------------------------------------"
+exit 0

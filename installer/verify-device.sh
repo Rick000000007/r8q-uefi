@@ -1,12 +1,15 @@
-#!/usr/bin/env bash
+#!/bin/sh
 # Project R8Q — Target Device, Architecture, Partition Map & Hardware Safety Verifier
-set -euo pipefail
+# Pure POSIX / BusyBox-compatible implementation (no python3 or bash required).
+set -eu
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
+# shellcheck source=scripts/lib-common.sh
+. "$SCRIPT_DIR/scripts/lib-common.sh"
 # shellcheck source=config/device.conf
-source "$SCRIPT_DIR/config/device.conf"
+. "$SCRIPT_DIR/config/device.conf"
 # shellcheck source=config/partition-map.conf
-source "$SCRIPT_DIR/config/partition-map.conf"
+. "$SCRIPT_DIR/config/partition-map.conf"
 
 MODE="verify"
 SIMULATE_TARGET=0
@@ -102,19 +105,39 @@ detect_live_device() {
     LIVE_CODENAME=""
     LIVE_MODEL=""
     LIVE_SOC=""
+    LIVE_DT_MODEL=""
+    LIVE_BOOTLOADER=""
 
     if command -v getprop >/dev/null 2>&1; then
-        LIVE_CODENAME="$(getprop ro.product.device 2>/dev/null || getprop ro.build.product 2>/dev/null || true)"
+        LIVE_CODENAME="$(getprop ro.product.device 2>/dev/null || getprop ro.product.system.device 2>/dev/null || getprop ro.build.product 2>/dev/null || getprop ro.twrp.device 2>/dev/null || true)"
         LIVE_MODEL="$(getprop ro.product.model 2>/dev/null || getprop ro.product.system.model 2>/dev/null || true)"
+        LIVE_BOOTLOADER="$(getprop ro.bootloader 2>/dev/null || true)"
     fi
     if [ -r /proc/device-tree/compatible ]; then
         LIVE_SOC="$(tr '\0' ' ' < /proc/device-tree/compatible 2>/dev/null || true)"
     elif [ -r /sys/firmware/devicetree/base/compatible ]; then
         LIVE_SOC="$(tr '\0' ' ' < /sys/firmware/devicetree/base/compatible 2>/dev/null || true)"
     fi
-    if [ -z "$LIVE_MODEL" ] && [ -r /proc/device-tree/model ]; then
-        LIVE_MODEL="$(tr '\0' ' ' < /proc/device-tree/model 2>/dev/null || true)"
+    if [ -r /proc/device-tree/model ]; then
+        LIVE_DT_MODEL="$(tr '\0' ' ' < /proc/device-tree/model 2>/dev/null || true)"
+    elif [ -r /sys/firmware/devicetree/base/model ]; then
+        LIVE_DT_MODEL="$(tr '\0' ' ' < /sys/firmware/devicetree/base/model 2>/dev/null || true)"
     fi
+
+    # Bootloader / DTB model takes precedence if it positively identifies SM-G781B / R8Q EUR hardware,
+    # since unified TWRP or LineageOS recoveries often report generic model strings (e.g., SAMSUNG_r8q).
+    case "$LIVE_DT_MODEL" in
+        *SM-G781B*|*G781B*|*"Samsung R8Q EUR"*)
+            LIVE_MODEL="$LIVE_DT_MODEL"
+            ;;
+        *)
+            case "$LIVE_BOOTLOADER" in
+                *G781B*) LIVE_MODEL="SM-G781B ($LIVE_BOOTLOADER)" ;;
+            esac
+            [ -n "$LIVE_MODEL" ] || LIVE_MODEL="$LIVE_DT_MODEL"
+            ;;
+    esac
+
     if [ -z "$LIVE_CODENAME" ]; then
         case "${LIVE_SOC}:${LIVE_MODEL}" in
             *samsung,r8q*|*"Samsung R8Q EUR"*) LIVE_CODENAME="r8q" ;;
@@ -183,12 +206,12 @@ case "$SOC_TO_CHECK" in
         ;;
 esac
 
-# Check available free storage headroom cleanly
+# Check available free storage headroom cleanly using POSIX/BusyBox df -k
 REQ_FREE="${MIN_SPACE_OVERRIDE:-$MIN_TOTAL_INSTALL_FREE_BYTES}"
-AVAIL_BYTES="$(df -PB1 "$SPACE_CHECK_DIR" | awk 'NR==2 {print $4}')"
-echo "[STORAGE-CHECK] Available space in '$SPACE_CHECK_DIR': $AVAIL_BYTES bytes (required: $REQ_FREE bytes)"
+AVAIL_BYTES="$(r8q_free_bytes "$SPACE_CHECK_DIR")"
+echo "[STORAGE-CHECK] Available space in '$SPACE_CHECK_DIR': ${AVAIL_BYTES:-unknown} bytes (required: $REQ_FREE bytes)"
 if [ -z "$AVAIL_BYTES" ] || [ "$AVAIL_BYTES" -lt "$REQ_FREE" ]; then
-    echo "[ERROR] Insufficient storage space: available $AVAIL_BYTES B < required $REQ_FREE B." >&2
+    echo "[ERROR] Insufficient storage space: available ${AVAIL_BYTES:-0} B < required $REQ_FREE B." >&2
     exit 13
 fi
 
@@ -221,22 +244,46 @@ fi
 # Validate independently provided partition map if supplied, or required in install mode
 if [ -n "$PARTITION_MAP_FILE" ]; then
     [ -f "$PARTITION_MAP_FILE" ] || { echo "[ERROR] Partition map file not found: $PARTITION_MAP_FILE" >&2; exit 16; }
-    python3 -B - "$PARTITION_MAP_FILE" "$SDA23_START_SECTOR" "$SDA23_SECTORS" "$SDA24_START_SECTOR" "$SDA24_SECTORS" "$SDA25_START_SECTOR" "$SDA25_SECTORS" << 'PYEOF'
-import json, sys
-path = sys.argv[1]
-s23, n23, s24, n24, s25, n25 = [int(x) for x in sys.argv[2:8]]
-with open(path, "r", encoding="utf-8") as f:
-    pmap = json.load(f)
-for name, start, sectors in [("sda23", s23, n23), ("sda24", s24, n24), ("sda25", s25, n25)]:
-    entry = pmap.get(name)
-    if not entry or int(entry.get("start", -1)) != start or int(entry.get("sectors", -1)) != sectors:
-        print(f"[ERROR] Partition map mismatch or missing entry for {name}: {entry}", file=sys.stderr)
-        sys.exit(17)
-if s23 + n23 != s24 or s24 + n24 != s25:
-    print("[ERROR] Partition contiguity sanity invariant violated", file=sys.stderr)
-    sys.exit(17)
-print("[PASS] Independent partition map matches SM8250 sda23/sda24/sda25 zero-gap boundary table.")
-PYEOF
+    awk -v RS='}' -v s23="$SDA23_START_SECTOR" -v n23="$SDA23_SECTORS" \
+        -v s24="$SDA24_START_SECTOR" -v n24="$SDA24_SECTORS" \
+        -v s25="$SDA25_START_SECTOR" -v n25="$SDA25_SECTORS" '
+    function extract_num(blk, key,    m) {
+        if (match(blk, "\"" key "\"[[:space:]]*:[[:space:]]*[0-9]+")) {
+            m = substr(blk, RSTART, RLENGTH);
+            sub(/.*:[[:space:]]*/, "", m);
+            return m + 0;
+        }
+        return -1;
+    }
+    {
+        for (i = 1; i <= 3; i++) {
+            name = (i == 1 ? "sda23" : (i == 2 ? "sda24" : "sda25"));
+            pat = "\"" name "\"[[:space:]]*:[[:space:]]*\\{";
+            if ($0 ~ pat) {
+                blk = $0;
+                sub(".*" pat, "", blk);
+                st[name] = extract_num(blk, "start");
+                sec[name] = extract_num(blk, "sectors");
+            }
+        }
+    }
+    END {
+        exp_st["sda23"] = s23 + 0; exp_sec["sda23"] = n23 + 0;
+        exp_st["sda24"] = s24 + 0; exp_sec["sda24"] = n24 + 0;
+        exp_st["sda25"] = s25 + 0; exp_sec["sda25"] = n25 + 0;
+        for (i = 1; i <= 3; i++) {
+            name = (i == 1 ? "sda23" : (i == 2 ? "sda24" : "sda25"));
+            if (!(name in st) || st[name] != exp_st[name] || sec[name] != exp_sec[name]) {
+                printf "[ERROR] Partition map mismatch or missing entry for %s\n", name > "/dev/stderr";
+                exit 17;
+            }
+        }
+        if ((s23 + n23) != s24 || (s24 + n24) != s25) {
+            print "[ERROR] Partition contiguity sanity invariant violated" > "/dev/stderr";
+            exit 17;
+        }
+        print "[PASS] Independent partition map matches SM8250 sda23/sda24/sda25 zero-gap boundary table.";
+    }' "$PARTITION_MAP_FILE"
 elif [ "$MODE" = "install" ]; then
     if [ -r /sys/block/sda/sda24/start ] && [ -r /sys/block/sda/sda25/start ]; then
         echo "[DEVICE-CHECK] Live sysfs partition nodes present; auditing geometry..."

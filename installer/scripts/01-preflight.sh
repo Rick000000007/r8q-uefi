@@ -1,48 +1,43 @@
-#!/usr/bin/env bash
-# Stage 01 [Steps 1-5]: Execution environment, root/device/SoC/storage & firmware preflight
-set -euo pipefail
+#!/bin/sh
+# Stage 01 [Steps 1-5]: Environment, root privilege, device/arch, storage & firmware preflight
+set -eu
 
 ROOT="${R8Q_INSTALLER_ROOT:?R8Q_INSTALLER_ROOT must be set via install.sh}"
 MODE="${R8Q_MODE:-verify}"
-
+# shellcheck source=lib-common.sh
+. "$ROOT/scripts/lib-common.sh"
 # shellcheck source=../config/device.conf
-source "$ROOT/config/device.conf"
+. "$ROOT/config/device.conf"
 
-echo "[STAGE 01/11] [STEP 1/19] Detecting execution environment ($MODE) and privileges..."
-echo "  Pipeline Token: ${R8Q_PIPELINE_TOKEN:-unset}"
-echo "  User ID: $(id -u) ($(id -un)) | Kernel: $(uname -s) $(uname -m)"
+SH_BIN="$(r8q_detect_sh)"
 
+echo "[STAGE 01/11] [STEP 1/19] Checking execution environment & root privilege policy..."
+UID_NOW="$(id -u 2>/dev/null || echo 1000)"
 if [ "$MODE" = "install" ]; then
     if [ "${CI:-}" = "true" ] || [ "${GITHUB_ACTIONS:-}" = "true" ]; then
-        echo "[SECURITY-ABORT] --install physical execution is forbidden inside CI/CD environments." >&2
+        echo "[ERROR] Refusing --install inside CI environment." >&2
         exit 30
     fi
-    if [ "$REQUIRE_ROOT_FOR_INSTALL" -eq 1 ] && [ "$(id -u)" -ne 0 ]; then
-        echo "[ERROR] Root privileges (uid 0) are required for --install mode." >&2
+    if [ "$UID_NOW" -ne 0 ] && [ "$REQUIRE_ROOT_FOR_INSTALL" -eq 1 ]; then
+        echo "[ERROR] --install requires root privileges (uid=0), current uid=$UID_NOW." >&2
         exit 31
     fi
 fi
 
-for tool in bash python3 sha256sum gzip tar df; do
+# Require only POSIX / TWRP recovery standard tools (zero bash or python3 dependency)
+for tool in sh sha256sum gzip tar cpio dd od wc awk df; do
     command -v "$tool" >/dev/null 2>&1 || {
-        echo "[ERROR] Required system tool not found: $tool" >&2
+        echo "[ERROR] Required installation utility missing: $tool" >&2
         exit 32
     }
 done
 
-echo "[STAGE 01/11] [STEPS 2-4/19] Identifying Samsung SM-G781B/r8q, SM8250/ARM64, and storage headroom..."
-ARGS=(--mode "$MODE")
-[ "${R8Q_SIMULATE_PROFILE:-}" = "r8q" ] && ARGS+=(--target-profile r8q)
-[ -n "${R8Q_DEVICE_MODEL:-}" ] && ARGS+=(--device-model "$R8Q_DEVICE_MODEL")
-[ -n "${R8Q_DEVICE_CODENAME:-}" ] && ARGS+=(--device-codename "$R8Q_DEVICE_CODENAME")
-[ -n "${R8Q_DEVICE_ARCH:-}" ] && ARGS+=(--arch "$R8Q_DEVICE_ARCH")
-[ -n "${R8Q_DEVICE_SOC:-}" ] && ARGS+=(--soc "$R8Q_DEVICE_SOC")
-[ -n "${R8Q_TARGET_PARTITION:-}" ] && ARGS+=(--target-partition "$R8Q_TARGET_PARTITION")
-[ -n "${R8Q_PARTITION_MAP_FILE:-}" ] && ARGS+=(--partition-map "$R8Q_PARTITION_MAP_FILE")
-[ -n "${R8Q_MIN_SPACE_BYTES:-}" ] && ARGS+=(--min-space-bytes "$R8Q_MIN_SPACE_BYTES")
-[ -n "${R8Q_SPACE_CHECK_DIR:-}" ] && ARGS+=(--check-space-dir "$R8Q_SPACE_CHECK_DIR")
-
-"$ROOT/verify-device.sh" "${ARGS[@]}"
+echo "[STAGE 01/11] [STEPS 2-4/19] Running SM-G781B / r8q, ARM64 & storage preflight checks..."
+if [ "${R8Q_SIMULATE_PROFILE:-}" = "r8q" ]; then
+    "$SH_BIN" "$ROOT/verify-device.sh" --mode "$MODE" --target-profile r8q
+else
+    "$SH_BIN" "$ROOT/verify-device.sh" --mode "$MODE"
+fi
 
 echo "[STAGE 01/11] [STEP 5/19] Verifying firmware and bootloader prerequisite payloads exist..."
 for req in \

@@ -1,23 +1,30 @@
-#!/usr/bin/env bash
-# Project R8Q — Unified One-Click Debian 12 ARM64 Master Installer
-# Orchestrates stages 01 through 11 (covering installation requirements 1..19)
-# in strict dependency order; halts immediately on any mandatory failure.
-set -euo pipefail
+#!/bin/sh
+# Project R8Q — Master 19-Step Debian 12 ARM64 Installer Orchestrator
+# Compatible with TWRP recovery (/sbin/sh / BusyBox ash / mksh) and Linux workstations.
+set -eu
 
-export R8Q_INSTALLER_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+R8Q_INSTALLER_ROOT="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
+export R8Q_INSTALLER_ROOT
+# shellcheck source=scripts/lib-common.sh
+. "$R8Q_INSTALLER_ROOT/scripts/lib-common.sh"
 
-# Parse flags
+R8Q_SH_BIN="$(r8q_detect_sh)" || {
+    echo "[FATAL] No POSIX sh interpreter found." >&2
+    exit 127
+}
+export R8Q_SH_BIN
+
 export R8Q_MODE=""
-export R8Q_DEVICE_MODEL=""
-export R8Q_DEVICE_CODENAME=""
-export R8Q_DEVICE_ARCH=""
-export R8Q_DEVICE_SOC=""
-export R8Q_TARGET_PARTITION=""
-export R8Q_PARTITION_MAP_FILE=""
-export R8Q_MIN_SPACE_BYTES=""
-export R8Q_SPACE_CHECK_DIR=""
-export R8Q_REPORT_OUT=""
-export R8Q_STAGING_TARGET_DIR=""
+export R8Q_SIMULATE_PROFILE="${R8Q_SIMULATE_PROFILE:-}"
+export R8Q_DEVICE_MODEL="${R8Q_DEVICE_MODEL:-}"
+export R8Q_DEVICE_CODENAME="${R8Q_DEVICE_CODENAME:-}"
+export R8Q_DEVICE_ARCH="${R8Q_DEVICE_ARCH:-}"
+export R8Q_DEVICE_SOC="${R8Q_DEVICE_SOC:-}"
+export R8Q_TARGET_PARTITION="${R8Q_TARGET_PARTITION:-}"
+export R8Q_PARTITION_MAP_FILE="${R8Q_PARTITION_MAP_FILE:-}"
+export R8Q_MIN_SPACE_BYTES="${R8Q_MIN_SPACE_BYTES:-}"
+export R8Q_SPACE_CHECK_DIR="${R8Q_SPACE_CHECK_DIR:-}"
+export R8Q_REPORT_OUT="${R8Q_REPORT_OUT:-}"
 export R8Q_WORKSTATION_DRYRUN=0
 SIMULATE_PROFILE=""
 
@@ -151,40 +158,36 @@ export R8Q_PIPELINE_TOKEN="r8q-$(date -u +%Y%m%dT%H%M%SZ)-$$"
 export R8Q_COMPLETED_STEPS=""
 
 run_stage() {
-    local stage_id="$1"
-    local script_name="$2"
-    local stage_path="$R8Q_INSTALLER_ROOT/scripts/$script_name"
+    stage_id="$1"
+    script_name="$2"
+    stage_path="$R8Q_INSTALLER_ROOT/scripts/$script_name"
     if [ ! -f "$stage_path" ]; then
         echo "[FATAL] Missing mandatory installer stage script: $stage_path" >&2
         exit 20
     fi
-    bash "$stage_path"
-    export "R8Q_STAGE_DONE_${stage_id}=1"
+    "$R8Q_SH_BIN" "$stage_path"
+    eval "export R8Q_STAGE_DONE_${stage_id}=1"
     if [ -z "$R8Q_COMPLETED_STEPS" ]; then
         R8Q_COMPLETED_STEPS="$stage_id"
     else
-        R8Q_COMPLETED_STEPS="$R8Q_COMPLETED_STEPS,$stage_id"
+        R8Q_COMPLETED_STEPS="${R8Q_COMPLETED_STEPS},${stage_id}"
     fi
+    export R8Q_COMPLETED_STEPS
 }
 
-echo "================================================================="
-echo "  PROJECT R8Q: UNIFIED DEBIAN 12 ARM64 MASTER INSTALLER"
-echo "  Mode: $R8Q_MODE | Root: $R8Q_INSTALLER_ROOT"
-echo "================================================================="
-
-# Mandatory verification pre-stages (executed in all modes: --verify, --dry-run, --install)
+# Always validate cryptographic package integrity FIRST in all modes
 run_stage "01" "01-preflight.sh"
 run_stage "02" "02-verify-payloads.sh"
 run_stage "03" "03-prepare-target.sh"
 
 if [ "$R8Q_MODE" = "verify" ]; then
     echo "================================================================="
-    echo "  [VERIFY COMPLETE] Stages 01-03 PASSED (0 storage writes)."
+    echo "  [VERIFY COMPLETE] Stages 01-03 PASSED cleanly (no writes performed)."
     echo "================================================================="
     exit 0
 fi
 
-# Installation / Dry-Run stages 04..11 in strict dependency order
+# Ordered execution Stages 04 -> 11 (Steps 9 -> 19)
 run_stage "04" "04-install-firmware.sh"
 run_stage "05" "05-install-uefi.sh"
 run_stage "06" "06-install-esp.sh"
@@ -193,8 +196,3 @@ run_stage "08" "08-install-initramfs.sh"
 run_stage "09" "09-install-rootfs.sh"
 run_stage "10" "10-configure-boot.sh"
 run_stage "11" "11-post-install-validation.sh"
-
-echo "================================================================="
-echo "  [SUCCESS] Unified R8Q Installer completed mode='$R8Q_MODE'"
-echo "  Completed Stages: $R8Q_COMPLETED_STEPS"
-echo "================================================================="
