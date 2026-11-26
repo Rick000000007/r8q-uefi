@@ -38,6 +38,7 @@ concurrency:
 
 permissions:
   contents: write
+  actions: read
 
 jobs:
   safety-pre-audit:
@@ -122,13 +123,22 @@ jobs:
     with:
       use_workflow_artifacts: true
 
-  publish-release:
-    name: Distribution - GitHub Release & Asset Publication
-    needs: [build-complete-platform, build-recovery, test-platform]
-    if: ${{ inputs.publish_release == true || startsWith(github.ref, 'refs/tags/v') }}
+  distribution-validation-staging:
+    name: Distribution - Validation & Staging
+    needs:
+      - safety-pre-audit
+      - build-firmware
+      - build-boot-manager
+      - build-kernel
+      - build-initramfs
+      - build-debian-rootfs
+      - build-esp
+      - build-complete-platform
+      - build-recovery
+      - test-platform
     uses: ./.github/workflows/build-release.yml
     with:
       release_version: ${{ inputs.release_version || 'v1.0.0-terminal' }}
-      publish_release: ${{ inputs.publish_release == true || startsWith(github.ref, 'refs/tags/v') }}
+      publish_release: ${{ github.event_name == 'workflow_dispatch' && inputs.publish_release == true }}
       use_workflow_artifacts: true
     secrets: inherit

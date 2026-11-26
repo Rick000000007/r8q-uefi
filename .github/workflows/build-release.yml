@@ -1,17 +1,19 @@
 name: Build Release Distribution (Layer 1-6)
 
 on:
-  push:
-    tags:
-      - 'v*'
   workflow_dispatch:
     inputs:
+      source_run_id:
+        description: 'Optional Master CI run ID for artifact staging (auto-resolves latest successful run for commit SHA if empty)'
+        required: false
+        type: string
+        default: ''
       release_version:
         description: 'Release Tag Version (e.g. v1.0.0-terminal)'
         required: false
         default: 'v1.0.0-terminal'
       publish_release:
-        description: 'Publish official GitHub Release asset bundle'
+        description: 'Publish official GitHub Release asset bundle (manual authorization required)'
         type: boolean
         default: false
   workflow_call:
@@ -32,11 +34,15 @@ concurrency:
 
 permissions:
   contents: write
+  actions: read
 
 jobs:
-  build-release-distribution:
-    name: Assemble & Publish Verified Distribution Bundle
+  distribution-validation-staging:
+    name: Distribution Validation & Staging
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
 
     steps:
       - name: Checkout Repository
@@ -49,12 +55,16 @@ jobs:
         with:
           python-version: "3.11"
 
+      - name: Install Distribution Verification Tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y mtools device-tree-compiler
+
       - name: Mandatory Static Safety Audit
         run: |
           echo "=========================================================="
           echo "   PROJECT R8Q: RELEASE SAFETY GATE & KEYSTORE AUDIT      "
           echo "=========================================================="
-          # Strict zero-tolerance check for sda25 write commands or destructive physical flashing
           if grep -rn --exclude-dir=".git" --exclude-dir="docs" --exclude-dir="documentation" --exclude="*.md" --exclude-dir=".github" --exclude="verify_phase8_5.py" \
              "dd.*sda25\|write.*sda25\|format.*sda25\|fastboot flash.*" . ; then
             echo "CRITICAL FAILURE: Unauthorized physical flashing command detected!"
@@ -62,184 +72,212 @@ jobs:
           fi
           echo "[PASS] Zero unauthorized physical block writes verified."
 
-      - name: Download Upstream Artifacts (Workflow Run)
+      # Workflow-call path: download all 10 mandatory artifacts explicitly from current run
+      - name: Download Artifact - UEFI Firmware Volume
         if: ${{ inputs.use_workflow_artifacts == true }}
         uses: actions/download-artifact@v4
         with:
+          name: r8q-uefi-firmware-volume
+          path: .ci-artifacts/r8q-uefi-firmware-volume
+
+      - name: Download Artifact - Boot Manager & Setup Utility
+        if: ${{ inputs.use_workflow_artifacts == true }}
+        uses: actions/download-artifact@v4
+        with:
+          name: r8q-boot-manager-and-setup
+          path: .ci-artifacts/r8q-boot-manager-and-setup
+
+      - name: Download Artifact - Linux Kernel & Device Tree
+        if: ${{ inputs.use_workflow_artifacts == true }}
+        uses: actions/download-artifact@v4
+        with:
+          name: r8q-kernel-and-dtb
+          path: .ci-artifacts/r8q-kernel-and-dtb
+
+      - name: Download Artifact - Initramfs
+        if: ${{ inputs.use_workflow_artifacts == true }}
+        uses: actions/download-artifact@v4
+        with:
+          name: r8q-initramfs
+          path: .ci-artifacts/r8q-initramfs
+
+      - name: Download Artifact - Debian 12 Rootfs
+        if: ${{ inputs.use_workflow_artifacts == true }}
+        uses: actions/download-artifact@v4
+        with:
+          name: r8q-debian12-rootfs
+          path: .ci-artifacts/r8q-debian12-rootfs
+
+      - name: Download Artifact - Debian 12 Rootfs Metadata
+        if: ${{ inputs.use_workflow_artifacts == true }}
+        uses: actions/download-artifact@v4
+        with:
+          name: r8q-debian12-rootfs-meta
+          path: .ci-artifacts/r8q-debian12-rootfs-meta
+
+      - name: Download Artifact - FAT32 ESP Disk Image
+        if: ${{ inputs.use_workflow_artifacts == true }}
+        uses: actions/download-artifact@v4
+        with:
+          name: r8q-esp
+          path: .ci-artifacts/r8q-esp
+
+      - name: Download Artifact - Compound Boot Image
+        if: ${{ inputs.use_workflow_artifacts == true }}
+        uses: actions/download-artifact@v4
+        with:
+          name: r8q-complete-boot-img
+          path: .ci-artifacts/r8q-complete-boot-img
+
+      - name: Download Artifact - Full System Distribution
+        if: ${{ inputs.use_workflow_artifacts == true }}
+        uses: actions/download-artifact@v4
+        with:
+          name: r8q-full-system-distribution
+          path: .ci-artifacts/r8q-full-system-distribution
+
+      - name: Download Artifact - Recovery Installer ZIP
+        if: ${{ inputs.use_workflow_artifacts == true }}
+        uses: actions/download-artifact@v4
+        with:
+          name: r8q-recovery-installer-zip
+          path: .ci-artifacts/r8q-recovery-installer-zip
+
+      # Standalone workflow_dispatch path: resolve verified Master CI run for this commit SHA (no stale release fallback)
+      - name: Resolve Verified Master CI Run (Standalone Dispatch)
+        if: ${{ inputs.use_workflow_artifacts != true }}
+        id: resolve-source
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          RUN_ID="${{ inputs.source_run_id }}"
+          if [ -z "$RUN_ID" ]; then
+            RUN_ID=$(gh run list \
+              --repo "${{ github.repository }}" \
+              --workflow "r8q-complete-build.yml" \
+              --commit "${{ github.sha }}" \
+              --status success \
+              --json databaseId,conclusion \
+              --jq '[.[] | select(.conclusion == "success")] | .[0].databaseId // empty')
+          fi
+          if [ -z "$RUN_ID" ]; then
+            echo "ERROR: No successful Master CI pipeline run found for commit ${{ github.sha }}."
+            echo "Run r8q-complete-build.yml or supply a verified source_run_id; stale release downloads are prohibited."
+            exit 1
+          fi
+          RUN_CONCLUSION=$(gh run view "$RUN_ID" --repo "${{ github.repository }}" --json conclusion --jq '.conclusion')
+          if [ "$RUN_CONCLUSION" != "success" ]; then
+            echo "ERROR: Source Master CI run $RUN_ID has conclusion '$RUN_CONCLUSION' (must be 'success')."
+            exit 1
+          fi
+          echo "Resolved verified Master CI run ID: $RUN_ID"
+          echo "run_id=$RUN_ID" >> "$GITHUB_OUTPUT"
+
+      - name: Download Artifacts From Verified Master CI Run (Standalone Dispatch)
+        if: ${{ inputs.use_workflow_artifacts != true }}
+        uses: actions/download-artifact@v4
+        with:
+          run-id: ${{ steps.resolve-source.outputs.run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
           path: .ci-artifacts
 
-      - name: Ensure Complete Release Component Structure
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Validate Payloads, Verify Digests & Stage Consolidated Distribution
         run: |
-          echo "Verifying release components in R8Q-DEBIAN12-RELEASE/..."
-          mkdir -p R8Q-DEBIAN12-RELEASE/{boot,firmware,kernel,rootfs}
+          chmod +x scripts/validate_and_stage_distribution.py
+          python3 scripts/validate_and_stage_distribution.py \
+            --artifacts-dir .ci-artifacts \
+            --dist-dir dist-staging/R8Q-Debian12-Distribution \
+            --release-version "${{ inputs.release_version || 'v1.0.0-terminal' }}"
 
-          if [ "${{ inputs.use_workflow_artifacts }}" = "true" ]; then
-            cp .ci-artifacts/r8q-uefi-firmware-volume/build/R8Q_EFI.fd R8Q-DEBIAN12-RELEASE/firmware/R8Q_EFI.fd
-            cp .ci-artifacts/r8q-kernel-and-dtb/build/Image R8Q-DEBIAN12-RELEASE/kernel/Image
-            cp .ci-artifacts/r8q-kernel-and-dtb/build/sm8250-samsung-r8q.dtb R8Q-DEBIAN12-RELEASE/kernel/sm8250-samsung-r8q.dtb
-            cp .ci-artifacts/r8q-initramfs/build/initramfs.img R8Q-DEBIAN12-RELEASE/kernel/initramfs.img
-            cp .ci-artifacts/r8q-esp/build/esp.img R8Q-DEBIAN12-RELEASE/boot/esp.img
-            cp .ci-artifacts/r8q-complete-boot-img/build/r8q-uefi-boot-complete.img R8Q-DEBIAN12-RELEASE/boot/r8q-uefi-boot-complete.img
-            cp .ci-artifacts/r8q-debian12-rootfs/R8Q-DEBIAN12-RELEASE/rootfs/r8q-rootfs.ext4.gz R8Q-DEBIAN12-RELEASE/rootfs/r8q-rootfs.ext4.gz
-            cp .ci-artifacts/r8q-recovery-installer-zip/build/R8Q-Debian12-Recovery.zip R8Q-DEBIAN12-RELEASE/R8Q-Debian12-Recovery.zip
-          else
-            # Standalone workflow trigger: stage from local build/ if present, else fetch release baseline strictly
-            [ -f "build/r8q-uefi-boot-complete.img" ] && cp build/r8q-uefi-boot-complete.img R8Q-DEBIAN12-RELEASE/boot/
-            [ -f "build/esp.img" ] && cp build/esp.img R8Q-DEBIAN12-RELEASE/boot/
-            [ -f "build/R8Q_EFI.fd" ] && cp build/R8Q_EFI.fd R8Q-DEBIAN12-RELEASE/firmware/
-            [ -f "build/Image" ] && cp build/Image R8Q-DEBIAN12-RELEASE/kernel/
-            [ -f "build/sm8250-samsung-r8q.dtb" ] && cp build/sm8250-samsung-r8q.dtb R8Q-DEBIAN12-RELEASE/kernel/
-            [ -f "build/initramfs.img" ] && cp build/initramfs.img R8Q-DEBIAN12-RELEASE/kernel/
-
-            [ ! -f "R8Q-DEBIAN12-RELEASE/firmware/R8Q_EFI.fd" ] && gh release download r8q-debian12-alpha1 -p "R8Q_EFI.fd" -D R8Q-DEBIAN12-RELEASE/firmware/ --clobber
-            [ ! -f "R8Q-DEBIAN12-RELEASE/kernel/Image" ] && gh release download r8q-debian12-alpha1 -p "Image" -D R8Q-DEBIAN12-RELEASE/kernel/ --clobber
-            [ ! -f "R8Q-DEBIAN12-RELEASE/kernel/sm8250-samsung-r8q.dtb" ] && gh release download r8q-debian12-alpha1 -p "sm8250-samsung-r8q.dtb" -D R8Q-DEBIAN12-RELEASE/kernel/ --clobber
-            [ ! -f "R8Q-DEBIAN12-RELEASE/kernel/initramfs.img" ] && gh release download r8q-debian12-alpha1 -p "initramfs.img" -D R8Q-DEBIAN12-RELEASE/kernel/ --clobber
-            [ ! -f "R8Q-DEBIAN12-RELEASE/boot/esp.img" ] && gh release download r8q-debian12-alpha1 -p "esp.img" -D R8Q-DEBIAN12-RELEASE/boot/ --clobber
-            [ ! -f "R8Q-DEBIAN12-RELEASE/boot/r8q-uefi-boot-complete.img" ] && gh release download r8q-debian12-alpha1 -p "r8q-uefi-boot-complete.img" -D R8Q-DEBIAN12-RELEASE/boot/ --clobber
-            [ ! -f "R8Q-DEBIAN12-RELEASE/rootfs/r8q-rootfs.ext4.gz" ] && gh release download r8q-debian12-alpha1 -p "r8q-rootfs.ext4.gz" -D R8Q-DEBIAN12-RELEASE/rootfs/ --clobber
-          fi
-
-      - name: Package LineageOS Recovery ZIP
-        env:
-          ALLOW_CUSTOM_BOOT_HASH: "1"
-          PRODUCTION_BUILD: "1"
+      - name: Verify Consolidated Checksum Manifest & Print Artifact Inventory
         run: |
-          if [ ! -f "R8Q-DEBIAN12-RELEASE/R8Q-Debian12-Recovery.zip" ]; then
-            python3 scripts/package_recovery_zip.py \
-              R8Q-DEBIAN12-RELEASE/boot/r8q-uefi-boot-complete.img \
-              R8Q-DEBIAN12-RELEASE/R8Q-Debian12-Recovery.zip
-          fi
-          (
-            cd R8Q-DEBIAN12-RELEASE
-            sha256sum R8Q-Debian12-Recovery.zip INSTALLATION-USB.md INSTALLER-AUDIT.md > SHA256SUMS-RECOVERY-ZIP.txt
-            sha256sum -b boot/r8q-uefi-boot-complete.img | sed 's|boot/||' >> SHA256SUMS-RECOVERY-ZIP.txt
-          )
+          cd dist-staging/R8Q-Debian12-Distribution
+          sha256sum -c SHA256SUMS.dist
+          sha256sum -c SHA256SUMS.ci
+          echo "=========================================================="
+          cat BUILD-INVENTORY.md
+          echo "=========================================================="
 
-      - name: Package Full System Distribution Tarball
+      - name: Upload Consolidated Distribution Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: r8q-consolidated-distribution
+          path: dist-staging/R8Q-Debian12-Distribution/
+          retention-days: 30
+          if-no-files-found: error
+
+  github-release-publication:
+    name: GitHub Release Publication
+    needs: distribution-validation-staging
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.publish_release == true }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: read
+
+    steps:
+      - name: Download Consolidated Distribution Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: r8q-consolidated-distribution
+          path: dist-release
+
+      - name: Verify Distribution Integrity Prior to Publication
         run: |
-          python3 scripts/package_full_system.py
-
-      - name: Validate System Artifacts & Superblock Integrity
-        run: |
-          python3 -c "
-          import os, sys, zipfile, tarfile, gzip
-
-          rel_dir = 'R8Q-DEBIAN12-RELEASE'
-          print('Auditing generated release artifacts...')
-
-          # 1. Assert non-empty files
-          for root, _, files in os.walk(rel_dir):
-              for f in files:
-                  p = os.path.join(root, f)
-                  if os.path.getsize(p) == 0:
-                      print(f'Error: Empty file detected: {p}', file=sys.stderr)
-                      sys.exit(1)
-
-          # 2. Validate Recovery ZIP integrity
-          rec_zip = os.path.join(rel_dir, 'R8Q-Debian12-Recovery.zip')
-          with zipfile.ZipFile(rec_zip, 'r') as z:
-              assert z.testzip() is None, 'Recovery ZIP corrupted'
-              names = z.namelist()
-              assert 'r8q-uefi-boot-complete.img' in names, 'Missing boot image in ZIP'
-              assert 'META-INF/com/google/android/update-binary' in names, 'Missing update-binary in ZIP'
-          print('Recovery ZIP integrity: PASSED')
-
-          # 3. Validate Rootfs Gzip & Ext4 Superblock
-          rootfs_gz = os.path.join(rel_dir, 'rootfs', 'r8q-rootfs.ext4.gz')
-          with gzip.open(rootfs_gz, 'rb') as f:
-              header = f.read(2048) # superblock is at offset 1024
-              magic = header[1024+0x38:1024+0x3A]
-              assert magic == b'\x53\xef', f'Invalid ext4 magic: {magic}'
-          print('Debian 12 ARM64 rootfs ext4 header validation: PASSED')
-
-          # 4. Validate Full System Tarball
-          full_tar = os.path.join(rel_dir, 'R8Q-Debian12-Full-System.tar.gz')
-          with tarfile.open(full_tar, 'r:gz') as t:
-              members = t.getnames()
-              required = [
-                  'R8Q-Debian12-Full-System/boot/r8q-uefi-boot-complete.img',
-                  'R8Q-Debian12-Full-System/boot/esp.img',
-                  'R8Q-Debian12-Full-System/firmware/R8Q_EFI.fd',
-                  'R8Q-Debian12-Full-System/kernel/Image',
-                  'R8Q-Debian12-Full-System/kernel/sm8250-samsung-r8q.dtb',
-                  'R8Q-Debian12-Full-System/kernel/initramfs.img',
-                  'R8Q-Debian12-Full-System/rootfs/r8q-rootfs.ext4.gz',
-                  'R8Q-Debian12-Full-System/R8Q-Debian12-Recovery.zip',
-                  'R8Q-Debian12-Full-System/README.md',
-                  'R8Q-Debian12-Full-System/INSTALLATION.md'
-              ]
-              for req in required:
-                  assert req in members, f'Missing required full system member: {req}'
-          print('Full System Tarball structure & member validation: PASSED')
-          "
-
-      - name: Verify Release Checksums
-        run: |
-          cd R8Q-DEBIAN12-RELEASE
-          sha256sum \
-            firmware/R8Q_EFI.fd \
-            kernel/Image \
-            kernel/sm8250-samsung-r8q.dtb \
-            kernel/initramfs.img \
-            rootfs/r8q-rootfs.ext4.gz \
-            boot/esp.img \
-            boot/r8q-uefi-boot-complete.img \
-            R8Q-Debian12-Recovery.zip \
-            R8Q-Debian12-Full-System.tar.gz \
-            > SHA256SUMS.ci
+          cd dist-release
+          sha256sum -c SHA256SUMS.dist
           sha256sum -c SHA256SUMS.ci
 
-      - name: Upload Artifact - Full System Package
-        uses: actions/upload-artifact@v4
-        with:
-          name: r8q-full-system
-          path: R8Q-DEBIAN12-RELEASE/R8Q-Debian12-Full-System.tar.gz
-          retention-days: 90
-
-      - name: Upload Artifact - Recovery Installer
-        uses: actions/upload-artifact@v4
-        with:
-          name: r8q-recovery
-          path: |
-            R8Q-DEBIAN12-RELEASE/R8Q-Debian12-Recovery.zip
-            R8Q-DEBIAN12-RELEASE/INSTALLATION-USB.md
-            R8Q-DEBIAN12-RELEASE/INSTALLER-AUDIT.md
-            R8Q-DEBIAN12-RELEASE/SHA256SUMS-RECOVERY-ZIP.txt
-          retention-days: 90
-
-      - name: Upload Artifact - Standalone Components
-        uses: actions/upload-artifact@v4
-        with:
-          name: r8q-release-manifest
-          path: |
-            R8Q-DEBIAN12-RELEASE/SHA256SUMS*
-            R8Q-DEBIAN12-RELEASE/BUILD-MANIFEST.md
-          retention-days: 90
-
-      - name: Publish GitHub Release
-        if: ${{ inputs.publish_release == true || startsWith(github.ref, 'refs/tags/v') }}
+      - name: Publish Authorized GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          if [ "${GITHUB_EVENT_NAME}" != "workflow_dispatch" ]; then
+            echo "ERROR: GitHub Release publication requires manual workflow_dispatch authorization."
+            exit 1
+          fi
           TAG="${{ inputs.release_version }}"
-          [ -z "$TAG" ] && TAG="${GITHUB_REF#refs/tags/}"
-          echo "Publishing GitHub Release for tag: $TAG..."
-          cd R8Q-DEBIAN12-RELEASE
+          if [ -z "$TAG" ]; then
+            echo "ERROR: Explicit release_version tag must be supplied for release publication."
+            exit 1
+          fi
+          cd dist-release
+          if ! gh release view "$TAG" --repo "${{ github.repository }}" >/dev/null 2>&1; then
+            gh release create "$TAG" \
+              --repo "${{ github.repository }}" \
+              --title "Project R8Q Release $TAG" \
+              --notes-file BUILD-INVENTORY.md \
+              --target "${{ github.sha }}"
+          fi
           gh release upload "$TAG" \
+            --repo "${{ github.repository }}" \
             BOOT-ARCHITECTURE.md \
+            BUILD-INVENTORY.json \
+            BUILD-INVENTORY.md \
             BUILD-MANIFEST.md \
             HARDWARE-COMPATIBILITY.md \
             INSTALLATION-USB.md \
             INSTALLATION.md \
             INSTALLER-AUDIT.md \
             PARTITION-LAYOUT.md \
-            R8Q-Debian12-Recovery.zip \
             R8Q-Debian12-Full-System.tar.gz \
+            R8Q-Debian12-Recovery.zip \
             README.md \
             RECOVERY.md \
-            SHA256SUMS* \
+            SHA256SUMS-RECOVERY-ZIP.txt \
+            SHA256SUMS.ci \
+            SHA256SUMS.dist \
             TROUBLESHOOTING.md \
+            boot/esp.img \
+            boot/r8q-uefi-boot-complete.img \
+            efi/BootManager.efi \
+            efi/Setup.efi \
+            efi/Shell.efi \
+            firmware/R8Q_EFI.fd \
+            kernel/Image \
+            kernel/initramfs.img \
+            kernel/r8q.dtb \
+            kernel/sm8250-samsung-r8q.dtb \
+            rootfs/r8q-rootfs.ext4.gz \
+            rootfs/r8q-rootfs.tar.gz \
             --clobber
