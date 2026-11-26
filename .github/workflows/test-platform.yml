@@ -155,5 +155,5 @@ jobs:
       - name: Verify Security & Non-Destructive Invariants
         run: |
           echo "Asserting zero hardcoded sda25 access or unauthorized flashing..."
-          ! grep -rn --exclude-dir=".git" --exclude-dir="docs" --exclude-dir="documentation" --exclude="*.md" --exclude-dir=".github" --exclude="verify_phase8_5.py" "write.*sda25\|dd.*sda25\|fastboot flash.*" .
+          ! grep -rn --exclude-dir=".git" --exclude-dir="__pycache__" --exclude-dir="docs" --exclude-dir="documentation" --exclude="*.md" --exclude-dir=".github" --exclude="verify_phase8_5.py" "write.*sda25\|dd.*sda25\|fastboot flash.*" .
           echo "Security assertions PASSED: zero block devices accessed, keystore isolated."

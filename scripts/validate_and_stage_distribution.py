@@ -256,8 +256,8 @@ def validate_compound_boot_img(
     ramdisk_size = unpacked[3]
     page_size = unpacked[8]
     header_version = unpacked[9]
-    header_size = unpacked[18]
-    dtb_size = unpacked[19]
+    header_size = unpacked[17]
+    dtb_size = unpacked[18]
 
     if magic != b"ANDROID!":
         raise AssertionError(f"Compound boot image missing ANDROID! magic: {magic!r}")
@@ -344,11 +344,11 @@ def validate_recovery_zip(rec_zip_path: str, boot_img_sha: str, boot_img_size: i
 
 
 def validate_full_system_tarball(
-    tar_path: str, expected_member_hashes: dict[str, str], staged_dtb_output: str
-) -> None:
-    """Stream full-system tarball, check required docs & hashes, and extract canonical DTB."""
+    tar_path: str, expected_member_hashes: dict[str, str], staged_dtb_output: str | None = None
+) -> bytes:
+    """Stream full-system tarball, check required docs & hashes, and return canonical DTB bytes."""
     found_members: set[str] = set()
-    extracted_dtb = False
+    extracted_dtb: bytes | None = None
 
     with tarfile.open(tar_path, "r:gz") as tar:
         for member in tar:
@@ -372,9 +372,10 @@ def validate_full_system_tarball(
                         f"Tarball member {norm} SHA-256 ({digest}) != current CI artifact ({expected_member_hashes[norm]})"
                     )
                 if dtb_chunks is not None:
-                    with open(staged_dtb_output, "wb") as out_f:
-                        out_f.write(b"".join(dtb_chunks))
-                    extracted_dtb = True
+                    extracted_dtb = b"".join(dtb_chunks)
+                    if staged_dtb_output is not None:
+                        with open(staged_dtb_output, "wb") as out_f:
+                            out_f.write(extracted_dtb)
             elif norm.startswith("R8Q-Debian12-Full-System/") and member.size == 0:
                 raise AssertionError(f"Zero-byte member in Full System tarball: {norm}")
 
@@ -393,8 +394,9 @@ def validate_full_system_tarball(
     for req in list(expected_member_hashes.keys()) + required_docs:
         if req not in found_members:
             raise AssertionError(f"Full System tarball missing required member: {req}")
-    if not extracted_dtb:
+    if extracted_dtb is None:
         raise AssertionError("Failed to extract canonical DTB from Full System tarball")
+    return extracted_dtb
 
 
 def write_inventory_reports(
@@ -457,7 +459,8 @@ def write_inventory_reports(
         f.write("\n".join(lines))
 
 
-def run_validation_and_staging(repo_root: str, artifacts_dir: str, dist_dir: str, release_version: str) -> None:
+def validate_upstream_artifacts(artifacts_dir: str) -> dict:
+    """Validate all 10 mandatory CI artifacts, digests, and cross-artifact provenance."""
     checks: list[str] = []
 
     # 1. Verify all 10 mandatory artifact directories exist and contain zero 0-byte files
@@ -656,13 +659,6 @@ def run_validation_and_staging(repo_root: str, artifacts_dir: str, dist_dir: str
                 f"SHA256SUMS.ci entry mismatch for {key}: expected {exp_digest}, got {ci_sums.get(key)}"
             )
 
-    # Prepare clean distribution directory and validate Full System tarball members
-    if os.path.exists(dist_dir):
-        shutil.rmtree(dist_dir)
-    for sub in ["boot", "efi", "firmware", "kernel", "rootfs"]:
-        os.makedirs(os.path.join(dist_dir, sub), exist_ok=True)
-
-    canonical_dtb_staged = os.path.join(dist_dir, "kernel", "sm8250-samsung-r8q.dtb")
     tar_member_expectations = {
         "R8Q-Debian12-Full-System/firmware/R8Q_EFI.fd": fd_sha,
         "R8Q-Debian12-Full-System/kernel/Image": kernel_sha,
@@ -673,10 +669,51 @@ def run_validation_and_staging(repo_root: str, artifacts_dir: str, dist_dir: str
         "R8Q-Debian12-Full-System/boot/r8q-uefi-boot-complete.img": boot_img_sha,
         "R8Q-Debian12-Full-System/R8Q-Debian12-Recovery.zip": rec_zip_sha,
     }
-    validate_full_system_tarball(full_tar_path, tar_member_expectations, canonical_dtb_staged)
+    canonical_dtb_bytes = validate_full_system_tarball(full_tar_path, tar_member_expectations)
     checks.append("Full System tarball & SHA256SUMS.ci verified bit-for-bit against all current-run payloads")
 
-    # 12. Populate Complete Consolidated Distribution Directory
+    return {
+        "checks": checks,
+        "efi_hashes": efi_hashes,
+        "paths": {
+            "fd": fd_path,
+            "fd_sha_sidecar": os.path.join(artifacts_dir, "r8q-uefi-firmware-volume", "R8Q_EFI.fd.sha256"),
+            "efi_dir": efi_dir,
+            "image": image_path,
+            "mainline_dtb": mainline_dtb_path,
+            "live_dtb": live_dtb_path,
+            "initrd": initrd_path,
+            "rootfs_ext4_gz": rootfs_ext4_gz,
+            "rootfs_tar_gz": rootfs_tar_gz,
+            "esp": esp_path,
+            "boot_img": boot_img_path,
+            "rec_zip": rec_zip_path,
+            "full_tar": full_tar_path,
+            "ci_manifest": ci_manifest_path,
+        },
+        "hashes": {
+            "boot_img": boot_img_sha,
+            "dtb_canonical": embedded_dtb_sha,
+        },
+        "canonical_dtb_bytes": canonical_dtb_bytes,
+    }
+
+
+def run_validation_and_staging(repo_root: str, artifacts_dir: str, dist_dir: str, release_version: str) -> None:
+    ctx = validate_upstream_artifacts(artifacts_dir)
+    checks = ctx["checks"]
+    p = ctx["paths"]
+    boot_img_sha = ctx["hashes"]["boot_img"]
+
+    # Prepare clean distribution directory and stage canonical payloads
+    if os.path.exists(dist_dir):
+        shutil.rmtree(dist_dir)
+    for sub in ["boot", "efi", "firmware", "kernel", "rootfs"]:
+        os.makedirs(os.path.join(dist_dir, sub), exist_ok=True)
+
+    with open(os.path.join(dist_dir, "kernel", "sm8250-samsung-r8q.dtb"), "wb") as out_dtb:
+        out_dtb.write(ctx["canonical_dtb_bytes"])
+
     rel_src_docs = os.path.join(repo_root, "R8Q-DEBIAN12-RELEASE")
     for doc_name in REQUIRED_DOCS:
         src_doc = os.path.join(rel_src_docs, doc_name)
@@ -684,24 +721,21 @@ def run_validation_and_staging(repo_root: str, artifacts_dir: str, dist_dir: str
             raise FileNotFoundError(f"Missing or empty release documentation file: {src_doc}")
         shutil.copy2(src_doc, os.path.join(dist_dir, doc_name))
 
-    shutil.copy2(fd_path, os.path.join(dist_dir, "firmware", "R8Q_EFI.fd"))
-    shutil.copy2(
-        os.path.join(artifacts_dir, "r8q-uefi-firmware-volume", "R8Q_EFI.fd.sha256"),
-        os.path.join(dist_dir, "firmware", "R8Q_EFI.fd.sha256"),
-    )
+    shutil.copy2(p["fd"], os.path.join(dist_dir, "firmware", "R8Q_EFI.fd"))
+    shutil.copy2(p["fd_sha_sidecar"], os.path.join(dist_dir, "firmware", "R8Q_EFI.fd.sha256"))
     for app in REQUIRED_EFI_APPS:
-        shutil.copy2(os.path.join(efi_dir, f"{app}.efi"), os.path.join(dist_dir, "efi", f"{app}.efi"))
-    shutil.copy2(os.path.join(efi_dir, "SHA256SUMS.txt"), os.path.join(dist_dir, "efi", "SHA256SUMS.txt"))
-    shutil.copy2(image_path, os.path.join(dist_dir, "kernel", "Image"))
-    shutil.copy2(live_dtb_path, os.path.join(dist_dir, "kernel", "r8q.dtb"))
-    shutil.copy2(initrd_path, os.path.join(dist_dir, "kernel", "initramfs.img"))
-    shutil.copy2(rootfs_ext4_gz, os.path.join(dist_dir, "rootfs", "r8q-rootfs.ext4.gz"))
-    shutil.copy2(rootfs_tar_gz, os.path.join(dist_dir, "rootfs", "r8q-rootfs.tar.gz"))
-    shutil.copy2(esp_path, os.path.join(dist_dir, "boot", "esp.img"))
-    shutil.copy2(boot_img_path, os.path.join(dist_dir, "boot", "r8q-uefi-boot-complete.img"))
-    shutil.copy2(rec_zip_path, os.path.join(dist_dir, "R8Q-Debian12-Recovery.zip"))
-    shutil.copy2(full_tar_path, os.path.join(dist_dir, "R8Q-Debian12-Full-System.tar.gz"))
-    shutil.copy2(ci_manifest_path, os.path.join(dist_dir, "SHA256SUMS.ci"))
+        shutil.copy2(os.path.join(p["efi_dir"], f"{app}.efi"), os.path.join(dist_dir, "efi", f"{app}.efi"))
+    shutil.copy2(os.path.join(p["efi_dir"], "SHA256SUMS.txt"), os.path.join(dist_dir, "efi", "SHA256SUMS.txt"))
+    shutil.copy2(p["image"], os.path.join(dist_dir, "kernel", "Image"))
+    shutil.copy2(p["live_dtb"], os.path.join(dist_dir, "kernel", "r8q.dtb"))
+    shutil.copy2(p["initrd"], os.path.join(dist_dir, "kernel", "initramfs.img"))
+    shutil.copy2(p["rootfs_ext4_gz"], os.path.join(dist_dir, "rootfs", "r8q-rootfs.ext4.gz"))
+    shutil.copy2(p["rootfs_tar_gz"], os.path.join(dist_dir, "rootfs", "r8q-rootfs.tar.gz"))
+    shutil.copy2(p["esp"], os.path.join(dist_dir, "boot", "esp.img"))
+    shutil.copy2(p["boot_img"], os.path.join(dist_dir, "boot", "r8q-uefi-boot-complete.img"))
+    shutil.copy2(p["rec_zip"], os.path.join(dist_dir, "R8Q-Debian12-Recovery.zip"))
+    shutil.copy2(p["full_tar"], os.path.join(dist_dir, "R8Q-Debian12-Full-System.tar.gz"))
+    shutil.copy2(p["ci_manifest"], os.path.join(dist_dir, "SHA256SUMS.ci"))
 
     rec_manifest_lines = [
         f"{sha256_file(os.path.join(dist_dir, 'R8Q-Debian12-Recovery.zip'))}  R8Q-Debian12-Recovery.zip",

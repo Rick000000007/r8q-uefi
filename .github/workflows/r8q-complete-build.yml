@@ -54,7 +54,7 @@ jobs:
           echo "   PROJECT R8Q: PRE-BUILD REPOSITORY SAFETY AUDIT"
           echo "=========================================================="
           # Verify zero unauthorized block device access or destructive physical commands
-          if grep -rn --exclude-dir=".git" --exclude-dir="docs" --exclude-dir="documentation" --exclude="*.md" --exclude-dir=".github" --exclude="verify_phase8_5.py" \
+          if grep -rn --exclude-dir=".git" --exclude-dir="__pycache__" --exclude-dir="docs" --exclude-dir="documentation" --exclude="*.md" --exclude-dir=".github" --exclude="verify_phase8_5.py" \
              "dd.*sda25\|write.*sda25\|format.*sda25\|fastboot flash.*" . ; then
             echo "CRITICAL FAILURE: Unauthorized physical flashing command detected!"
             exit 1
@@ -140,5 +140,25 @@ jobs:
     with:
       release_version: ${{ inputs.release_version || 'v1.0.0-terminal' }}
       publish_release: ${{ github.event_name == 'workflow_dispatch' && inputs.publish_release == true }}
+      use_workflow_artifacts: true
+    secrets: inherit
+
+  build-unified-installer:
+    name: Unified Installer - One-Click Installer ZIP
+    needs:
+      - safety-pre-audit
+      - build-firmware
+      - build-boot-manager
+      - build-kernel
+      - build-initramfs
+      - build-debian-rootfs
+      - build-esp
+      - build-complete-platform
+      - build-recovery
+      - test-platform
+      - distribution-validation-staging
+    uses: ./.github/workflows/build-unified-installer.yml
+    with:
+      release_version: ${{ inputs.release_version || 'v1.0.0-terminal' }}
       use_workflow_artifacts: true
     secrets: inherit

@@ -1,0 +1,192 @@
+name: Build Unified One-Click Installer Package
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_run_id:
+        description: 'Optional Master CI run ID for artifact packaging (auto-resolves latest successful run if empty)'
+        required: false
+        type: string
+        default: ''
+      release_version:
+        description: 'Installer Package Version'
+        required: false
+        type: string
+        default: 'v1.0.0-terminal'
+  workflow_call:
+    inputs:
+      release_version:
+        type: string
+        default: 'v1.0.0-terminal'
+      use_workflow_artifacts:
+        type: boolean
+        default: true
+
+concurrency:
+  group: r8q-unified-installer-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  build-unified-installer:
+    name: Assemble, Test & Upload R8Q-Debian12-ARM64-Installer.zip
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Packaging & Verification Tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y mtools device-tree-compiler unzip
+
+      - name: Download Artifact - UEFI Firmware Volume
+        if: ${{ inputs.use_workflow_artifacts == true }}
+        uses: actions/download-artifact@v4
+        with:
+          name: r8q-uefi-firmware-volume
+          path: .ci-artifacts/r8q-uefi-firmware-volume
+
+      - name: Download Artifact - Boot Manager & Setup Utility
+        if: ${{ inputs.use_workflow_artifacts == true }}
+        uses: actions/download-artifact@v4
+        with:
+          name: r8q-boot-manager-and-setup
+          path: .ci-artifacts/r8q-boot-manager-and-setup
+
+      - name: Download Artifact - Linux Kernel & Device Tree
+        if: ${{ inputs.use_workflow_artifacts == true }}
+        uses: actions/download-artifact@v4
+        with:
+          name: r8q-kernel-and-dtb
+          path: .ci-artifacts/r8q-kernel-and-dtb
+
+      - name: Download Artifact - Initramfs
+        if: ${{ inputs.use_workflow_artifacts == true }}
+        uses: actions/download-artifact@v4
+        with:
+          name: r8q-initramfs
+          path: .ci-artifacts/r8q-initramfs
+
+      - name: Download Artifact - Debian 12 Rootfs
+        if: ${{ inputs.use_workflow_artifacts == true }}
+        uses: actions/download-artifact@v4
+        with:
+          name: r8q-debian12-rootfs
+          path: .ci-artifacts/r8q-debian12-rootfs
+
+      - name: Download Artifact - Debian 12 Rootfs Metadata
+        if: ${{ inputs.use_workflow_artifacts == true }}
+        uses: actions/download-artifact@v4
+        with:
+          name: r8q-debian12-rootfs-meta
+          path: .ci-artifacts/r8q-debian12-rootfs-meta
+
+      - name: Download Artifact - FAT32 ESP Disk Image
+        if: ${{ inputs.use_workflow_artifacts == true }}
+        uses: actions/download-artifact@v4
+        with:
+          name: r8q-esp
+          path: .ci-artifacts/r8q-esp
+
+      - name: Download Artifact - Compound Boot Image
+        if: ${{ inputs.use_workflow_artifacts == true }}
+        uses: actions/download-artifact@v4
+        with:
+          name: r8q-complete-boot-img
+          path: .ci-artifacts/r8q-complete-boot-img
+
+      - name: Download Artifact - Full System Distribution
+        if: ${{ inputs.use_workflow_artifacts == true }}
+        uses: actions/download-artifact@v4
+        with:
+          name: r8q-full-system-distribution
+          path: .ci-artifacts/r8q-full-system-distribution
+
+      - name: Download Artifact - Recovery Installer ZIP
+        if: ${{ inputs.use_workflow_artifacts == true }}
+        uses: actions/download-artifact@v4
+        with:
+          name: r8q-recovery-installer-zip
+          path: .ci-artifacts/r8q-recovery-installer-zip
+
+      - name: Resolve Verified Master CI Run (Standalone Dispatch)
+        if: ${{ inputs.use_workflow_artifacts != true }}
+        id: resolve-source
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          RUN_ID="${{ inputs.source_run_id }}"
+          if [ -z "$RUN_ID" ]; then
+            RUN_ID=$(gh run list \
+              --repo "${{ github.repository }}" \
+              --workflow "r8q-complete-build.yml" \
+              --commit "${{ github.sha }}" \
+              --status success \
+              --json databaseId,conclusion \
+              --jq '[.[] | select(.conclusion == "success")] | .[0].databaseId // empty')
+          fi
+          if [ -z "$RUN_ID" ]; then
+            echo "ERROR: No successful Master CI run found for commit ${{ github.sha }}."
+            exit 1
+          fi
+          echo "run_id=$RUN_ID" >> "$GITHUB_OUTPUT"
+
+      - name: Download Artifacts From Verified Master CI Run (Standalone Dispatch)
+        if: ${{ inputs.use_workflow_artifacts != true }}
+        uses: actions/download-artifact@v4
+        with:
+          run-id: ${{ steps.resolve-source.outputs.run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: .ci-artifacts
+
+      - name: Assemble & Package R8Q-Debian12-ARM64-Installer.zip
+        run: |
+          chmod +x scripts/build_unified_installer.py
+          python3 scripts/build_unified_installer.py \
+            --artifacts-dir .ci-artifacts \
+            --stage-dir dist-installer/stage \
+            --output dist-installer/R8Q-Debian12-ARM64-Installer.zip \
+            --version "${{ inputs.release_version || 'v1.0.0-terminal' }}"
+          rm -rf dist-installer/stage .ci-artifacts
+          ls -lh dist-installer/R8Q-Debian12-ARM64-Installer.zip
+          cat dist-installer/R8Q-Debian12-ARM64-Installer.zip.sha256
+
+      - name: Test Archive Extraction, Checksums, Verification & Dry-Run Execution
+        run: |
+          EXTRACT_TMP="/tmp/r8q_unified_extract"
+          rm -rf "$EXTRACT_TMP"
+          mkdir -p "$EXTRACT_TMP"
+          unzip -q dist-installer/R8Q-Debian12-ARM64-Installer.zip -d "$EXTRACT_TMP"
+          PKG_DIR="$EXTRACT_TMP/R8Q-Debian12-ARM64-Installer"
+
+          (
+            cd "$PKG_DIR"
+            sha256sum -c manifests/SHA256SUMS >/dev/null
+            ./install.sh --help >/dev/null
+            ./verify-checksums.sh
+            ./verify-device.sh --target-profile r8q
+            ./install.sh --verify --target-profile r8q
+            ./install.sh --dry-run
+          )
+
+          R8Q_UNIFIED_INSTALLER_ZIP="$PWD/dist-installer/R8Q-Debian12-ARM64-Installer.zip" \
+            python3 -m unittest tests/test_unified_installer.py -v
+          rm -rf "$EXTRACT_TMP"
+
+      - name: Upload Artifact - R8Q-Debian12-ARM64-Installer.zip
+        uses: actions/upload-artifact@v4
+        with:
+          name: R8Q-Debian12-ARM64-Installer.zip
+          path: dist-installer/R8Q-Debian12-ARM64-Installer.zip
+          retention-days: 30
+          if-no-files-found: error

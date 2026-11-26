@@ -65,7 +65,7 @@ jobs:
           echo "=========================================================="
           echo "   PROJECT R8Q: RELEASE SAFETY GATE & KEYSTORE AUDIT      "
           echo "=========================================================="
-          if grep -rn --exclude-dir=".git" --exclude-dir="docs" --exclude-dir="documentation" --exclude="*.md" --exclude-dir=".github" --exclude="verify_phase8_5.py" \
+          if grep -rn --exclude-dir=".git" --exclude-dir="__pycache__" --exclude-dir="docs" --exclude-dir="documentation" --exclude="*.md" --exclude-dir=".github" --exclude="verify_phase8_5.py" \
              "dd.*sda25\|write.*sda25\|format.*sda25\|fastboot flash.*" . ; then
             echo "CRITICAL FAILURE: Unauthorized physical flashing command detected!"
             exit 1
