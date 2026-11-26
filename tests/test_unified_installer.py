@@ -130,18 +130,6 @@ def _create_mock_payload_sources(base_dir: str) -> dict:
         with open(os.path.join(efi_dir, f"{app}.efi"), "wb") as f:
             f.write(pe_stub)
 
-    # Real or synthetic ESP
-    local_esp = os.path.join(PROJECT_ROOT, "build", "esp.img")
-    esp_path = os.path.join(src_dir, "esp.img")
-    if os.path.isfile(local_esp) and os.path.getsize(local_esp) == 268435456:
-        shutil.copy2(local_esp, esp_path)
-    else:
-        with open(esp_path, "wb") as f:
-            f.seek(268435456 - 1)
-            f.write(b"\x00")
-            f.seek(510)
-            f.write(b"\x55\xaa" + b"EFI PART")
-
     # Kernel ARM64 EFI Stub header
     img_path = os.path.join(src_dir, "Image")
     img_hdr = bytearray(4096)
@@ -171,6 +159,44 @@ def _create_mock_payload_sources(base_dir: str) -> dict:
     initrd_path = os.path.join(src_dir, "initramfs.img")
     with gzip.open(initrd_path, "wb") as gz:
         gz.write(cpio_raw)
+
+    # Real (if complete with BootManager/Setup) or synthetic GPT+FAT32 ESP
+    local_esp = os.path.join(PROJECT_ROOT, "build", "esp.img")
+    esp_path = os.path.join(src_dir, "esp.img")
+    reuse_local_esp = False
+    if os.path.isfile(local_esp) and os.path.getsize(local_esp) == 268435456 and shutil.which("mdir"):
+        chk = subprocess.run(
+            ["mdir", "-b", "-i", f"{local_esp}@@1M", "::", "::/EFI/BOOT", "::/EFI/R8Q"],
+            capture_output=True,
+            text=True,
+        )
+        entries_lower = {line.strip().lower() for line in chk.stdout.splitlines() if line.strip()}
+        if chk.returncode == 0 and "::/efi/r8q/bootmanager.efi" in entries_lower and "::/efi/r8q/r8q.dtb" in entries_lower:
+            reuse_local_esp = True
+
+    if reuse_local_esp:
+        shutil.copy2(local_esp, esp_path)
+    else:
+        with open(esp_path, "wb") as f:
+            f.seek(268435456 - 1)
+            f.write(b"\x00")
+        subprocess.run(["parted", "-s", esp_path, "mklabel", "gpt", "mkpart", "ESP", "fat32", "1MiB", "100%", "set", "1", "esp", "on"], check=True)
+        subprocess.run(["mkfs.vfat", "--offset=2048", "-F", "32", "-n", "R8Q_BOOT", esp_path], check=True)
+        part = f"{esp_path}@@1M"
+        subprocess.run(["mmd", "-i", part, "::EFI", "::EFI/BOOT", "::EFI/R8Q"], check=True)
+        startup_tmp = os.path.join(src_dir, "startup.nsh")
+        with open(startup_tmp, "w", encoding="utf-8") as sf:
+            sf.write("@echo -off\nfs0:\\EFI\\R8Q\\LinuxBoot.efi\n")
+        for src_p, dst_p in [
+            (os.path.join(efi_dir, "BootManager.efi"), "::EFI/BOOT/BOOTAA64.EFI"),
+            (os.path.join(efi_dir, "BootManager.efi"), "::EFI/R8Q/BootManager.efi"),
+            (os.path.join(efi_dir, "Setup.efi"), "::EFI/R8Q/Setup.efi"),
+            (img_path, "::EFI/R8Q/Image"),
+            (initrd_path, "::EFI/R8Q/initramfs.img"),
+            (live_dtb_path, "::EFI/R8Q/r8q.dtb"),
+            (startup_tmp, "::startup.nsh"),
+        ]:
+            subprocess.run(["mcopy", "-o", "-i", part, src_p, dst_p], check=True)
 
     # Debian 12 Rootfs ext4.gz + tar.gz padded >30 MiB to mirror validation check
     ext4_gz = os.path.join(src_dir, "r8q-rootfs.ext4.gz")
